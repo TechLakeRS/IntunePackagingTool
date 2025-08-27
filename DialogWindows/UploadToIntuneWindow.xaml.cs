@@ -221,5 +221,10 @@ namespace IntunePackagingTool
             _intuneService?.Dispose();
             _uploadService?.Dispose();
         }
+
+        private void InstallCommandTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+
+        }
     }
 }

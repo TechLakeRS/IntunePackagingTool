@@ -90,10 +90,10 @@
                             </ComboBox>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Install Command:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
-                            <TextBox Grid.Row="1" Grid.Column="1" Name="InstallCommandTextBox" Style="{StaticResource ModernTextBox}" Text="Deploy-Application.exe -DeploymentType &quot;Install&quot; -DeployMode &quot;Silent&quot;"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Name="InstallCommandTextBox" Style="{StaticResource ModernTextBox}" Text="Deploy-Application.exe -DeploymentType &quot;Install&quot;"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Uninstall Command:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
-                            <TextBox Grid.Row="2" Grid.Column="1" Name="UninstallCommandTextBox" Style="{StaticResource ModernTextBox}" Text="Deploy-Application.exe -DeploymentType &quot;Uninstall&quot; -DeployMode &quot;Silent&quot;"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Name="UninstallCommandTextBox" Style="{StaticResource ModernTextBox}" Text="Deploy-Application.exe -DeploymentType &quot;Uninstall&quot;"/>
 
                             <TextBlock Grid.Row="3" Grid.Column="0" Text="Description:" VerticalAlignment="Top" Margin="0,12,0,0" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
                             <TextBox Grid.Row="3" Grid.Column="1" Name="DescriptionTextBox" Style="{StaticResource ModernTextBox}" Height="80" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Text="Application packaged with NBB PSADT Tools"/>

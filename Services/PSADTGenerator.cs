@@ -2,15 +2,52 @@ using System.IO;
 using System.Threading.Tasks;
 using System;
 using System.Linq;
+using System.Text;
 
 namespace IntunePackagingTool
 {
+    public class PSADTOptions
+    {
+        // Installation Options
+        public bool SilentInstall { get; set; }
+        public bool SuppressRestart { get; set; }
+        public bool AllUsersInstall { get; set; }
+        public bool VerboseLogging { get; set; }
+
+        // User Interaction
+        public bool CloseRunningApps { get; set; }
+        public bool AllowUserDeferrals { get; set; }
+        public bool CheckDiskSpace { get; set; }
+        public bool ShowProgress { get; set; }
+
+        // Prerequisites
+        public bool CheckDotNet { get; set; }
+        public bool ImportCertificates { get; set; }
+        public bool CheckVCRedist { get; set; }
+        public bool RegisterDLLs { get; set; }
+
+        // File & Registry Operations
+        public bool CopyToAllUsers { get; set; }
+        public bool SetHKCUAllUsers { get; set; }
+        public bool SetCustomRegistry { get; set; }
+        public bool CopyConfigFiles { get; set; }
+
+        // Shortcuts & Cleanup
+        public bool DesktopShortcut { get; set; }
+        public bool StartMenuEntry { get; set; }
+        public bool RemovePreviousVersions { get; set; }
+        public bool CreateInstallMarker { get; set; }
+
+        // Package Info
+        public string PackageType { get; set; } // "MSI" or "EXE"
+    }
+
     public class PSADTGenerator
     {
         private readonly string _baseOutputPath = @"\\nbb.local\sys\SCCMData\IntuneApplications";
         private readonly string _templatePath = @"\\nbb.local\sys\SCCMData\TOOLS\IntunePackagingTool\20250811\Application";
 
-        public async Task<string> CreatePackageAsync(ApplicationInfo appInfo)
+        public async Task<string> CreatePackageAsync(ApplicationInfo appInfo, PSADTOptions psadtOptions = null)
         {
             try
             {
@@ -58,7 +95,7 @@ namespace IntunePackagingTool
                 {
                     // Check if it's multiple files (semicolon separated), single file, or directory
                     bool hasValidSource = false;
-                    
+
                     if (appInfo.SourcesPath.Contains(";"))
                     {
                         // Multiple files - check if at least one exists
@@ -70,7 +107,7 @@ namespace IntunePackagingTool
                         // Single file or directory
                         hasValidSource = File.Exists(appInfo.SourcesPath) || Directory.Exists(appInfo.SourcesPath);
                     }
-                    
+
                     if (hasValidSource)
                     {
                         await CopySourceFilesToApplicationAsync(appInfo.SourcesPath, packagePath);
@@ -81,8 +118,8 @@ namespace IntunePackagingTool
                     }
                 }
 
-                // Modify the Deploy-Application.ps1 in the Application folder with metadata
-                await ModifyPSADTScriptAsync(packagePath, appInfo);
+                // Modify the Deploy-Application.ps1 in the Application folder with metadata AND cheatsheet functions
+                await ModifyPSADTScriptAsync(packagePath, appInfo, psadtOptions);
 
                 return packagePath;
             }
@@ -97,7 +134,7 @@ namespace IntunePackagingTool
             try
             {
                 var destinationAppFolder = Path.Combine(packagePath, "Application");
-                
+
                 if (!Directory.Exists(_templatePath))
                 {
                     throw new DirectoryNotFoundException($"Template path not found: {_templatePath}");
@@ -122,7 +159,7 @@ namespace IntunePackagingTool
             try
             {
                 var applicationFilesPath = Path.Combine(packagePath, "Application", "Files");
-                
+
                 // Create Application\Files folder if it doesn't exist
                 Directory.CreateDirectory(applicationFilesPath);
 
@@ -133,7 +170,7 @@ namespace IntunePackagingTool
                     {
                         // Handle multiple files
                         var filePaths = sourcePath.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                        
+
                         foreach (var filePath in filePaths)
                         {
                             var trimmedPath = filePath.Trim();
@@ -161,7 +198,7 @@ namespace IntunePackagingTool
                         {
                             var relativePath = Path.GetRelativePath(sourcePath, file);
                             var destinationFile = Path.Combine(applicationFilesPath, relativePath);
-                            
+
                             var destinationDir = Path.GetDirectoryName(destinationFile);
                             if (!string.IsNullOrEmpty(destinationDir))
                             {
@@ -217,12 +254,12 @@ namespace IntunePackagingTool
             }
         }
 
-        private async Task ModifyPSADTScriptAsync(string packagePath, ApplicationInfo appInfo)
+        private async Task ModifyPSADTScriptAsync(string packagePath, ApplicationInfo appInfo, PSADTOptions psadtOptions)
         {
             try
             {
                 var scriptPath = Path.Combine(packagePath, "Application", "Deploy-Application.ps1");
-                
+
                 if (!File.Exists(scriptPath))
                 {
                     throw new FileNotFoundException($"Deploy-Application.ps1 not found in copied template: {scriptPath}");
@@ -234,10 +271,16 @@ namespace IntunePackagingTool
                 // Update the metadata variables in the script
                 scriptContent = UpdateScriptMetadata(scriptContent, appInfo);
 
+                // If PSADT options are provided, inject cheatsheet functions
+                if (psadtOptions != null)
+                {
+                    scriptContent = InjectPSADTCheatsheetFunctions(scriptContent, appInfo, psadtOptions);
+                }
+
                 // Write the modified script back
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
-                
-                Console.WriteLine($"Modified Deploy-Application.ps1 with metadata: {scriptPath}");
+
+                Console.WriteLine($"Modified Deploy-Application.ps1 with metadata and cheatsheet functions: {scriptPath}");
             }
             catch (Exception ex)
             {
@@ -249,11 +292,11 @@ namespace IntunePackagingTool
         {
             // Update the variable declarations section with user's metadata
             var lines = scriptContent.Split('\n').ToList();
-            
+
             for (int i = 0; i < lines.Count; i++)
             {
                 var line = lines[i].Trim();
-                
+
                 // Update specific variables (handle both [string] and [String], with or without values)
                 if (line.Contains("$appVendor") && (line.StartsWith("[string]") || line.StartsWith("[String]")))
                 {
@@ -292,8 +335,276 @@ namespace IntunePackagingTool
                     break; // Exit loop to avoid infinite insertion
                 }
             }
-            
+
             return string.Join('\n', lines);
+        }
+
+        private string InjectPSADTCheatsheetFunctions(string scriptContent, ApplicationInfo appInfo, PSADTOptions options)
+        {
+            var lines = scriptContent.Split('\n').ToList();
+
+            // Find insertion points for different sections
+            int preInstallIndex = FindSectionIndex(lines, "Pre-Installation");
+            int installIndex = FindSectionIndex(lines, "Installation");
+            int postInstallIndex = FindSectionIndex(lines, "Post-Installation");
+            int uninstallIndex = FindSectionIndex(lines, "Uninstallation");
+
+            // Insert PRE-INSTALLATION functions
+            if (preInstallIndex > 0)
+            {
+                var preInstallCode = GeneratePreInstallationCode(options);
+                if (!string.IsNullOrWhiteSpace(preInstallCode))
+                {
+                    InsertCodeBlock(lines, preInstallIndex, preInstallCode);
+                    // Update indices since we inserted lines
+                    var insertedLines = preInstallCode.Split('\n').Length;
+                    installIndex += insertedLines;
+                    postInstallIndex += insertedLines;
+                    uninstallIndex += insertedLines;
+                }
+            }
+
+            // Insert INSTALLATION functions
+            if (installIndex > 0)
+            {
+                var installCode = GenerateInstallationCode(appInfo, options);
+                if (!string.IsNullOrWhiteSpace(installCode))
+                {
+                    InsertCodeBlock(lines, installIndex, installCode);
+                    var insertedLines = installCode.Split('\n').Length;
+                    postInstallIndex += insertedLines;
+                    uninstallIndex += insertedLines;
+                }
+            }
+
+            // Insert POST-INSTALLATION functions
+            if (postInstallIndex > 0)
+            {
+                var postInstallCode = GeneratePostInstallationCode(appInfo, options);
+                if (!string.IsNullOrWhiteSpace(postInstallCode))
+                {
+                    InsertCodeBlock(lines, postInstallIndex, postInstallCode);
+                    var insertedLines = postInstallCode.Split('\n').Length;
+                    uninstallIndex += insertedLines;
+                }
+            }
+
+            // Insert UNINSTALLATION functions
+            if (uninstallIndex > 0)
+            {
+                var uninstallCode = GenerateUninstallationCode(appInfo, options);
+                if (!string.IsNullOrWhiteSpace(uninstallCode))
+                {
+                    InsertCodeBlock(lines, uninstallIndex, uninstallCode);
+                }
+            }
+
+            return string.Join('\n', lines);
+        }
+
+        private int FindSectionIndex(List<string> lines, string sectionName)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                // Look for the placeholder comment, then insert AFTER it
+                if (lines[i].Contains($"<Perform {sectionName} tasks here>"))
+                {
+                    return i + 1; // Insert AFTER this line
+                }
+            }
+            return -1;
+        }
+
+        private void InsertCodeBlock(List<string> lines, int index, string codeBlock)
+        {
+            var codeLines = codeBlock.Split('\n');
+            for (int i = 0; i < codeLines.Length; i++)
+            {
+                lines.Insert(index + i, codeLines[i]);
+            }
+        }
+
+        private string GeneratePreInstallationCode(PSADTOptions options)
+        {
+            var sb = new StringBuilder();
+
+            // User Interaction
+            if (options.CloseRunningApps || options.AllowUserDeferrals || options.CheckDiskSpace)
+            {
+                var welcomeParams = new List<string>();
+
+                if (options.CloseRunningApps)
+                    welcomeParams.Add("-CloseApps 'notepad,excel,winword'");
+
+                if (options.AllowUserDeferrals)
+                {
+                    welcomeParams.Add("-AllowDefer");
+                    welcomeParams.Add("-DeferTimes 3");
+                }
+
+                if (options.CheckDiskSpace)
+                {
+                    welcomeParams.Add("-CheckDiskSpace");
+                    welcomeParams.Add("-RequiredDiskSpace 500");
+                }
+
+                sb.AppendLine($"\t\t# Show welcome dialog with user interaction options");
+                sb.AppendLine($"\t\tShow-InstallationWelcome {string.Join(" ", welcomeParams)}");
+                sb.AppendLine();
+            }
+
+            // Prerequisites
+            if (options.CheckDotNet)
+            {
+                sb.AppendLine("\t\t# Check .NET Framework version (from cheatsheet)");
+                sb.AppendLine("\t\t$version_we_require = [version]\"4.5.2\"");
+                sb.AppendLine("\t\tif((Get-RegistryKey \"HKLM:\\SOFTWARE\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full\" -Value Version) -lt $version_we_require) {");
+                sb.AppendLine("\t\t\tWrite-Log \"Installing .NET Framework 4.5.2...\"");
+                sb.AppendLine("\t\t\tExecute-Process -Path \"$dirFiles\\NDP452-KB2901907-x86-x64-AllOS-ENU.exe\" -Parameters \"/q /norestart\"");
+                sb.AppendLine("\t\t}");
+                sb.AppendLine();
+            }
+
+            if (options.ImportCertificates)
+            {
+                sb.AppendLine("\t\t# Import certificates to Trusted Publishers store (from cheatsheet)");
+                sb.AppendLine("\t\tExecute-Process -Path \"certutil.exe\" -Parameters \"-f -addstore -enterprise TrustedPublisher `\"$dirFiles\\cert.cer`\"\"");
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
+        }
+
+        private string GenerateInstallationCode(ApplicationInfo appInfo, PSADTOptions options)
+        {
+            var sb = new StringBuilder();
+
+            if (options.ShowProgress)
+            {
+                sb.AppendLine("\t\t# Show installation progress");
+                sb.AppendLine($"\t\tShow-InstallationProgress -StatusMessage 'Installing {appInfo.Name}...'");
+                sb.AppendLine();
+            }
+
+            // Main installation based on package type
+            if (options.PackageType == "MSI")
+            {
+                var msiParams = new List<string>();
+
+                if (options.SilentInstall) msiParams.Add("/quiet");
+                if (options.SuppressRestart) msiParams.Add("/norestart");
+                if (options.AllUsersInstall) msiParams.Add("ALLUSERS=1");
+
+                sb.AppendLine("\t\t# MSI Installation with selected options");
+                sb.AppendLine($"\t\tExecute-MSI -Action 'Install' -Path '$dirFiles\\YourApp.msi' -Parameters '{string.Join(" ", msiParams)}'");
+
+                if (options.SuppressRestart)
+                {
+                    sb.AppendLine("\t\t\t-AddParameters 'REBOOT=ReallySuppress'");
+                }
+            }
+            else if (options.PackageType == "EXE")
+            {
+                var exeParams = new List<string>();
+
+                if (options.SilentInstall) exeParams.Add("/S");
+                if (options.SuppressRestart) exeParams.Add("/norestart");
+                if (options.AllUsersInstall) exeParams.Add("ALLUSERS=1");
+
+                sb.AppendLine("\t\t# EXE Installation with selected options");
+                sb.AppendLine($"\t\tExecute-Process -Path '$dirFiles\\setup.exe' -Parameters '{string.Join(" ", exeParams)}' -WindowStyle 'Hidden'");
+            }
+
+            sb.AppendLine();
+            return sb.ToString();
+        }
+
+        private string GeneratePostInstallationCode(ApplicationInfo appInfo, PSADTOptions options)
+        {
+            var sb = new StringBuilder();
+
+            if (options.RegisterDLLs)
+            {
+                sb.AppendLine("\t\t# Register DLL modules (from cheatsheet)");
+                sb.AppendLine("\t\tRegister-DLL -FilePath \"$dirFiles\\codec.dll\"");
+                sb.AppendLine();
+            }
+
+            if (options.CopyToAllUsers)
+            {
+                sb.AppendLine("\t\t# Copy files to all user profiles (from cheatsheet)");
+                sb.AppendLine("\t\t$ProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty 'ProfilePath'");
+                sb.AppendLine("\t\tForEach ($Profile in $ProfilePaths) {");
+                sb.AppendLine("\t\t\tCopy-File -Path \"$dirFiles\\config.ini\" -Destination \"$Profile\\AppData\\Local\\App\\\"");
+                sb.AppendLine("\t\t}");
+                sb.AppendLine();
+            }
+
+            if (options.SetHKCUAllUsers)
+            {
+                sb.AppendLine("\t\t# Set HKCU registry for all users (from cheatsheet)");
+                sb.AppendLine("\t\t[scriptblock]$HKCURegistrySettings = {");
+                sb.AppendLine($"\t\t\tSet-RegistryKey -Key 'HKCU\\Software\\{appInfo.Manufacturer}\\{appInfo.Name}' -Name 'Version' -Value '{appInfo.Version}' -Type String -SID $UserProfile.SID");
+                sb.AppendLine("\t\t}");
+                sb.AppendLine("\t\tInvoke-HKCURegistrySettingsForAllUsers -RegistrySettings $HKCURegistrySettings");
+                sb.AppendLine();
+            }
+
+            if (options.SetCustomRegistry)
+            {
+                sb.AppendLine("\t\t# Set custom registry keys");
+                sb.AppendLine($"\t\tSet-RegistryKey -Key 'HKLM:\\SOFTWARE\\{appInfo.Manufacturer}\\{appInfo.Name}' -Name 'Version' -Value '{appInfo.Version}' -Type String");
+                sb.AppendLine($"\t\tSet-RegistryKey -Key 'HKLM:\\SOFTWARE\\{appInfo.Manufacturer}\\{appInfo.Name}' -Name 'InstallDate' -Value (Get-Date) -Type String");
+                sb.AppendLine();
+            }
+
+            if (options.DesktopShortcut || options.StartMenuEntry)
+            {
+                sb.AppendLine("\t\t# Create shortcuts");
+
+                if (options.DesktopShortcut)
+                {
+                    sb.AppendLine($"\t\tNew-Shortcut -Path \"$envCommonDesktop\\{appInfo.Name}.lnk\" -TargetPath \"$envProgramFiles\\{appInfo.Name}\\app.exe\"");
+                }
+
+                if (options.StartMenuEntry)
+                {
+                    sb.AppendLine($"\t\tNew-Shortcut -Path \"$envCommonStartMenuPrograms\\{appInfo.Name}.lnk\" -TargetPath \"$envProgramFiles\\{appInfo.Name}\\app.exe\"");
+                }
+
+                sb.AppendLine();
+            }
+
+            if (options.CreateInstallMarker)
+            {
+                sb.AppendLine("\t\t# Create install marker (from cheatsheet)");
+                sb.AppendLine("\t\tSet-RegistryKey -Key \"$configToolkitRegPath\\$appDeployToolkitName\\InstallMarkers\\$installName\"");
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
+        }
+
+        private string GenerateUninstallationCode(ApplicationInfo appInfo, PSADTOptions options)
+        {
+            var sb = new StringBuilder();
+
+            if (options.RemovePreviousVersions)
+            {
+                if (options.PackageType == "MSI")
+                {
+                    sb.AppendLine("\t\t# Uninstall MSI");
+                    sb.AppendLine("\t\tExecute-MSI -Action 'Uninstall' -Path '$dirFiles\\YourApp.msi' -Parameters '/quiet /norestart'");
+                }
+                else
+                {
+                    sb.AppendLine("\t\t# Remove previous versions (from cheatsheet)");
+                    sb.AppendLine($"\t\tRemove-MSIApplications -Name '{appInfo.Name}'");
+                }
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
         }
 
         public string GetScriptPath(string manufacturer, string appName, string version)
