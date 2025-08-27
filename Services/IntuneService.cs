@@ -20,9 +20,7 @@ namespace IntunePackagingTool
         private DateTime _tokenExpiry = DateTime.MinValue;
         private bool _enableDebug = false;
 
-        private readonly string _clientId = "b47987a1-70b4-415a-9a4e-9775473e382b";
-        private readonly string _tenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7";
-        private readonly string _certificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F";
+     
 
         public void EnableDebug(bool enable)
         {
