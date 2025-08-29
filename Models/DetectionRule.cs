@@ -1,55 +1,131 @@
+using System;
+using System.ComponentModel;
+
 namespace IntunePackagingTool
 {
     public enum DetectionRuleType
     {
         File,
         Registry,
-        Script
+        MSI 
     }
 
-    public class DetectionRule
+    public class DetectionRule : INotifyPropertyChanged
     {
-        public DetectionRuleType Type { get; set; }
-        public string Path { get; set; } = "";
-        public string FileOrFolderName { get; set; } = "";
-        public bool CheckVersion { get; set; }
-        public string DetectionValue { get; set; } = "";
-        public string Operator { get; set; } = "greaterThanOrEqual";
-        
-        // Registry specific properties
-        public string RegistryHive { get; set; } = "";
-        public string RegistryKey { get; set; } = "";
-        public string RegistryValueName { get; set; } = "";
-        public string ExpectedValue { get; set; } = "";
-        
-        // Script specific properties
-        public string ScriptContent { get; set; } = "";
-        public bool EnforceSignatureCheck { get; set; }
-        public bool RunAs32Bit { get; set; }
+        private DetectionRuleType _type;
+        private string _path = "";
+        private string _fileOrFolderName = "";
+        private bool _checkVersion;
+        private string _operator = ""; 
 
-        // Display properties for UI
-        public string Icon => Type switch
+        public DetectionRuleType Type
         {
-            DetectionRuleType.File => "📁",
-            DetectionRuleType.Registry => "🗃️",
-            DetectionRuleType.Script => "💻",
-            _ => "❓"
-        };
+            get => _type;
+            set
+            {
+                _type = value;
+                OnPropertyChanged(nameof(Type));
+                OnPropertyChanged(nameof(Title)); 
+            }
+        }
 
-        public string Title => Type switch
+        public string Path
         {
-            DetectionRuleType.File => $"File Detection: {FileOrFolderName}",
-            DetectionRuleType.Registry => $"Registry Detection: {RegistryValueName}",
-            DetectionRuleType.Script => "PowerShell Script Detection",
-            _ => "Unknown Detection"
-        };
+            get => _path;
+            set
+            {
+                _path = value ?? "";
+                OnPropertyChanged(nameof(Path));
+                OnPropertyChanged(nameof(Title));
+            }
+        }
 
-        public string Description => Type switch
+        public string FileOrFolderName
         {
-            DetectionRuleType.File => $"Path: {Path}\\{FileOrFolderName}" + (CheckVersion ? $" (Version {Operator} {DetectionValue})" : ""),
-            DetectionRuleType.Registry => $"Key: {RegistryHive}\\{RegistryKey}\\{RegistryValueName}",
-            DetectionRuleType.Script => "Custom PowerShell detection script",
-            _ => ""
-        };
+            get => _fileOrFolderName;
+            set
+            {
+                _fileOrFolderName = value ?? "";
+                OnPropertyChanged(nameof(FileOrFolderName));
+                OnPropertyChanged(nameof(Title));
+            }
+        }
+
+        public bool CheckVersion
+        {
+            get => _checkVersion;
+            set
+            {
+                _checkVersion = value;
+                OnPropertyChanged(nameof(CheckVersion));
+                OnPropertyChanged(nameof(Title));
+            }
+        }
+
+        public string Operator
+        {
+            get => _operator;
+            set
+            {
+                _operator = value ?? "";
+                OnPropertyChanged(nameof(Operator));
+                OnPropertyChanged(nameof(Title));
+            }
+        }
+
+       
+        public string Title
+        {
+            get
+            {
+                return Type switch
+                {
+                    DetectionRuleType.File => CheckVersion
+                        ? $"File: {System.IO.Path.Combine(Path, FileOrFolderName)} (Check Version)"
+                        : $"File: {System.IO.Path.Combine(Path, FileOrFolderName)}",
+
+                    DetectionRuleType.Registry => string.IsNullOrEmpty(FileOrFolderName)
+                        ? $"Registry: {Path} (Key Exists)"
+                        : $"Registry: {Path}\\{FileOrFolderName}",
+
+                    DetectionRuleType.MSI => CheckVersion
+                        ? $"MSI: {Path} (Version {Operator} {FileOrFolderName})"
+                        : $"MSI: {Path}",
+
+                    _ => "Unknown Detection Rule"
+                };
+            }
+        }
+
+       
+        public string Description
+        {
+            get
+            {
+                return Type switch
+                {
+                    DetectionRuleType.File => CheckVersion
+                        ? $"Detects file '{FileOrFolderName}' in path '{Path}' and validates its version"
+                        : $"Detects presence of file '{FileOrFolderName}' in path '{Path}'",
+
+                    DetectionRuleType.Registry => string.IsNullOrEmpty(FileOrFolderName)
+                        ? $"Checks if registry key '{Path}' exists"
+                        : $"Checks registry value '{FileOrFolderName}' in key '{Path}'",
+
+                    DetectionRuleType.MSI => CheckVersion
+                        ? $"Detects MSI product '{Path}' with version {Operator} {FileOrFolderName}"
+                        : $"Detects presence of MSI product '{Path}'",
+
+                    _ => "Unknown detection rule type"
+                };
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }

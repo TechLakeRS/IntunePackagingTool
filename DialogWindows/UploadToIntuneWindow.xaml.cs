@@ -14,7 +14,9 @@ namespace IntunePackagingTool
     {
         public ApplicationInfo? ApplicationInfo { get; set; }
         public string PackagePath { get; set; } = "";
-        
+        public string? IconPath { get; set; }
+        private string? _selectedIconPath;  // ADD THIS LINE
+
         private ObservableCollection<DetectionRule> _detectionRules = new ObservableCollection<DetectionRule>();
         private IntuneService _intuneService = new IntuneService();
         private IntuneUploadService _uploadService;
@@ -26,13 +28,36 @@ namespace IntunePackagingTool
             _uploadService = new IntuneUploadService(_intuneService);
         }
 
-        // Implement IUploadProgress interface
+
         public void UpdateProgress(int percentage, string message)
+        {
+            // Call the overloaded version with default chunk values
+            UpdateProgress(percentage, message, 0, 0);
+        }
+        public void UpdateProgress(int percentage, string message, int currentChunk, int totalChunks)
         {
             Dispatcher.Invoke(() =>
             {
+                // Show panel if hidden
+                if (UploadProgressPanel.Visibility != Visibility.Visible)
+                    UploadProgressPanel.Visibility = Visibility.Visible;
+
+                // Update progress bar
                 UploadProgressBar.Value = percentage;
-                UploadStatusText.Text = message;
+
+                // Update percentage text (make sure this element exists in XAML)
+                if (UploadPercentageText != null)
+                    UploadPercentageText.Text = $"{percentage}%";
+
+                // Update status with chunk info
+                if (currentChunk > 0 && totalChunks > 0)
+                {
+                    UploadStatusText.Text = $"Uploading chunk {currentChunk}/{totalChunks} - {message}";
+                }
+                else
+                {
+                    UploadStatusText.Text = message;
+                }
             });
         }
 
@@ -56,37 +81,8 @@ namespace IntunePackagingTool
             });
         }
 
-        private void AddFileDetectionButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new AddFileDetectionDialog
-            {
-                Owner = this
-            };
 
-            if (dialog.ShowDialog() == true && dialog.DetectionRule != null)
-            {
-                _detectionRules.Add(dialog.DetectionRule);
-            }
-        }
-
-        private void AddRegistryDetectionButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new AddRegistryDetectionDialog
-            {
-                Owner = this
-            };
-
-            if (dialog.ShowDialog() == true && dialog.DetectionRule != null)
-            {
-                _detectionRules.Add(dialog.DetectionRule);
-            }
-        }
-
-        private void AddScriptDetectionButton_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Script detection rule editor will be implemented in a future version.", 
-                "Coming Soon", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
+        
 
         private void BrowseIconButton_Click(object sender, RoutedEventArgs e)
         {
@@ -168,7 +164,8 @@ namespace IntunePackagingTool
                     installCommand, 
                     uninstallCommand, 
                     description,
-                    installContext,  // Pass the actual UI selection
+                    installContext,
+                    IconPath ?? _selectedIconPath,
                     this);
 
                 var intuneFolder = System.IO.Path.Combine(PackagePath, "Intune");
@@ -222,9 +219,6 @@ namespace IntunePackagingTool
             _uploadService?.Dispose();
         }
 
-        private void InstallCommandTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-
-        }
+      
     }
 }

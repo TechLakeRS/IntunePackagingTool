@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
+
 
 namespace IntunePackagingTool
 {
@@ -24,19 +26,17 @@ namespace IntunePackagingTool
         public MainWindow()
         {
             InitializeComponent();
+            ShowPage("CreateApplication");
+            SetActiveNavButton(CreateAppNavButton);
             ApplicationsList.ItemsSource = _applications;
             LoadCategoriesDropdown();
             Loaded += async (s, e) => await LoadAllApplicationsAsync();
+            ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
 
         }
 
         #region Navigation Methods
-        private void DashboardNavButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowPage("Dashboard");
-            UpdateNavigation(DashboardNavButton);
-        }
-
+ 
         private void CreateAppNavButton_Click(object sender, RoutedEventArgs e)
         {
             ShowPage("CreateApplication");
@@ -49,12 +49,6 @@ namespace IntunePackagingTool
             UpdateNavigation(ViewAppsNavButton);
         }
 
-        private void HistoryNavButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowPage("History");
-            UpdateNavigation(HistoryNavButton);
-        }
-
         private void SettingsNavButton_Click(object sender, RoutedEventArgs e)
         {
             ShowPage("Settings");
@@ -64,20 +58,14 @@ namespace IntunePackagingTool
         private void ShowPage(string pageName)
         {
             // Hide all pages
-            DashboardPage.Visibility = Visibility.Collapsed;
+           
             CreateApplicationPage.Visibility = Visibility.Collapsed;
             ViewApplicationsPage.Visibility = Visibility.Collapsed;
-            HistoryPage.Visibility = Visibility.Collapsed;
             SettingsPage.Visibility = Visibility.Collapsed;
 
             // Show selected page and update header
             switch (pageName)
             {
-                case "Dashboard":
-                    DashboardPage.Visibility = Visibility.Visible;
-                    PageTitle.Text = "Dashboard";
-                    PageSubtitle.Text = "Application packaging overview and quick actions";
-                    break;
                 case "CreateApplication":
                     CreateApplicationPage.Visibility = Visibility.Visible;
                     PageTitle.Text = "Create Package";
@@ -88,11 +76,6 @@ namespace IntunePackagingTool
                     PageTitle.Text = "Applications";
                     PageSubtitle.Text = "Browse and manage Microsoft Intune applications";
                     break;
-                case "History":
-                    HistoryPage.Visibility = Visibility.Visible;
-                    PageTitle.Text = "Upload History";
-                    PageSubtitle.Text = "View recent package uploads and deployment logs";
-                    break;
                 case "Settings":
                     SettingsPage.Visibility = Visibility.Visible;
                     PageTitle.Text = "Settings";
@@ -101,15 +84,71 @@ namespace IntunePackagingTool
             }
         }
 
+        private async void ApplicationsList_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (ApplicationsList.SelectedItem != null)
+            {
+                var selectedApp = ApplicationsList.SelectedItem as IntuneApplication;
+
+                if (selectedApp != null)
+                {
+                    try
+                    {
+                        // Show loading state
+                        StatusText.Text = $"Loading details for {selectedApp.DisplayName} from Microsoft Intune...";
+                        ProgressBar.Visibility = Visibility.Visible;
+                        ProgressBar.IsIndeterminate = true;
+
+                        // Fetch REAL data from Microsoft Intune using your existing service
+                        var appDetail = await _intuneService.GetApplicationDetailAsync(selectedApp.Id);
+
+                        // Hide progress
+                        ProgressBar.Visibility = Visibility.Collapsed;
+
+                        if (appDetail != null)
+                        {
+                            // Hide list and show detail view with REAL data from Intune
+                            ApplicationsListPanel.Visibility = Visibility.Collapsed;
+                            ApplicationDetailView.Visibility = Visibility.Visible;
+                            ApplicationDetailView.LoadApplicationDetail(appDetail);
+
+                            // Update page title
+                            PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
+                            PageSubtitle.Text = "Live data from Microsoft Intune";
+                            StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ProgressBar.Visibility = Visibility.Collapsed;
+                        StatusText.Text = "Error loading application details";
+                        MessageBox.Show($"Error loading application details from Intune:\n\n{ex.Message}", "Intune API Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+        }
+
+
+        private void ApplicationDetailView_BackToListRequested(object sender, EventArgs e)
+        {
+           
+            ApplicationDetailView.Visibility = Visibility.Collapsed;
+            ApplicationsListPanel.Visibility = Visibility.Visible;
+            PageTitle.Text = "Microsoft Intune Applications";
+            PageSubtitle.Text = "Browse and manage your application packages";
+        }
+
+
+
+
         private void UpdateNavigation(Button activeButton)
         {
             // Reset all nav buttons to normal style
-            DashboardNavButton.Style = (Style)FindResource("SidebarNavButton");
+           
             CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
-            HistoryNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
-
             // Set active button to active style
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
@@ -189,7 +228,17 @@ namespace IntunePackagingTool
             CategoryFilter.SelectedIndex = 0; // Default to "All Categories"
         }
 
+        private void SetActiveNavButton(Button activeButton)
+        {
+            // Reset all navigation buttons to inactive style
+            
+            CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
+            ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
+            SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
 
+            // Set the active button to active style
+            activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
+        }
 
         private void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -218,7 +267,7 @@ namespace IntunePackagingTool
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            await LoadAllApplicationsAsync(); // Reload ALL apps, then current filter applies
+            await LoadAllApplicationsAsync(); 
         }
 
         private async void DebugTest_Click(object sender, RoutedEventArgs e)
@@ -653,6 +702,7 @@ namespace IntunePackagingTool
             }
         }
 
+        
         private void UploadButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -664,7 +714,8 @@ namespace IntunePackagingTool
                     return;
                 }
 
-                var uploadWindow = new UploadToIntuneWindow
+                
+                var uploadWizard = new IntuneUploadWizard
                 {
                     Owner = this,
                     ApplicationInfo = new ApplicationInfo
@@ -676,11 +727,12 @@ namespace IntunePackagingTool
                     PackagePath = _currentPackagePath
                 };
 
-                uploadWindow.ShowDialog();
+               
+                uploadWizard.ShowDialog();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error opening upload window: {ex.Message}", "Error",
+                MessageBox.Show($"Error opening upload wizard: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

@@ -1,0 +1,185 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Windows.Media.Imaging;
+
+namespace IntunePackagingTool
+{
+    public class ApplicationDetail : INotifyPropertyChanged
+    {
+        // Basic Information (matching your IntuneApplication class)
+        public string Id { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string Publisher { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string InstallContext { get; set; } = "System";
+        public string InstallCommand { get; set; } = "Deploy-Application.exe Install";
+        public string UninstallCommand { get; set; } = "Deploy-Application.exe Uninstall";
+        public string NetworkSharePath { get; set; } = "";
+
+        private byte[] _iconData;
+        private BitmapImage _iconImage;
+
+        public byte[] IconData
+        {
+            get => _iconData;
+            set
+            {
+                _iconData = value;
+                OnPropertyChanged();
+                // Automatically create BitmapImage when IconData is set
+                if (value != null && value.Length > 0)
+                {
+                    CreateIconImage();
+                }
+            }
+        }
+
+        public string IconType { get; set; }
+
+        public BitmapImage IconImage
+        {
+            get => _iconImage;
+            private set
+            {
+                _iconImage = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private void CreateIconImage()
+        {
+            if (_iconData == null || _iconData.Length == 0)
+            {
+                IconImage = null;
+                System.Diagnostics.Debug.WriteLine("❌ No icon data to create image from");
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"Creating icon from {_iconData.Length} bytes...");
+
+                // Try creating on UI thread
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var bitmap = new BitmapImage();
+                    using (var stream = new MemoryStream(_iconData))
+                    {
+                        stream.Position = 0;
+                        bitmap.BeginInit();
+                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                        bitmap.StreamSource = stream;
+                        bitmap.EndInit();
+                        bitmap.Freeze();
+                    }
+                    IconImage = bitmap;
+                    System.Diagnostics.Debug.WriteLine($"✅ Icon created: {bitmap.PixelWidth}x{bitmap.PixelHeight}");
+                    System.Diagnostics.Debug.WriteLine($"✅ Icon frozen: {bitmap.IsFrozen}");
+                    System.Diagnostics.Debug.WriteLine($"✅ IconImage is null: {IconImage == null}");
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Failed to create icon: {ex.Message}");
+                IconImage = null;
+            }
+        }
+
+
+
+        // Extended Properties from Microsoft Graph API
+        public string Owner { get; set; } = "";
+        public string Developer { get; set; } = "";
+        public string Notes { get; set; } = "";
+        public string FileName { get; set; } = "";
+        public long Size { get; set; } 
+        public DateTime CreatedDateTime { get; set; } = DateTime.MinValue;
+        public DateTime LastModifiedDateTime { get; set; } = DateTime.MinValue;
+        public bool IsFeatured { get; set; } = false;
+        public bool IsAssigned { get; set; } = false;
+        public string PrivacyInformationUrl { get; set; } = "";
+        public string InformationUrl { get; set; } = "";
+        public string UploadState { get; set; }
+        public string PublishingState { get; set; } = "";
+        public string ApplicableArchitectures { get; set; } = "";
+        public string AllowedArchitectures { get; set; } = "";
+        public int? MinimumFreeDiskSpaceInMB { get; set; } 
+        public int? MinimumMemoryInMB { get; set; }
+        public int? MinimumNumberOfProcessors { get; set; } 
+        public int? MinimumCpuSpeedInMHz { get; set; }
+        public string SetupFilePath { get; set; } = "";
+        public string MinimumSupportedWindowsRelease { get; set; } = "";
+        public bool AllowAvailableUninstall { get; set; }
+
+        // Collections (using your existing DetectionRule class)
+        public List<DetectionRule> DetectionRules { get; set; } = new List<DetectionRule>();
+        public List<AssignedGroup> AssignedGroups { get; set; } = new List<AssignedGroup>();
+        public List<RequirementRule> RequirementRules { get; set; } = new List<RequirementRule>();
+        public List<ReturnCode> ReturnCodes { get; set; } = new List<ReturnCode>();
+        public List<string> RoleScopeTagIds { get; set; } = new List<string>();
+
+        // Computed Properties for UI Display
+        public string SizeFormatted
+        {
+            get
+            {
+                if (Size > 1024 * 1024 * 1024) // GB
+                    return $"{Size / (1024.0 * 1024 * 1024):F1} GB";
+                else if (Size > 1024 * 1024) // MB
+                    return $"{Size / (1024.0 * 1024):F1} MB";
+                else if (Size > 1024) // KB
+                    return $"{Size / 1024.0:F1} KB";
+                else if (Size > 0)
+                    return $"{Size} B";
+                else
+                    return "Unknown";
+            }
+        }
+
+        public string CreatedDateFormatted => CreatedDateTime != DateTime.MinValue ? CreatedDateTime.ToString("MMM dd, yyyy HH:mm") : "Unknown";
+        public string LastModifiedFormatted => LastModifiedDateTime != DateTime.MinValue ? LastModifiedDateTime.ToString("MMM dd, yyyy HH:mm") : "Unknown";
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class GroupAssignmentIds
+    {
+        public string SystemInstallId { get; set; }
+        public string UserInstallId { get; set; }
+        public string SystemUninstallId { get; set; }
+        public string UserUninstallId { get; set; }
+
+        public int Count => new[] { SystemInstallId, UserInstallId, SystemUninstallId, UserUninstallId }
+            .Count(id => !string.IsNullOrEmpty(id));
+    }
+
+
+    public class AssignedGroup
+    {
+        public string GroupName { get; set; } = "";
+        public string AssignmentType { get; set; } = ""; // Available, Required, Uninstall
+    }
+
+    public class RequirementRule
+    {
+        public string Type { get; set; } = "";
+        public string Description { get; set; } = "";
+    }
+
+    public class ReturnCode
+    {
+        public int Code { get; set; } 
+        public string Type { get; set; } = "";
+        public string Description => $"Exit Code {Code}: {Type}";
+    }
+}

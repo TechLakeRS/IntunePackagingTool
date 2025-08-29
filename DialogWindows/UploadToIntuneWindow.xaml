@@ -6,7 +6,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="#F5F7FA">
-    
+
     <Window.Resources>
         <!-- Modern Button Style -->
         <Style TargetType="Button" x:Key="ModernButton">
@@ -58,19 +58,19 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="☁️ Upload Application to Microsoft Intune" FontSize="24" FontWeight="SemiBold" Foreground="#212529"/>
+            <TextBlock Text="Upload Application to Microsoft Intune" FontSize="24" FontWeight="SemiBold" Foreground="#212529"/>
             <TextBlock Name="AppSummaryText" Text="Adobe Reader v2023.1.0" FontSize="14" Foreground="#6C757D" Margin="0,5,0,0"/>
         </StackPanel>
 
         <!-- Main Content -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                
+
                 <!-- Application Settings -->
                 <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,20">
                     <StackPanel>
-                        <TextBlock Text="📱 Application Settings" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
-                        
+                        <TextBlock Text="Application Settings" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
+
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150"/>
@@ -101,12 +101,14 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Detection Rules -->
+                <!-- Detection Rules Section - Now references external UserControl -->
                 <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,20">
                     <StackPanel>
-                        <TextBlock Text="🔍 Detection Rules" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
-                        
-                        <!-- Detection Rules List -->
+                        <TextBlock Text="Detection Rules" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
+                        <TextBlock Text="Detection rules will be configured in the wizard step." 
+                                   FontSize="12" Foreground="#6C757D" Margin="0,0,0,10"/>
+
+                        <!-- Summary of detection rules (read-only) -->
                         <ItemsControl Name="DetectionRulesList" Margin="0,0,0,15">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -115,49 +117,79 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            
-                                            <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                                            <TextBlock Grid.Column="0" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Type}" Value="File">
+                                                                <Setter Property="Text" Value="📁"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Type}" Value="Registry">
+                                                                <Setter Property="Text" Value="🗃️"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Type}" Value="MSI">
+                                                                <Setter Property="Text" Value="📦"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+
                                             <StackPanel Grid.Column="1">
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="#6C757D"/>
+                                                <TextBlock FontWeight="SemiBold" FontSize="13">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Type}" Value="File">
+                                                                    <Setter Property="Text" Value="{Binding Path, StringFormat='File: {0}'}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Type}" Value="Registry">
+                                                                    <Setter Property="Text" Value="{Binding Path, StringFormat='Registry: {0}'}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Type}" Value="MSI">
+                                                                    <Setter Property="Text" Value="{Binding Path, StringFormat='MSI: {0}'}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding FileOrFolderName}" FontSize="11" Foreground="#6C757D"/>
                                             </StackPanel>
-                                            <Button Grid.Column="2" Content="❌" Background="Transparent" BorderThickness="0" FontSize="12" Cursor="Hand" ToolTip="Remove Rule" Click="RemoveDetectionRule_Click" Tag="{Binding}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        
-                        <!-- Add Detection Rules -->
-                        <StackPanel Orientation="Horizontal">
-                            <Button Name="AddFileDetectionButton" Content="📁 Add File Detection" Style="{StaticResource SecondaryButton}" Click="AddFileDetectionButton_Click"/>
-                            <Button Name="AddRegistryDetectionButton" Content="🗃️ Add Registry Detection" Style="{StaticResource SecondaryButton}" Click="AddRegistryDetectionButton_Click"/>
-                            <Button Name="AddScriptDetectionButton" Content="💻 Add Script Detection" Style="{StaticResource SecondaryButton}" Click="AddScriptDetectionButton_Click"/>
-                        </StackPanel>
+
+                        <!-- Note about where to configure rules -->
+                        <Border Background="#FFF3CD" BorderBrush="#FFEAA7" BorderThickness="1" CornerRadius="4" Padding="10">
+                            <TextBlock Text="Note: Configure detection rules in the previous wizard step." 
+                                       FontSize="12" Foreground="#856404"/>
+                        </Border>
                     </StackPanel>
                 </Border>
 
                 <!-- App Icon -->
                 <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,20">
                     <StackPanel>
-                        <TextBlock Text="🎨 Application Icon" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
-                        
+                        <TextBlock Text="Application Icon" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
+
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            
+
                             <Border Grid.Column="0" Width="64" Height="64" Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Margin="0,0,15,0">
                                 <TextBlock Text="📱" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center" Name="DefaultIconText"/>
                             </Border>
-                            
+
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="Application Icon (Optional)" FontWeight="Medium" FontSize="13"/>
                                 <TextBlock Text="Select a PNG or ICO file to represent your application" FontSize="11" Foreground="#6C757D" Margin="0,2,0,10"/>
-                                <Button Name="BrowseIconButton" Content="📁 Browse Icon..." Style="{StaticResource SecondaryButton}" Click="BrowseIconButton_Click" HorizontalAlignment="Left"/>
+                                <Button Name="BrowseIconButton" Content="Browse Icon..." Style="{StaticResource SecondaryButton}" Click="BrowseIconButton_Click" HorizontalAlignment="Left"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -166,9 +198,20 @@
                 <!-- Upload Progress -->
                 <Border Name="UploadProgressPanel" Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Padding="20" Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock Text="📤 Upload Progress" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
-                        
-                        <ProgressBar Name="UploadProgressBar" Height="20" Minimum="0" Maximum="100" Value="0" Margin="0,0,0,10"/>
+                        <TextBlock Text="Upload Progress" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,15"/>
+
+                        <!-- Progress bar with percentage overlay -->
+                        <Grid Margin="0,0,0,10">
+                            <ProgressBar Name="UploadProgressBar" Height="20" Minimum="0" Maximum="100" Value="0"/>
+                            <TextBlock Name="UploadPercentageText" 
+                      Text="0%" 
+                      HorizontalAlignment="Center" 
+                      VerticalAlignment="Center"
+                      FontWeight="Bold"
+                      Foreground="Black"/>
+                        </Grid>
+
+                        <!-- Status text for chunk info -->
                         <TextBlock Name="UploadStatusText" Text="Preparing upload..." FontSize="12" Foreground="#6C757D"/>
                     </StackPanel>
                 </Border>
@@ -179,7 +222,7 @@
         <!-- Action Buttons -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource SecondaryButton}" Click="CancelButton_Click"/>
-            <Button Name="UploadButton" Content=" Create and Upload to Intune" Style="{StaticResource SuccessButton}" Click="UploadButton_Click"/>
+            <Button Name="UploadButton" Content="Create and Upload to Intune" Style="{StaticResource SuccessButton}" Click="UploadButton_Click"/>
         </StackPanel>
 
     </Grid>

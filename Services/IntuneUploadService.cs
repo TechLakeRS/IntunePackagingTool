@@ -47,6 +47,7 @@ namespace IntunePackagingTool
             string uninstallCommand, 
             string description,
             string installContext,
+            string? iconPath = null, 
             IUploadProgress? progress = null)
         {
             try
@@ -78,7 +79,7 @@ namespace IntunePackagingTool
 
                 // Step 4: Create Win32LobApp
                 progress?.UpdateProgress(25, "Creating application in Intune...");
-                var appId = await CreateWin32LobAppAsync(appInfo, installCommand, uninstallCommand, description, detectionRules, installContext, intuneWinInfo);
+                var appId = await CreateWin32LobAppAsync(appInfo, installCommand, uninstallCommand, description, detectionRules, installContext, intuneWinInfo, iconPath);
 
                 // Step 5: Create content version
                 progress?.UpdateProgress(35, "Creating content version...");
@@ -410,7 +411,8 @@ namespace IntunePackagingTool
             string description, 
             List<DetectionRule> detectionRules,
             string installContext,
-            IntuneWinInfo intuneWinInfo)
+            IntuneWinInfo intuneWinInfo,
+            string? iconPath = null) 
         {
             var formattedDetectionRules = new List<Dictionary<string, object>>();
             
@@ -463,7 +465,74 @@ namespace IntunePackagingTool
                 }
             };
 
-            var json = JsonSerializer.Serialize(createAppPayload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            // In CreateWin32LobAppAsync method, enhance the icon handling section:
+
+            // ADD ICON HANDLING
+            Debug.WriteLine($"=== ICON PROCESSING ===");
+            Debug.WriteLine($"Icon path provided: {iconPath ?? "NULL"}");
+
+            if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(iconPath);
+                    Debug.WriteLine($"Icon file exists: true");
+                    Debug.WriteLine($"Icon file size: {fileInfo.Length} bytes");
+
+                    var iconData = ConvertIconToBase64(iconPath);
+                    if (iconData != null)
+                    {
+                        createAppPayload["largeIcon"] = iconData;
+                        Debug.WriteLine($"✓ Added icon to payload");
+
+                        // Verify the structure
+                        var iconJson = JsonSerializer.Serialize(iconData);
+                        Debug.WriteLine($"Icon structure: {iconJson}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine("❌ ConvertIconToBase64 returned null");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"⚠ Failed to add icon: {ex.Message}");
+                    // Continue without icon - not a critical failure
+                }
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(iconPath))
+                {
+                    Debug.WriteLine("⚠ No icon path provided");
+                }
+                else
+                {
+                    Debug.WriteLine($"❌ Icon file not found: {iconPath}");
+                }
+            }
+
+            // Log the final JSON to verify icon is included
+            var json = JsonSerializer.Serialize(createAppPayload, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            });
+
+            Debug.WriteLine("=== CHECKING FINAL PAYLOAD ===");
+            Debug.WriteLine($"Payload contains 'largeIcon': {json.Contains("\"largeIcon\"")}");
+            if (json.Contains("\"largeIcon\""))
+            {
+                // Extract just the largeIcon part for verification (first 100 chars of value)
+                var iconIndex = json.IndexOf("\"largeIcon\"");
+                if (iconIndex > 0)
+                {
+                    var iconSection = json.Substring(iconIndex, Math.Min(500, json.Length - iconIndex));
+                    Debug.WriteLine($"Icon section in payload: {iconSection}");
+                }
+            }
+
+            
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _httpClient!.PostAsync("https://graph.microsoft.com/beta/deviceAppManagement/mobileApps", content);
             var responseText = await response.Content.ReadAsStringAsync();
@@ -478,6 +547,58 @@ namespace IntunePackagingTool
 
             Debug.WriteLine($"✓ Created Win32 app in Intune. ID: {appId}");
             return appId ?? throw new Exception("App ID not returned from creation");
+        }
+
+        private Dictionary<string, object>? ConvertIconToBase64(string iconPath)
+        {
+            try
+            {
+                Debug.WriteLine($"=== CONVERTING ICON ===");
+                Debug.WriteLine($"Icon path: {iconPath}");
+
+                // Read the icon file
+                var iconBytes = File.ReadAllBytes(iconPath);
+                Debug.WriteLine($"Icon size: {iconBytes.Length} bytes");
+
+                // If icon is too large (> 500KB), you might need to resize it
+                if (iconBytes.Length > 500 * 1024)
+                {
+                    Debug.WriteLine($"⚠ Icon is large ({iconBytes.Length} bytes), may fail to upload");
+                }
+
+                // Convert to base64
+                var base64String = Convert.ToBase64String(iconBytes);
+                Debug.WriteLine($"Base64 length: {base64String.Length} characters");
+
+                // Determine MIME type based on file extension
+                var extension = Path.GetExtension(iconPath).ToLower();
+                var mimeType = extension switch
+                {
+                    ".png" => "image/png",
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".ico" => "image/x-icon",
+                    _ => "image/png" // Default to PNG
+                };
+
+                Debug.WriteLine($"MIME type: {mimeType}");
+
+                // Return the icon object structure WITHOUT @odata.type
+                // The Graph API expects just type and value for largeIcon
+                var iconData = new Dictionary<string, object>
+                {
+                    ["type"] = mimeType,
+                    ["value"] = base64String
+                };
+
+                Debug.WriteLine("✓ Icon converted successfully");
+                return iconData;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Error converting icon to base64: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                return null;
+            }
         }
 
         private async Task<string> CreateContentVersionAsync(string appId)
@@ -652,200 +773,193 @@ namespace IntunePackagingTool
 }
 
       private async Task UploadFileToAzureStorageAsync(string sasUri, string filePath, IUploadProgress? progress = null)
-{
-    const int chunkSize = 6 * 1024 * 1024; // 6MB chunks
-    var fileInfo = new FileInfo(filePath);
-    var totalSize = fileInfo.Length;
-    var totalChunks = (int)Math.Ceiling((double)totalSize / chunkSize);
-
-    Debug.WriteLine($"=== AZURE STORAGE UPLOAD ===");
-    Debug.WriteLine($"File: {Path.GetFileName(filePath)}");
-    Debug.WriteLine($"Size: {totalSize:N0} bytes");
-    Debug.WriteLine($"Chunks: {totalChunks}");
-
-    // ✅ CREATE SEPARATE HTTP CLIENT FOR AZURE STORAGE (NO AUTH HEADER)
-    using var azureHttpClient = new HttpClient();
-    azureHttpClient.Timeout = TimeSpan.FromMinutes(10);
-
-    using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-    var blockIds = new List<string>();
-    
-    var sasRenewalTimer = System.Diagnostics.Stopwatch.StartNew();
-    var currentSasUri = sasUri;
-
-    for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++)
-    {
-        var blockId = Convert.ToBase64String(Encoding.ASCII.GetBytes(chunkIndex.ToString("0000")));
-        blockIds.Add(blockId);
-
-        var buffer = new byte[Math.Min(chunkSize, totalSize - (chunkIndex * chunkSize))];
-        await fileStream.ReadAsync(buffer, 0, buffer.Length);
-
-        var chunkUri = $"{currentSasUri}&comp=block&blockid={blockId}";
-        
-        Console.WriteLine($"Uploading chunk {chunkIndex + 1}/{totalChunks} ({buffer.Length:N0} bytes)");
-        
-        // ✅ CRITICAL FIX: Set the exact Content-Type that Azure Storage expects
-        using var request = new HttpRequestMessage(HttpMethod.Put, chunkUri);
-        request.Content = new ByteArrayContent(buffer);
-        
-        // ✅ THE KEY FIX: Set Content-Type to match PowerShell 7.39 behavior
-        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain") 
-        { 
-            CharSet = "iso-8859-1" 
-        };
-        
-        // ✅ Set x-ms-blob-type header
-        request.Headers.Add("x-ms-blob-type", "BlockBlob");
-
-        var response = await azureHttpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
         {
-            var errorText = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"❌ Chunk {chunkIndex} upload failed: {response.StatusCode}");
-            Console.WriteLine($"Error response: {errorText}");
-            throw new Exception($"Failed to upload chunk {chunkIndex}. Status: {response.StatusCode}, Response: {errorText}");
+            const int chunkSize = 6 * 1024 * 1024; // 6MB chunks
+            var fileInfo = new FileInfo(filePath);
+            var totalSize = fileInfo.Length;
+            var totalChunks = (int)Math.Ceiling((double)totalSize / chunkSize);
+
+            Debug.WriteLine($"=== AZURE STORAGE UPLOAD ===");
+            Debug.WriteLine($"File: {Path.GetFileName(filePath)}");
+            Debug.WriteLine($"Size: {totalSize:N0} bytes");
+            Debug.WriteLine($"Chunks: {totalChunks}");
+
+             // ✅ CREATE SEPARATE HTTP CLIENT FOR AZURE STORAGE (NO AUTH HEADER)
+            progress?.UpdateProgress(65, $"Starting upload: {Path.GetFileName(filePath)} ({FormatBytes(totalSize)})");
+
+            using var azureHttpClient = new HttpClient();
+            azureHttpClient.Timeout = TimeSpan.FromMinutes(10);
+
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            var blockIds = new List<string>();
+    
+            var sasRenewalTimer = System.Diagnostics.Stopwatch.StartNew();
+            var currentSasUri = sasUri;
+
+            for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++)
+            {
+                var blockId = Convert.ToBase64String(Encoding.ASCII.GetBytes(chunkIndex.ToString("0000")));
+                blockIds.Add(blockId);
+
+                var buffer = new byte[Math.Min(chunkSize, totalSize - (chunkIndex * chunkSize))];
+                await fileStream.ReadAsync(buffer, 0, buffer.Length);
+                var bytesUploaded = (long)chunkIndex * chunkSize;
+                var percentComplete = (int)((bytesUploaded * 100) / totalSize);
+                var progressPercentage = 65 + (int)((chunkIndex + 1.0) / totalChunks * 15);
+                progress?.UpdateProgress(progressPercentage,
+                $"Uploading chunk {chunkIndex + 1}/{totalChunks} ({FormatBytes(bytesUploaded)}/{FormatBytes(totalSize)} - {percentComplete}%)");
+
+                var chunkUri = $"{currentSasUri}&comp=block&blockid={blockId}";
+        
+                Console.WriteLine($"Uploading chunk {chunkIndex + 1}/{totalChunks} ({buffer.Length:N0} bytes)");
+        
+                using var request = new HttpRequestMessage(HttpMethod.Put, chunkUri);
+                request.Content = new ByteArrayContent(buffer);
+        
+              
+                request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain") 
+                { 
+                    CharSet = "iso-8859-1" 
+                };
+        
+             
+                request.Headers.Add("x-ms-blob-type", "BlockBlob");
+
+                var response = await azureHttpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorText = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"❌ Chunk {chunkIndex} upload failed: {response.StatusCode}");
+                    Console.WriteLine($"Error response: {errorText}");
+                    throw new Exception($"Failed to upload chunk {chunkIndex}. Status: {response.StatusCode}, Response: {errorText}");
+                }
+
+                progressPercentage = 65 + (int)((chunkIndex + 1.0) / totalChunks * 15);
+                progress?.UpdateProgress(progressPercentage, $"Uploading chunk {chunkIndex + 1} of {totalChunks}...");
+
+                Console.WriteLine($"✓ Uploaded chunk {chunkIndex + 1}/{totalChunks}");
+        
+                // SAS renewal every 7 minutes
+                if (chunkIndex < totalChunks - 1 && sasRenewalTimer.ElapsedMilliseconds >= 450000)
+                {
+                    progress?.UpdateProgress(progressPercentage, "Renewing SAS token...");
+                    currentSasUri = await RenewSasUriAsync();
+                    sasRenewalTimer.Restart();
+                    
+                }
+            }
+            progress?.UpdateProgress(82, "Committing blocks to Azure Storage...");
+
+         
+            Console.WriteLine("Finalizing upload by committing block list...");
+            var blockListXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?><BlockList>";
+            foreach (var blockId in blockIds)
+            {
+                blockListXml += $"<Latest>{blockId}</Latest>";
+            }
+            blockListXml += "</BlockList>";
+
+            var finalizeUri = $"{currentSasUri}&comp=blocklist";
+    
+            using var finalizeRequest = new HttpRequestMessage(HttpMethod.Put, finalizeUri);
+            finalizeRequest.Content = new StringContent(blockListXml, Encoding.UTF8);
+            finalizeRequest.Content.Headers.ContentType = null; // Remove Content-Type for block list
+    
+            var finalizeResponse = await azureHttpClient.SendAsync(finalizeRequest);
+
+            if (!finalizeResponse.IsSuccessStatusCode)
+            {
+                var errorText = await finalizeResponse.Content.ReadAsStringAsync();
+                Console.WriteLine($"❌ Finalization failed: {finalizeResponse.StatusCode}");
+                Console.WriteLine($"Error response: {errorText}");
+                throw new Exception($"Failed to finalize upload. Status: {finalizeResponse.StatusCode}, Response: {errorText}");
+            }
+
+            progress?.UpdateProgress(84, "File uploaded successfully to Azure Storage");
+            Debug.WriteLine($"✅ Successfully uploaded file to Azure Storage");
+
+            
+        }
+        private string FormatBytes(long bytes)
+        {
+            if (bytes >= 1073741824)
+                return $"{bytes / 1073741824.0:F2} GB";
+            if (bytes >= 1048576)
+                return $"{bytes / 1048576.0:F2} MB";
+            if (bytes >= 1024)
+                return $"{bytes / 1024.0:F2} KB";
+            return $"{bytes} bytes";
         }
 
-        var progressPercentage = 65 + (int)((chunkIndex + 1.0) / totalChunks * 15);
-        progress?.UpdateProgress(progressPercentage, $"Uploading chunk {chunkIndex + 1} of {totalChunks}...");
-
-        Console.WriteLine($"✓ Uploaded chunk {chunkIndex + 1}/{totalChunks}");
+        private async Task CommitFileAsync(string appId, string contentVersionId, string fileId, EncryptionInfo encryptionInfo)
+        {
         
-        // SAS renewal every 7 minutes
-        if (chunkIndex < totalChunks - 1 && sasRenewalTimer.ElapsedMilliseconds >= 450000)
-        {
-            Console.WriteLine("⏳ Renewing SAS URI due to time limit...");
-            currentSasUri = await RenewSasUriAsync();
-            sasRenewalTimer.Restart();
-            Console.WriteLine("✓ SAS URI renewed successfully");
+
+            // Check for empty/null values
+            var issues = new List<string>();
+            if (string.IsNullOrWhiteSpace(encryptionInfo.EncryptionKey)) issues.Add("EncryptionKey is empty");
+            if (string.IsNullOrWhiteSpace(encryptionInfo.MacKey)) issues.Add("MacKey is empty");
+            if (string.IsNullOrWhiteSpace(encryptionInfo.InitializationVector)) issues.Add("InitializationVector is empty");
+            if (string.IsNullOrWhiteSpace(encryptionInfo.Mac)) issues.Add("Mac is empty");
+            if (string.IsNullOrWhiteSpace(encryptionInfo.FileDigest)) issues.Add("FileDigest is empty");
+
+            if (issues.Any())
+            {
+                Console.WriteLine("❌ ENCRYPTION ISSUES FOUND:");
+                foreach (var issue in issues)
+                {
+                    Console.WriteLine($"   - {issue}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("✅ All encryption fields appear populated");
+            }
+
+            var commitBody = new Dictionary<string, object>
+            {
+                ["fileEncryptionInfo"] = new Dictionary<string, object>
+                {
+                    ["encryptionKey"] = encryptionInfo.EncryptionKey ?? "",
+                    ["macKey"] = encryptionInfo.MacKey ?? "",
+                    ["initializationVector"] = encryptionInfo.InitializationVector ?? "",
+                    ["mac"] = encryptionInfo.Mac ?? "",
+                    ["profileIdentifier"] = encryptionInfo.ProfileIdentifier ?? "ProfileVersion1",
+                    ["fileDigest"] = encryptionInfo.FileDigest ?? "",
+                    ["fileDigestAlgorithm"] = encryptionInfo.FileDigestAlgorithm ?? "SHA256"
+                }
+            };
+
+            var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions/{contentVersionId}/files/{fileId}/commit";
+            var json = JsonSerializer.Serialize(commitBody, new JsonSerializerOptions 
+            { 
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true  // Make it readable
+            });
+    
+    
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+    
+            try
+            {
+                var response = await _httpClient!.PostAsync(url, content);
+                var responseText = await response.Content.ReadAsStringAsync();
+
+               
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to commit file. Status: {response.StatusCode}, Response: {responseText}");
+                }
+
+                Console.WriteLine($"✅ File committed successfully");
+            }
+            catch (Exception ex)
+            {
+          
+                throw;
+            }
         }
-    }
-
-    // ✅ FINALIZE: Commit block list
-    Console.WriteLine("Finalizing upload by committing block list...");
-    var blockListXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?><BlockList>";
-    foreach (var blockId in blockIds)
-    {
-        blockListXml += $"<Latest>{blockId}</Latest>";
-    }
-    blockListXml += "</BlockList>";
-
-    var finalizeUri = $"{currentSasUri}&comp=blocklist";
-    
-    using var finalizeRequest = new HttpRequestMessage(HttpMethod.Put, finalizeUri);
-    finalizeRequest.Content = new StringContent(blockListXml, Encoding.UTF8);
-    finalizeRequest.Content.Headers.ContentType = null; // Remove Content-Type for block list
-    
-    var finalizeResponse = await azureHttpClient.SendAsync(finalizeRequest);
-
-    if (!finalizeResponse.IsSuccessStatusCode)
-    {
-        var errorText = await finalizeResponse.Content.ReadAsStringAsync();
-        Console.WriteLine($"❌ Finalization failed: {finalizeResponse.StatusCode}");
-        Console.WriteLine($"Error response: {errorText}");
-        throw new Exception($"Failed to finalize upload. Status: {finalizeResponse.StatusCode}, Response: {errorText}");
-    }
-
-    Console.WriteLine($"✅ Successfully uploaded file to Azure Storage with correct Content-Type");
-}
-
-     private async Task CommitFileAsync(string appId, string contentVersionId, string fileId, EncryptionInfo encryptionInfo)
-{
-    Console.WriteLine("==========================================================");
-    Console.WriteLine("=== COMMITTING FILE (DETAILED DEBUG) ===");
-    Console.WriteLine("==========================================================");
-    Console.WriteLine($"AppId: {appId}");
-    Console.WriteLine($"ContentVersionId: {contentVersionId}");
-    Console.WriteLine($"FileId: {fileId}");
-    Console.WriteLine("");
-    Console.WriteLine("=== ENCRYPTION INFO VALIDATION ===");
-    Console.WriteLine($"EncryptionKey: '{encryptionInfo.EncryptionKey}' (Length: {encryptionInfo.EncryptionKey?.Length ?? 0})");
-    Console.WriteLine($"MacKey: '{encryptionInfo.MacKey}' (Length: {encryptionInfo.MacKey?.Length ?? 0})");
-    Console.WriteLine($"InitializationVector: '{encryptionInfo.InitializationVector}' (Length: {encryptionInfo.InitializationVector?.Length ?? 0})");
-    Console.WriteLine($"Mac: '{encryptionInfo.Mac}' (Length: {encryptionInfo.Mac?.Length ?? 0})");
-    Console.WriteLine($"ProfileIdentifier: '{encryptionInfo.ProfileIdentifier}' (Length: {encryptionInfo.ProfileIdentifier?.Length ?? 0})");
-    Console.WriteLine($"FileDigest: '{encryptionInfo.FileDigest}' (Length: {encryptionInfo.FileDigest?.Length ?? 0})");
-    Console.WriteLine($"FileDigestAlgorithm: '{encryptionInfo.FileDigestAlgorithm}' (Length: {encryptionInfo.FileDigestAlgorithm?.Length ?? 0})");
-    Console.WriteLine("");
-
-    // Check for empty/null values
-    var issues = new List<string>();
-    if (string.IsNullOrWhiteSpace(encryptionInfo.EncryptionKey)) issues.Add("EncryptionKey is empty");
-    if (string.IsNullOrWhiteSpace(encryptionInfo.MacKey)) issues.Add("MacKey is empty");
-    if (string.IsNullOrWhiteSpace(encryptionInfo.InitializationVector)) issues.Add("InitializationVector is empty");
-    if (string.IsNullOrWhiteSpace(encryptionInfo.Mac)) issues.Add("Mac is empty");
-    if (string.IsNullOrWhiteSpace(encryptionInfo.FileDigest)) issues.Add("FileDigest is empty");
-
-    if (issues.Any())
-    {
-        Console.WriteLine("❌ ENCRYPTION ISSUES FOUND:");
-        foreach (var issue in issues)
-        {
-            Console.WriteLine($"   - {issue}");
-        }
-    }
-    else
-    {
-        Console.WriteLine("✅ All encryption fields appear populated");
-    }
-
-    var commitBody = new Dictionary<string, object>
-    {
-        ["fileEncryptionInfo"] = new Dictionary<string, object>
-        {
-            ["encryptionKey"] = encryptionInfo.EncryptionKey ?? "",
-            ["macKey"] = encryptionInfo.MacKey ?? "",
-            ["initializationVector"] = encryptionInfo.InitializationVector ?? "",
-            ["mac"] = encryptionInfo.Mac ?? "",
-            ["profileIdentifier"] = encryptionInfo.ProfileIdentifier ?? "ProfileVersion1",
-            ["fileDigest"] = encryptionInfo.FileDigest ?? "",
-            ["fileDigestAlgorithm"] = encryptionInfo.FileDigestAlgorithm ?? "SHA256"
-        }
-    };
-
-    var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions/{contentVersionId}/files/{fileId}/commit";
-    var json = JsonSerializer.Serialize(commitBody, new JsonSerializerOptions 
-    { 
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true  // Make it readable
-    });
-    
-    Console.WriteLine("=== COMMIT REQUEST ===");
-    Console.WriteLine($"URL: {url}");
-    Console.WriteLine("PAYLOAD:");
-    Console.WriteLine(json);
-    Console.WriteLine("");
-    
-    var content = new StringContent(json, Encoding.UTF8, "application/json");
-    
-    try
-    {
-        var response = await _httpClient!.PostAsync(url, content);
-        var responseText = await response.Content.ReadAsStringAsync();
-
-        Console.WriteLine("=== COMMIT RESPONSE ===");
-        Console.WriteLine($"Status Code: {response.StatusCode} ({(int)response.StatusCode})");
-        Console.WriteLine($"Success: {response.IsSuccessStatusCode}");
-        Console.WriteLine("Response Body:");
-        Console.WriteLine(responseText);
-        Console.WriteLine("==========================================================");
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new Exception($"Failed to commit file. Status: {response.StatusCode}, Response: {responseText}");
-        }
-
-        Console.WriteLine($"✅ File committed successfully");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ EXCEPTION during commit: {ex.Message}");
-        Console.WriteLine($"Exception Type: {ex.GetType().Name}");
-        Console.WriteLine("==========================================================");
-        throw;
-    }
-}
 
       private async Task WaitForFileProcessingAsync(string appId, string contentVersionId, string fileId, string stage)
         {
@@ -967,10 +1081,13 @@ namespace IntunePackagingTool
             {
                 case DetectionRuleType.File:
                     return ConvertFileDetectionForBetaAPI(rule);
-                    
+
                 case DetectionRuleType.Registry:
                     return ConvertRegistryDetectionForBetaAPI(rule);
-                    
+
+                case DetectionRuleType.MSI:
+                    return ConvertMsiDetectionForBetaAPI(rule);
+
                 default:
                     Debug.WriteLine($"⚠ Cannot convert {rule.Type} detection rule for beta API yet");
                     return null;
@@ -987,11 +1104,11 @@ namespace IntunePackagingTool
                 ["check32BitOn64System"] = false
             };
 
-            if (rule.CheckVersion && !string.IsNullOrEmpty(rule.DetectionValue))
+            if (rule.CheckVersion)
             {
                 fileRule["detectionType"] = "version";
-                fileRule["operator"] = string.IsNullOrEmpty(rule.Operator) ? "greaterThanOrEqual" : rule.Operator;
-                fileRule["detectionValue"] = rule.DetectionValue.Trim();
+                fileRule["operator"] = "greaterThanOrEqual"; // Default operator
+                fileRule["detectionValue"] = "1.0.0"; // Default version - you can enhance this later
             }
             else
             {
@@ -1006,31 +1123,60 @@ namespace IntunePackagingTool
             var registryRule = new Dictionary<string, object>
             {
                 ["@odata.type"] = "#microsoft.graph.win32LobAppRegistryDetection",
-                ["keyPath"] = rule.RegistryKey.Trim(),
+                ["keyPath"] = rule.Path.Trim(), // Use Path property for registry key
                 ["check32BitOn64System"] = false
             };
 
-            if (!string.IsNullOrEmpty(rule.RegistryValueName))
+            // If FileOrFolderName is set, it's the registry value name
+            if (!string.IsNullOrEmpty(rule.FileOrFolderName))
             {
-                registryRule["valueName"] = rule.RegistryValueName.Trim();
-                
-                if (!string.IsNullOrEmpty(rule.ExpectedValue))
-                {
-                    registryRule["detectionType"] = "string";
-                    registryRule["operator"] = string.IsNullOrEmpty(rule.Operator) ? "equal" : rule.Operator;
-                    registryRule["detectionValue"] = rule.ExpectedValue.Trim();
-                }
-                else
-                {
-                    registryRule["detectionType"] = "exists";
-                }
+                registryRule["valueName"] = rule.FileOrFolderName.Trim();
+                registryRule["detectionType"] = "exists"; // Default to exists check
             }
             else
             {
-                registryRule["detectionType"] = "exists";
+                registryRule["detectionType"] = "exists"; // Key exists check
             }
 
             return registryRule;
+        }
+
+        private Dictionary<string, object> ConvertMsiDetectionForBetaAPI(DetectionRule rule)
+        {
+            var msiRule = new Dictionary<string, object>
+            {
+                ["@odata.type"] = "#microsoft.graph.win32LobAppProductCodeDetection",
+                ["productCode"] = rule.Path.Trim(), // MSI product code stored in Path
+                ["productVersionOperator"] = "notConfigured"
+            };
+
+            // If CheckVersion is true and FileOrFolderName contains version info
+            if (rule.CheckVersion && !string.IsNullOrEmpty(rule.FileOrFolderName))
+            {
+                // Parse the version info stored as "operator:version"
+                var versionParts = rule.FileOrFolderName.Split(':');
+                if (versionParts.Length == 2)
+                {
+                    var operatorText = versionParts[0].Trim();
+                    var versionValue = versionParts[1].Trim();
+
+                    // Convert operator text to API format
+                    var apiOperator = operatorText switch
+                    {
+                        "Greater than or equal to" => "greaterThanOrEqual",
+                        "Equal to" => "equal",
+                        "Greater than" => "greaterThan",
+                        "Less than" => "lessThan",
+                        "Less than or equal to" => "lessThanOrEqual",
+                        _ => "greaterThanOrEqual"
+                    };
+
+                    msiRule["productVersionOperator"] = apiOperator;
+                    msiRule["productVersion"] = versionValue;
+                }
+            }
+
+            return msiRule;
         }
 
         private async Task<string> RenewSasUriAsync()
