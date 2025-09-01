@@ -10,4 +10,11 @@
 		<PublishSingleFile>true</PublishSingleFile>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	</PropertyGroup>
+	<ItemGroup>
+		<Folder Include="Services\" />
+		<Folder Include="Utilities\" />
+		<Folder Include="Views\" />
+		<Folder Include="Dialogs\" />
+		<Folder Include="Dialogs\WizardSteps\" />
+	</ItemGroup>
 </Project>

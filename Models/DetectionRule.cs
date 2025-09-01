@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel;
 
-namespace IntunePackagingTool
+namespace IntunePackagingTool.Models
 {
     public enum DetectionRuleType
     {

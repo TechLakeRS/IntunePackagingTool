@@ -5,17 +5,15 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 
-namespace IntunePackagingTool
+namespace IntunePackagingTool.Models
 {
-    public class ApplicationDetail : INotifyPropertyChanged
+    /// <summary>
+    /// Full application details from Microsoft Graph API
+    /// Extends IntuneApplication with all additional properties
+    /// </summary>
+    public class ApplicationDetail : IntuneApplication, INotifyPropertyChanged
     {
-        // Basic Information (matching your IntuneApplication class)
-        public string Id { get; set; } = "";
-        public string DisplayName { get; set; } = "";
-        public string Version { get; set; } = "";
-        public string Publisher { get; set; } = "";
-        public string Category { get; set; } = "";
-        public string Description { get; set; } = "";
+        
         public string InstallContext { get; set; } = "System";
         public string InstallCommand { get; set; } = "Deploy-Application.exe Install";
         public string UninstallCommand { get; set; } = "Deploy-Application.exe Uninstall";
@@ -31,7 +29,6 @@ namespace IntunePackagingTool
             {
                 _iconData = value;
                 OnPropertyChanged();
-                // Automatically create BitmapImage when IconData is set
                 if (value != null && value.Length > 0)
                 {
                     CreateIconImage();
@@ -64,7 +61,6 @@ namespace IntunePackagingTool
             {
                 System.Diagnostics.Debug.WriteLine($"Creating icon from {_iconData.Length} bytes...");
 
-                // Try creating on UI thread
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     var bitmap = new BitmapImage();
@@ -79,8 +75,6 @@ namespace IntunePackagingTool
                     }
                     IconImage = bitmap;
                     System.Diagnostics.Debug.WriteLine($"✅ Icon created: {bitmap.PixelWidth}x{bitmap.PixelHeight}");
-                    System.Diagnostics.Debug.WriteLine($"✅ Icon frozen: {bitmap.IsFrozen}");
-                    System.Diagnostics.Debug.WriteLine($"✅ IconImage is null: {IconImage == null}");
                 });
             }
             catch (Exception ex)
@@ -90,14 +84,12 @@ namespace IntunePackagingTool
             }
         }
 
-
-
         // Extended Properties from Microsoft Graph API
         public string Owner { get; set; } = "";
         public string Developer { get; set; } = "";
         public string Notes { get; set; } = "";
         public string FileName { get; set; } = "";
-        public long Size { get; set; } 
+        public long Size { get; set; }
         public DateTime CreatedDateTime { get; set; } = DateTime.MinValue;
         public DateTime LastModifiedDateTime { get; set; } = DateTime.MinValue;
         public bool IsFeatured { get; set; } = false;
@@ -108,15 +100,15 @@ namespace IntunePackagingTool
         public string PublishingState { get; set; } = "";
         public string ApplicableArchitectures { get; set; } = "";
         public string AllowedArchitectures { get; set; } = "";
-        public int? MinimumFreeDiskSpaceInMB { get; set; } 
+        public int? MinimumFreeDiskSpaceInMB { get; set; }
         public int? MinimumMemoryInMB { get; set; }
-        public int? MinimumNumberOfProcessors { get; set; } 
+        public int? MinimumNumberOfProcessors { get; set; }
         public int? MinimumCpuSpeedInMHz { get; set; }
         public string SetupFilePath { get; set; } = "";
         public string MinimumSupportedWindowsRelease { get; set; } = "";
         public bool AllowAvailableUninstall { get; set; }
 
-        // Collections (using your existing DetectionRule class)
+        // Collections
         public List<DetectionRule> DetectionRules { get; set; } = new List<DetectionRule>();
         public List<AssignedGroup> AssignedGroups { get; set; } = new List<AssignedGroup>();
         public List<RequirementRule> RequirementRules { get; set; } = new List<RequirementRule>();
@@ -152,6 +144,7 @@ namespace IntunePackagingTool
         }
     }
 
+    // Keep these supporting classes in the same file
     public class GroupAssignmentIds
     {
         public string SystemInstallId { get; set; }
@@ -163,11 +156,10 @@ namespace IntunePackagingTool
             .Count(id => !string.IsNullOrEmpty(id));
     }
 
-
     public class AssignedGroup
     {
         public string GroupName { get; set; } = "";
-        public string AssignmentType { get; set; } = ""; // Available, Required, Uninstall
+        public string AssignmentType { get; set; } = "";
     }
 
     public class RequirementRule
@@ -178,7 +170,7 @@ namespace IntunePackagingTool
 
     public class ReturnCode
     {
-        public int Code { get; set; } 
+        public int Code { get; set; }
         public string Type { get; set; } = "";
         public string Description => $"Exit Code {Code}: {Type}";
     }

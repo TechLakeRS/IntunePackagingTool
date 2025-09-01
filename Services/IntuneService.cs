@@ -1,4 +1,5 @@
-using IntunePackagingTool.DialogWindows.WizardSteps;
+using IntunePackagingTool.WizardSteps;
+using IntunePackagingTool.Models; 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,7 +15,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 
-namespace IntunePackagingTool
+namespace IntunePackagingTool.Services
+
 {
     public class IntuneService
     {

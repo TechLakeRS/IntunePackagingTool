@@ -3,8 +3,9 @@ using System.Threading.Tasks;
 using System;
 using System.Linq;
 using System.Text;
+using IntunePackagingTool.Models;
 
-namespace IntunePackagingTool
+namespace IntunePackagingTool.Services
 {
     public class PSADTOptions
     {

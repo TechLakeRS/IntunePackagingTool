@@ -1,15 +1,11 @@
+using System;
+
 namespace IntunePackagingTool
 {
-    public class IntuneApplication
-    {
-        public string DisplayName { get; set; } = "";
-        public string Description { get; set; }
-        public string Version { get; set; } = "";
-        public string Category { get; set; } = "";
-        public string Id { get; set; } = "";
-        public string Publisher { get; set; } = "";
-        public DateTime LastModified { get; set; }
-    }
+    /// <summary>
+    /// Input model for creating new application packages
+    /// Uses different property names for historical/UI reasons
+    /// </summary>
 
     public class ApplicationInfo
     {
@@ -20,6 +16,5 @@ namespace IntunePackagingTool
         public string SourcesPath { get; set; } = "";
         public string ServiceNowSRI { get; set; } = "";
     }
-
 
 }

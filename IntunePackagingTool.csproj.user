@@ -4,19 +4,7 @@
     <_LastSelectedProfileId>C:\Users\admin.sarkerr\source\repos\IntunePackagingTool\Properties\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Update="ApplicationDetailView.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Update="DialogWindows\IntuneUploadWizard.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Update="DialogWindows\WizardSteps\AppDetailsStep.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Update="DialogWindows\WizardSteps\DetectionRulesStep.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Update="DialogWindows\WizardSteps\ReviewUploadStep.xaml.cs">
+    <Compile Update="Views\ApplicationDetailView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

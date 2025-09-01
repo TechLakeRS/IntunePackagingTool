@@ -9,8 +9,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using IntunePackagingTool.Models;
 
-namespace IntunePackagingTool
+namespace IntunePackagingTool.Services
 {
     public interface IUploadProgress
     {
