@@ -20,7 +20,7 @@ namespace IntunePackagingTool.Services
 
     public class IntuneUploadService : IDisposable
     {
-        private HttpClient? _httpClient;
+        private HttpClient? sharedHttpClient;
         private readonly IntuneService _intuneService;
          private string _currentAppId = "";
          private string _currentContentVersionId = "";
@@ -33,10 +33,10 @@ namespace IntunePackagingTool.Services
 
         private void EnsureHttpClient()
         {
-            if (_httpClient == null)
+            if (sharedHttpClient == null)
             {
-                _httpClient = new HttpClient();
-                _httpClient.Timeout = TimeSpan.FromMinutes(30); // Increased for file uploads
+                sharedHttpClient = new HttpClient();
+                sharedHttpClient.Timeout = TimeSpan.FromMinutes(30); // Increased for file uploads
             }
         }
 
@@ -56,7 +56,7 @@ namespace IntunePackagingTool.Services
                 progress?.UpdateProgress(5, "Authenticating with Microsoft Graph...");
                 var token = await _intuneService.GetAccessTokenAsync();
                 EnsureHttpClient();
-                _httpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                sharedHttpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
                 // Step 1: Create the .intunewin file
                 progress?.UpdateProgress(10, "Converting package to .intunewin format...");
@@ -535,7 +535,7 @@ namespace IntunePackagingTool.Services
 
             
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient!.PostAsync("https://graph.microsoft.com/beta/deviceAppManagement/mobileApps", content);
+            var response = await sharedHttpClient!.PostAsync("https://graph.microsoft.com/beta/deviceAppManagement/mobileApps", content);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -606,7 +606,7 @@ namespace IntunePackagingTool.Services
         {
             var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions";
             var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await _httpClient!.PostAsync(url, content);
+            var response = await sharedHttpClient!.PostAsync(url, content);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -647,7 +647,7 @@ namespace IntunePackagingTool.Services
     Debug.WriteLine(json);
     
     var content = new StringContent(json, Encoding.UTF8, "application/json");
-    var response = await _httpClient!.PostAsync(url, content);
+    var response = await sharedHttpClient!.PostAsync(url, content);
     var responseText = await response.Content.ReadAsStringAsync();
 
     if (!response.IsSuccessStatusCode)
@@ -673,7 +673,7 @@ namespace IntunePackagingTool.Services
     {
         try
         {
-            var response = await _httpClient!.GetAsync(url);
+            var response = await sharedHttpClient!.GetAsync(url);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -802,8 +802,19 @@ namespace IntunePackagingTool.Services
                 var blockId = Convert.ToBase64String(Encoding.ASCII.GetBytes(chunkIndex.ToString("0000")));
                 blockIds.Add(blockId);
 
-                var buffer = new byte[Math.Min(chunkSize, totalSize - (chunkIndex * chunkSize))];
-                await fileStream.ReadAsync(buffer, 0, buffer.Length);
+                var remainingBytes = Math.Min(chunkSize, totalSize - (chunkIndex * chunkSize));
+                var buffer = new byte[remainingBytes];
+                var totalBytesRead = 0;
+
+                while (totalBytesRead < buffer.Length)
+                {
+                    var bytesRead = await fileStream.ReadAsync(buffer, totalBytesRead, buffer.Length - totalBytesRead);
+                    if (bytesRead == 0)
+                    {
+                        throw new EndOfStreamException($"Unexpected end of file. Expected {buffer.Length} bytes but got {totalBytesRead}");
+                    }
+                    totalBytesRead += bytesRead;
+                }
                 var bytesUploaded = (long)chunkIndex * chunkSize;
                 var percentComplete = (int)((bytesUploaded * 100) / totalSize);
                 var progressPercentage = 65 + (int)((chunkIndex + 1.0) / totalChunks * 15);
@@ -943,7 +954,7 @@ namespace IntunePackagingTool.Services
     
             try
             {
-                var response = await _httpClient!.PostAsync(url, content);
+                var response = await sharedHttpClient!.PostAsync(url, content);
                 var responseText = await response.Content.ReadAsStringAsync();
 
                
@@ -957,8 +968,8 @@ namespace IntunePackagingTool.Services
             }
             catch (Exception ex)
             {
-          
-                throw;
+
+                throw new Exception($"Failed to upload application to Intune: {ex.Message}", ex);
             }
         }
 
@@ -974,7 +985,7 @@ namespace IntunePackagingTool.Services
             
             for (int attempts = 0; attempts < 120; attempts++)
             {
-                var response = await _httpClient!.GetAsync(url);
+                var response = await sharedHttpClient!.GetAsync(url);
                 var responseText = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -1049,7 +1060,7 @@ namespace IntunePackagingTool.Services
             var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}";
             var json = JsonSerializer.Serialize(commitBody, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient!.PatchAsync(url, content);
+            var response = await sharedHttpClient!.PatchAsync(url, content);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -1185,7 +1196,7 @@ namespace IntunePackagingTool.Services
             var renewUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{_currentAppId}/microsoft.graph.win32LobApp/contentVersions/{_currentContentVersionId}/files/{_currentFileId}/renewUpload";
             
             var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await _httpClient!.PostAsync(renewUrl, content);
+            var response = await sharedHttpClient!.PostAsync(renewUrl, content);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -1203,7 +1214,7 @@ namespace IntunePackagingTool.Services
             
             for (int attempts = 0; attempts < 30; attempts++) // 5 minutes max
             {
-                var response = await _httpClient!.GetAsync(url);
+                var response = await sharedHttpClient!.GetAsync(url);
                 var responseText = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -1239,7 +1250,7 @@ namespace IntunePackagingTool.Services
 
         public void Dispose()
         {
-            _httpClient?.Dispose();
+            sharedHttpClient?.Dispose();
         }
     }
 

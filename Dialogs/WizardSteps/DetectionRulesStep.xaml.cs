@@ -132,10 +132,17 @@ namespace IntunePackagingTool.WizardSteps
                     var directory = Path.GetDirectoryName(selectedFile);
                     var fileName = Path.GetFileName(selectedFile);
 
-                    // Convert absolute path to environment variable path if possible
-                    string environmentPath = ConvertToEnvironmentPath(directory);
+                    if (directory != null)
+                    {
+                        string environmentPath = ConvertToEnvironmentPath(directory);
+                        FilePathTextBox.Text = environmentPath;
+                    }
+                    else
+                    {
+                       
+                        FilePathTextBox.Text = string.Empty;
+                    }
 
-                    FilePathTextBox.Text = environmentPath;
                     FileNameTextBox.Text = fileName;
                 }
             }

@@ -1,5 +1,6 @@
-using IntunePackagingTool.WizardSteps;
+using IntunePackagingTool.Dialogs;
 using IntunePackagingTool.Models; 
+using IntunePackagingTool.WizardSteps;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,49 +19,32 @@ using System.Windows.Media.Imaging;
 namespace IntunePackagingTool.Services
 
 {
-    public class IntuneService
+    public class IntuneService : IDisposable
     {
-        // Remove static to allow proper disposal and recreation
-        private HttpClient? _httpClient;
+        private static readonly HttpClient _sharedHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+
+        private readonly CacheService _cache = new CacheService();
+
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
-        private bool _enableDebug = false;
+        private bool _disposed = false;
 
         private readonly string _clientId = "b47987a1-70b4-415a-9a4e-9775473e382b";
         private readonly string _tenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7";
         private readonly string _certificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F";
 
-        public void EnableDebug(bool enable)
-        {
-            _enableDebug = enable;
-        }
-
-        private void ShowDebug(string message, string title = "Debug")
-        {
-            if (_enableDebug)
-            {
-                MessageBox.Show(message, title);
-            }
-        }
-
-        private void EnsureHttpClient()
-        {
-            if (_httpClient == null)
-            {
-                _httpClient = new HttpClient();
-                _httpClient.Timeout = TimeSpan.FromMinutes(2);
-            }
-        }
-
         public async Task<string> GetAccessTokenAsync()
         {
             if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
             {
-                ShowDebug("Using cached access token", "Debug - Step 1");
+                
                 return _accessToken;
             }
 
-            EnsureHttpClient();
+           
             var certificate = LoadCertificate();
             var assertion = CreateJwtAssertion(certificate);
 
@@ -74,26 +58,28 @@ namespace IntunePackagingTool.Services
             });
 
             var tokenUrl = $"https://login.microsoftonline.com/{_tenantId}/oauth2/v2.0/token";
-            var response = await _httpClient!.PostAsync(tokenUrl, content);
+            var response = await _sharedHttpClient!.PostAsync(tokenUrl, content);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
-                ShowDebug($"Token request failed: {response.StatusCode}\n{responseText}", "Debug - Token Error");
+                
                 throw new Exception($"Failed to get access token. Status: {response.StatusCode}, Response: {responseText}");
             }
 
             var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseText);
             if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
             {
-                ShowDebug("Access token is missing in response", "Debug - Token Error");
+               
                 throw new Exception("Access token is missing in response");
             }
 
             _accessToken = tokenResponse.AccessToken;
             _tokenExpiry = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn);
 
-            ShowDebug("Access token obtained successfully", "Debug - Success");
+            _sharedHttpClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+
             return _accessToken;
         }
 
@@ -104,7 +90,7 @@ namespace IntunePackagingTool.Services
             var certificates = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
             if (certificates.Count == 0)
             {
-                ShowDebug("Certificate not found", "Debug - Certificate Error");
+               
                 throw new Exception("Certificate not found");
             }
             return certificates[0];
@@ -142,6 +128,12 @@ namespace IntunePackagingTool.Services
             var messageBytes = Encoding.UTF8.GetBytes(message);
 
             using var rsa = certificate.GetRSAPrivateKey();
+            if (rsa == null)
+            {
+                throw new InvalidOperationException(
+                    "Certificate does not contain a private key. " +
+                    "Please ensure you're using a certificate with a private key for authentication.");
+            }
             var signature = rsa.SignData(messageBytes, System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
             var signatureEncoded = Base64UrlEncode(signature);
 
@@ -156,7 +148,19 @@ namespace IntunePackagingTool.Services
                 .Replace("=", "");
         }
 
-        public async Task<List<IntuneApplication>> GetApplicationsAsync()
+        public async Task<List<IntuneApplication>> GetApplicationsAsync(bool forceRefresh = false)
+        {
+            if (forceRefresh)
+            {
+                _cache.Clear("apps_list");
+            }
+
+            return await _cache.GetOrAddAsync("apps_list",
+                async () => await GetApplicationsFromGraphAsync(),
+                TimeSpan.FromMinutes(10));
+        }
+
+        public async Task<List<IntuneApplication>> GetApplicationsFromGraphAsync()
         {
             try
             {
@@ -165,15 +169,12 @@ namespace IntunePackagingTool.Services
                 
                 var token = await GetAccessTokenAsync();
                 Debug.WriteLine($"✓ Token obtained for Graph API call, length: {token.Length}");
-                
-                EnsureHttpClient();
-                _httpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
                 // Try with smaller batch and expand categories - if it fails, we'll fallback
                 var requestUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps?$filter=isof('microsoft.graph.win32LobApp')&$expand=categories&$top=100";
                 Debug.WriteLine($"Making Graph API request to: {requestUrl}");
 
-                var response = await _httpClient.GetAsync(requestUrl);
+                var response = await _sharedHttpClient.GetAsync(requestUrl);
                 var responseText = await response.Content.ReadAsStringAsync();
 
                 Debug.WriteLine($"Graph API response status: {response.StatusCode}");
@@ -187,7 +188,7 @@ namespace IntunePackagingTool.Services
                     requestUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps?$filter=isof('microsoft.graph.win32LobApp')&$top=100";
                     Debug.WriteLine($"Fallback request to: {requestUrl}");
                     
-                    response = await _httpClient.GetAsync(requestUrl);
+                    response = await _sharedHttpClient.GetAsync(requestUrl);
                     responseText = await response.Content.ReadAsStringAsync();
                     
                     if (!response.IsSuccessStatusCode)
@@ -276,7 +277,7 @@ namespace IntunePackagingTool.Services
                 {
                     Debug.WriteLine($"Getting page {pageCount + 1}...");
                     
-                    var nextResponse = await _httpClient.GetAsync(graphResponse!.ODataNextLink);
+                    var nextResponse = await _sharedHttpClient.GetAsync(graphResponse!.ODataNextLink);
                     if (!nextResponse.IsSuccessStatusCode) break;
                     
                     var nextResponseText = await nextResponse.Content.ReadAsStringAsync();
@@ -345,22 +346,34 @@ namespace IntunePackagingTool.Services
                 throw;
             }
         }
+        public async Task<ApplicationDetail> GetApplicationDetailAsync(string intuneAppId, bool forceRefresh = false)
+        {
+            var cacheKey = $"app_detail_{intuneAppId}";
 
-        public async Task<ApplicationDetail> GetApplicationDetailAsync(string intuneAppId)
+            if (forceRefresh)
+            {
+                _cache.Clear(cacheKey);
+            }
+
+            return await _cache.GetOrAddAsync(cacheKey,
+                async () => await GetApplicationDetailFromGraphAsync(intuneAppId),
+                TimeSpan.FromMinutes(15));
+        }
+        public async Task<ApplicationDetail> GetApplicationDetailFromGraphAsync(string intuneAppId)
          {
             try
             {
             Debug.WriteLine($"=== FETCHING APP DETAILS FOR: {intuneAppId} ===");
 
             var token = await GetAccessTokenAsync();
-            EnsureHttpClient();
-            _httpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            
+            
 
             // Get the complete application details including detection rules in single call
             var appUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{intuneAppId}";
             Debug.WriteLine($"Getting complete app details from: {appUrl}");
 
-            var appResponse = await _httpClient.GetAsync(appUrl);
+            var appResponse = await _sharedHttpClient.GetAsync(appUrl);
             var appResponseText = await appResponse.Content.ReadAsStringAsync();
 
             if (!appResponse.IsSuccessStatusCode)
@@ -695,13 +708,12 @@ namespace IntunePackagingTool.Services
             try
             {
                 var token = await GetAccessTokenAsync();
-                EnsureHttpClient();
-                _httpClient.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+               
+               
 
                 // First check if group exists
                 var checkUrl = $"https://graph.microsoft.com/v1.0/groups?$filter=displayName eq '{Uri.EscapeDataString(displayName)}'";
-                var checkResponse = await _httpClient.GetAsync(checkUrl);
+                var checkResponse = await _sharedHttpClient.GetAsync(checkUrl);
 
                 if (checkResponse.IsSuccessStatusCode)
                 {
@@ -732,7 +744,7 @@ namespace IntunePackagingTool.Services
                 var content = new StringContent(JsonSerializer.Serialize(groupPayload),
                     System.Text.Encoding.UTF8, "application/json");
 
-                var createResponse = await _httpClient.PostAsync(createUrl, content);
+                var createResponse = await _sharedHttpClient.PostAsync(createUrl, content);
                 var responseContent = await createResponse.Content.ReadAsStringAsync();
 
                 if (!createResponse.IsSuccessStatusCode)
@@ -758,9 +770,8 @@ namespace IntunePackagingTool.Services
             try
             {
                 var token = await GetAccessTokenAsync();
-                EnsureHttpClient();
-                _httpClient.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+               
+                
 
                 // Create install assignments
                 if (!string.IsNullOrEmpty(groupIds.SystemInstallId))
@@ -809,7 +820,7 @@ namespace IntunePackagingTool.Services
             var content = new StringContent(JsonSerializer.Serialize(assignmentPayload),
                 System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(url, content);
+            var response = await _sharedHttpClient.PostAsync(url, content);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -823,7 +834,7 @@ namespace IntunePackagingTool.Services
             }
         }
 
-        // Add this method if you don't have it already
+        
         
 
         private async Task<List<AssignedGroup>> GetAssignedGroupsAsync(string appId)
@@ -833,7 +844,7 @@ namespace IntunePackagingTool.Services
             try
             {
                 var assignmentsUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/assignments";
-                var response = await _httpClient!.GetAsync(assignmentsUrl);
+                var response = await _sharedHttpClient!.GetAsync(assignmentsUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -907,7 +918,7 @@ namespace IntunePackagingTool.Services
             try
             {
                 var groupUrl = $"https://graph.microsoft.com/beta/groups/{groupId}?$select=displayName";
-                var response = await _httpClient!.GetAsync(groupUrl);
+                var response = await _sharedHttpClient!.GetAsync(groupUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -929,7 +940,7 @@ namespace IntunePackagingTool.Services
             try
             {
                 var categoriesUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/categories";
-                var response = await _httpClient!.GetAsync(categoriesUrl);
+                var response = await _sharedHttpClient!.GetAsync(categoriesUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -962,26 +973,49 @@ namespace IntunePackagingTool.Services
             return "Uncategorized";
         }
 
-        public async Task RunFullDebugTestAsync()
+        public async Task<List<string>> GetApplicationCategoriesAsync()
         {
-            EnableDebug(true);
-
             try
             {
-                ShowDebug("Starting comprehensive debug test...", "Debug Test");
-
                 var token = await GetAccessTokenAsync();
-                ShowDebug($"✓ Token obtained. Length: {token.Length}", "Debug Test");
+                var url = "https://graph.microsoft.com/beta/deviceAppManagement/mobileAppCategories";
 
-                var apps = await GetApplicationsAsync();
-                ShowDebug($"✓ Retrieved {apps.Count} Win32 applications from Intune.", "Debug Test");
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-                ShowDebug("🎉 COMPLETE SUCCESS! All tests passed.", "Debug Test");
+                var response = await httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(json);
+
+                    var categories = new List<string>();
+                    if (doc.RootElement.TryGetProperty("value", out var value))
+                    {
+                        foreach (var cat in value.EnumerateArray())
+                        {
+                            if (cat.TryGetProperty("displayName", out var name))
+                            {
+                                var categoryName = name.GetString();
+                                if (!string.IsNullOrWhiteSpace(categoryName))
+                                    categories.Add(categoryName);
+                            }
+                        }
+                    }
+
+                    // Sort alphabetically for easier selection
+                    categories.Sort();
+                    return categories;
+                }
             }
             catch (Exception ex)
             {
-                ShowDebug($"❌ Debug test failed: {ex.Message}", "Debug Test");
+                Debug.WriteLine($"Error fetching categories: {ex.Message}");
             }
+
+            // Return empty list if fetch fails (will fall back to hardcoded)
+            return new List<string>();
         }
 
         public async Task <string>UploadApplicationAsync(ApplicationInfo appInfo, List<DetectionRule> detectionRules = null)
@@ -989,10 +1023,6 @@ namespace IntunePackagingTool.Services
             try
             {
                 var token = await GetAccessTokenAsync();
-                EnsureHttpClient();
-                _httpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-                string appId = "generated-app-id"; // Get this from the actual upload response
-                return appId;
                 await Task.Delay(1000); // Simulate upload delay
 
                 MessageBox.Show(
@@ -1000,6 +1030,9 @@ namespace IntunePackagingTool.Services
                     $"Package: {appInfo.Manufacturer}_{appInfo.Name}_{appInfo.Version}\n\n" +
                     $"Package is ready at the network location.\n",
                     "Upload Status", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                string appId = "generated-app-id"; // Get this from the actual upload response
+                return appId;
             }
             catch (Exception ex)
             {
@@ -1007,10 +1040,123 @@ namespace IntunePackagingTool.Services
             }
         }
 
+        public async Task<bool> UpdateApplicationAsync(
+       string appId,
+       string displayName,
+       string description,
+       string category,
+       List<DetectionRule> detectionRules,
+       string packagePath = null,
+       string iconPath = null)
+        {
+            try
+            {
+                var token = await GetAccessTokenAsync();
+                var updateUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}";
+
+                // Build update body
+                var updateBody = new Dictionary<string, object>
+                {
+                    ["@odata.type"] = "#microsoft.graph.win32LobApp",
+                    ["displayName"] = displayName,
+                    ["description"] = description,
+                    ["categories"] = new[] { category }
+                };
+
+                // Add detection rules if provided
+                if (detectionRules?.Count > 0)
+                {
+                    var formattedRules = new List<object>();
+
+                    foreach (var rule in detectionRules)
+                    {
+                        object formattedRule = rule.Type switch
+                        {
+                            DetectionRuleType.File => new
+                            {
+                                odataType = "#microsoft.graph.win32LobAppFileSystemDetection",
+                                path = rule.Path,
+                                fileOrFolderName = rule.FileOrFolderName,
+                                check32BitOn64System = false,
+                                detectionType = rule.CheckVersion ? "version" : "exists"
+                            },
+                            DetectionRuleType.Registry => new
+                            {
+                                odataType = "#microsoft.graph.win32LobAppRegistryDetection",
+                                check32BitOn64System = false,
+                                keyPath = rule.Path,
+                                valueName = rule.FileOrFolderName,
+                                detectionType = string.IsNullOrEmpty(rule.FileOrFolderName) ? "exists" : "string"
+                            },
+                            DetectionRuleType.MSI => new
+                            {
+                                odataType = "#microsoft.graph.win32LobAppProductCodeDetection",
+                                productCode = rule.Path,
+                                productVersionOperator = rule.Operator,
+                                productVersion = rule.FileOrFolderName
+                            },
+                            _ => null
+                        };
+
+                        if (formattedRule != null)
+                        {
+                            formattedRules.Add(formattedRule);
+                        }
+                    }
+
+                    updateBody["detectionRules"] = formattedRules;
+                }
+
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                var json = JsonSerializer.Serialize(updateBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var patchMethod = new HttpMethod("PATCH");
+                var request = new HttpRequestMessage(patchMethod, updateUrl)
+                {
+                    Content = content
+                };
+
+                var response = await httpClient.SendAsync(request);
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error updating app: {ex.Message}");
+                return false;
+            }
+        }
+
         // Dispose method to clean up HttpClient
         public void Dispose()
         {
-            _httpClient?.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Don't dispose the static HttpClient
+                    // Clear sensitive data
+                    _accessToken = null;
+
+                    // Clear any other managed resources if needed
+                }
+                _disposed = true;
+            }
+        }
+
+        ~IntuneService()
+        {
+            Dispose(false);
         }
     }
 

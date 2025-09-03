@@ -26,7 +26,7 @@ namespace IntunePackagingTool.WizardSteps
 
         // Events
         public delegate void UploadRequestedEventHandler(string installCommand, string uninstallCommand, string description, string installContext);
-        public event UploadRequestedEventHandler UploadRequested;
+        
 
         // Private fields
         private ApplicationDetail _applicationDetail;
@@ -337,6 +337,7 @@ namespace IntunePackagingTool.WizardSteps
             });
         }
 
+
         private async Task<string> UploadApplication()
         {
             EnsureIntuneService();
@@ -344,13 +345,18 @@ namespace IntunePackagingTool.WizardSteps
 
             try
             {
+                // Check PackagePath early
+                if (string.IsNullOrEmpty(PackagePath))
+                {
+                    throw new InvalidOperationException("Package path is required for upload. Please ensure a package has been selected.");
+                }
                 var appInfo = ApplicationInfo ?? new ApplicationInfo
                 {
                     Name = _applicationDetail?.DisplayName ?? "Unknown",
                     Version = _applicationDetail?.Version ?? "1.0.0",
                     Manufacturer = _applicationDetail?.Publisher ?? "Unknown",
                     InstallContext = _applicationDetail?.InstallContext ?? "System",
-                    SourcesPath = PackagePath ?? ""
+                    SourcesPath = PackagePath
                 };
 
                 var installCommand = _applicationDetail?.InstallCommand ?? "Deploy-Application.exe -DeploymentType Install";

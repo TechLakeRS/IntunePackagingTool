@@ -1,4 +1,7 @@
-﻿using Microsoft.Win32;
+﻿using IntunePackagingTool.Models;   
+using IntunePackagingTool.Services;  
+using IntunePackagingTool.Utilities; 
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -10,18 +13,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Input;
-using IntunePackagingTool.Models;   
-using IntunePackagingTool.Services;  
-using IntunePackagingTool.Utilities; 
+using System.Windows.Media;
+using System.Windows.Data;
 
 
 
 namespace IntunePackagingTool
 {
     public partial class MainWindow : Window
+
     {
+        private System.Windows.Threading.DispatcherTimer _searchTimer;
+        private string _pendingSearchText = "";
         private IntuneService _intuneService = new IntuneService();
         private PSADTGenerator _psadtGenerator = new PSADTGenerator();
         private ObservableCollection<IntuneApplication> _applications = new ObservableCollection<IntuneApplication>();
@@ -30,12 +34,16 @@ namespace IntunePackagingTool
         public MainWindow()
         {
             InitializeComponent();
+            _searchTimer = new System.Windows.Threading.DispatcherTimer();
+            _searchTimer.Interval = TimeSpan.FromMilliseconds(300); // 300ms delay
+            _searchTimer.Tick += SearchTimer_Tick;
             ShowPage("CreateApplication");
             SetActiveNavButton(CreateAppNavButton);
             ApplicationsList.ItemsSource = _applications;
             LoadCategoriesDropdown();
             Loaded += async (s, e) => await LoadAllApplicationsAsync();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
+       
 
         }
 
@@ -79,6 +87,7 @@ namespace IntunePackagingTool
                     ViewApplicationsPage.Visibility = Visibility.Visible;
                     PageTitle.Text = "Applications";
                     PageSubtitle.Text = "Browse and manage Microsoft Intune applications";
+                    SearchTextBox.Focus();
                     break;
                 case "Settings":
                     SettingsPage.Visibility = Visibility.Visible;
@@ -88,6 +97,15 @@ namespace IntunePackagingTool
             }
         }
 
+        private void btnRemoteTest_Click(object sender, RoutedEventArgs e)
+        {
+            string packagePath = _currentPackagePath;
+            var remoteTest = new RemoteTestWindow(packagePath)
+            {
+                Owner = this
+            };
+            remoteTest.ShowDialog();
+        }
         private async void ApplicationsList_DoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (ApplicationsList.SelectedItem != null)
@@ -156,6 +174,27 @@ namespace IntunePackagingTool
             // Set active button to active style
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // Stop the timer if it's running
+            _searchTimer.Stop();
+
+            // Store the search text
+            _pendingSearchText = SearchTextBox.Text;
+
+            // Start the timer
+            _searchTimer.Start();
+        }
+
+        // ADD THIS METHOD - Execute search after debounce delay
+        private void SearchTimer_Tick(object sender, EventArgs e)
+        {
+            _searchTimer.Stop();
+
+            // Perform the actual search
+            FilterApplications(_pendingSearchText);
+        }
         #endregion
 
         #region Quick Action Methods
@@ -169,6 +208,8 @@ namespace IntunePackagingTool
         {
             ShowPage("ViewApplications");
             UpdateNavigation(ViewAppsNavButton);
+
+            
         }
 
         private void QuickUploadToIntune_Click(object sender, RoutedEventArgs e)
@@ -187,8 +228,44 @@ namespace IntunePackagingTool
         #endregion
 
         #region Application Loading Methods
+        
+        private readonly int _pageSize = 50;
+        private int _currentPage = 0;
+        private List<IntuneApplication> _allApplications = new List<IntuneApplication>();
 
-        private async Task LoadAllApplicationsAsync()
+        private async Task LoadApplicationsPagedAsync()
+        {
+            try
+            {
+                ShowStatus($"Loading applications (page {_currentPage + 1})...");
+                ShowProgress(true);
+
+                // Load only if not cached
+                if (_allApplications.Count == 0)
+                {
+                    _allApplications = await _intuneService.GetApplicationsAsync();
+                }
+
+                // Display only current page
+                var pagedApps = _allApplications
+                    .Skip(_currentPage * _pageSize)
+                    .Take(_pageSize);
+
+                _applications.Clear();
+                foreach (var app in pagedApps)
+                {
+                    _applications.Add(app);
+                }
+
+                ShowStatus($"Showing {_applications.Count} of {_allApplications.Count} applications");
+            }
+            finally
+            {
+                ShowProgress(false);
+            }
+        }
+
+        private async Task LoadAllApplicationsAsync(bool forceRefresh = false)
         {
             try
             {
@@ -196,13 +273,22 @@ namespace IntunePackagingTool
                 ShowProgress(true);
 
                 // Load ALL apps once
-                var apps = await _intuneService.GetApplicationsAsync();
+                var apps = await _intuneService.GetApplicationsAsync(forceRefresh);
 
-                _applications.Clear();
-                foreach (var app in apps)
+                await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    _applications.Add(app);
-                }
+                    _applications.Clear();
+                    foreach (var app in apps)
+                    {
+                        _applications.Add(app);
+                    }
+
+                    // Set the DataContext for the ListView
+                    ApplicationsList.ItemsSource = _applications;
+
+                    // Force refresh
+                    CollectionViewSource.GetDefaultView(_applications).Refresh();
+                });
 
                 ShowStatus($"Loaded {apps.Count} applications");
                 ShowProgress(false);
@@ -249,64 +335,44 @@ namespace IntunePackagingTool
             FilterApplications(); // Just filter, don't reload
         }
 
-        private void FilterApplications()
+        private void FilterApplications(string searchText = null)
         {
-            if (CategoryFilter.SelectedItem == null) return;
+            if (_applications == null) return;
 
-            var selectedCategory = CategoryFilter.SelectedItem.ToString();
-            if (selectedCategory == "All Categories")
+            var filtered = _applications.AsEnumerable();
+
+            // Apply search filter if provided
+            if (!string.IsNullOrWhiteSpace(searchText))
             {
-                ApplicationsList.ItemsSource = _applications;
+                var lowerSearch = searchText.ToLower();
+                filtered = filtered.Where(app =>
+                    app.DisplayName?.ToLower().Contains(lowerSearch) == true ||
+                    app.Publisher?.ToLower().Contains(lowerSearch) == true ||
+                    app.Version?.ToLower().Contains(lowerSearch) == true);
             }
-            else
+
+            // Apply category filter if selected
+            if (CategoryFilter.SelectedItem != null)
             {
-                var filteredApps = _applications.Where(app =>
-                    !string.IsNullOrWhiteSpace(app.Category) &&
-                    app.Category.Equals(selectedCategory, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                ApplicationsList.ItemsSource = filteredApps;
+                var selectedCategory = CategoryFilter.SelectedItem.ToString();
+                if (selectedCategory != "All Categories")
+                {
+                    filtered = filtered.Where(app =>
+                        app.Category?.Equals(selectedCategory, StringComparison.OrdinalIgnoreCase) == true);
+                }
             }
+
+            // Update the ListView
+            ApplicationsList.ItemsSource = filtered.ToList();
         }
 
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            await LoadAllApplicationsAsync(); 
+            await LoadAllApplicationsAsync(forceRefresh: true); 
         }
 
-        private async void DebugTest_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                await _intuneService.RunFullDebugTestAsync();
-
-                if (!string.IsNullOrEmpty(_currentPackagePath))
-                {
-                    var intuneFolder = Path.Combine(_currentPackagePath, "Intune");
-                    if (Directory.Exists(intuneFolder))
-                    {
-                        var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
-                        if (intuneWinFiles.Length > 0)
-                        {
-                            MessageBox.Show("Found .intunewin file! Inspecting...", "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-                            IntuneWinDebugger.InspectIntuneWinFile(intuneWinFiles[0]);
-                        }
-                        else
-                        {
-                            MessageBox.Show("No .intunewin files found. Generate a package first.", "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-                        }
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("No current package. Generate a package first to test .intunewin inspection.", "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Debug test failed: {ex.Message}", "Debug Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+       
         #endregion
 
         #region Package Creation Methods
@@ -370,8 +436,20 @@ namespace IntunePackagingTool
             try
             {
                 // Create Windows Installer object
-                Type installerType = Type.GetTypeFromProgID("WindowsInstaller.Installer");
-                dynamic installer = Activator.CreateInstance(installerType);
+                Type? installerType = Type.GetTypeFromProgID("WindowsInstaller.Installer");
+                if (installerType == null)
+                {
+                    Console.WriteLine("Windows Installer not available");
+                    ExtractMetadataFromFilename(msiPath);
+                    return;
+                }
+                dynamic? installer = Activator.CreateInstance(installerType);
+                if (installer == null)
+                {
+                    Console.WriteLine("Failed to create Windows Installer instance");
+                    ExtractMetadataFromFilename(msiPath);
+                    return;
+                }
                 dynamic database = installer.OpenDatabase(msiPath, 0);
 
                 // Extract metadata
@@ -577,7 +655,7 @@ namespace IntunePackagingTool
                 };
 
                 // Collect PSADT options from UI checkboxes (only if Advanced Options are expanded and visible)
-                PSADTOptions psadtOptions = null;
+                PSADTOptions? psadtOptions = null;
 
                 if (AdvancedOptionsExpander.IsExpanded && PSADTOptionsPanel.Visibility == Visibility.Visible)
                 {
@@ -620,7 +698,7 @@ namespace IntunePackagingTool
 
                 // Use your existing PSADTGenerator
                 var generator = new PSADTGenerator();
-                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
+                string packagePath = await generator.CreatePackageAsync( appInfo, psadtOptions);
                 _currentPackagePath = packagePath;
 
                 // Show success and update UI
@@ -694,7 +772,7 @@ namespace IntunePackagingTool
 
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "powershell_ise.exe",
+                    FileName = "C:\\Program Files\\Microsoft VS Code\\Code.exe",
                     Arguments = $"\"{scriptPath}\"",
                     UseShellExecute = true
                 });

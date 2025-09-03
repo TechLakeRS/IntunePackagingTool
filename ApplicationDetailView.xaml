@@ -46,16 +46,32 @@
                            Foreground="White"/>
             </StackPanel>
 
-            <Button Grid.Column="2" Name="OpenScriptButton"
-                    Content="📝 Open Script" 
-                    Click="OpenScriptButton_Click"
-                    Background="#E74C3C" 
-                    Foreground="White"
-                    BorderThickness="0"
-                    Padding="15,12"
-                    Margin="10"
-                    FontWeight="Medium"
-                    Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" 
+                VerticalAlignment="Center" Margin="10">
+
+                <!-- Update Button -->
+                <Button Name="UpdateApplicationButton"
+                Content="📦 Update" 
+                Click="UpdateApplicationButton_Click"
+                Background="#2196F3" 
+                Foreground="White"
+                BorderThickness="0"
+                Padding="12,10"
+                Margin="0,0,8,0"
+                FontWeight="Medium"
+                Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+
+                <!-- Open Script Button -->
+                <Button Name="OpenScriptButton"
+                Content="📝 Open Script" 
+                Click="OpenScriptButton_Click"
+                Background="#E74C3C" 
+                Foreground="White"
+                BorderThickness="0"
+                Padding="12,10"
+                FontWeight="Medium"
+                Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+            </StackPanel>
         </Grid>
 
         <!-- Main content area -->
@@ -338,37 +354,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Additional Information -->
-                    <Border Background="#F8F9FA" CornerRadius="6" Padding="20" Margin="0,0,0,15"
-                            BorderBrush="#E1E8ED" BorderThickness="1">
-                        <StackPanel>
-                            <TextBlock Text="ℹ️ Additional Information" 
-                                       FontSize="16" FontWeight="SemiBold" 
-                                       Foreground="#2C3E50" Margin="0,0,0,15"/>
-
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="120"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Is Assigned:" FontWeight="Medium" Margin="0,8" Foreground="#555"/>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Name="IsAssignedText" Text="" Margin="0,8"/>
-
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Allow Uninstall:" FontWeight="Medium" Margin="0,8" Foreground="#555"/>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Name="AllowUninstallText" Text="" Margin="0,8"/>
-
-                                
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                  
 
                     <!-- URLs & Links -->
                     <Border Background="#F8F9FA" CornerRadius="6" Padding="20" Margin="0,0,0,15"
@@ -412,7 +398,7 @@
                                            FontFamily="Consolas" FontSize="11" 
                                            TextWrapping="Wrap"/>
                             </Border>
-
+                            
                             <StackPanel Name="ActionButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                 <Button Name="OpenFolderButton" Content="📂 Open Folder" 
                                         Click="OpenFolderButton_Click"

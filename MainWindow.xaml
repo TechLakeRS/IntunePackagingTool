@@ -125,7 +125,7 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="RefreshButton_Click"/>
-                        <Button Name="DebugTestButton" Content="🔍 Debug" Style="{StaticResource SecondaryButton}" Click="DebugTest_Click"/>
+                       
                     </StackPanel>
                 </Grid>
             </Border>
@@ -406,6 +406,21 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <Border Background="{StaticResource SecondaryBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
+                                                <TextBlock Text="2" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Remote Test PSADT script" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Button Name="btnRemoteTest" 
+                                                Content="🖥️ Remote Test" 
+                                                Click="btnRemoteTest_Click"
+                                                Style="{StaticResource ModernButton}"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Step 3: Upload to Intune -->
                                 <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16">
                                     <StackPanel>
@@ -428,7 +443,7 @@
                     <!-- VIEW APPLICATIONS PAGE -->
                     <Grid Name="ViewApplicationsPage" Visibility="Collapsed">
 
-                        <!-- Main Applications List (your existing functionality) -->
+                        <!-- Main Applications List  -->
                         <Border Name="ApplicationsListPanel" Style="{StaticResource ModernCard}">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -444,20 +459,34 @@
                                         <TextBlock Text="📱" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Text="Microsoft Intune Applications" FontSize="20" FontWeight="SemiBold" 
-                           Foreground="#212529" VerticalAlignment="Center"/>
+                               Foreground="#212529" VerticalAlignment="Center"/>
                                     <TextBlock Text="(Double-click any app for details)" FontSize="12" Foreground="#666" 
-                           VerticalAlignment="Center" Margin="16,0,0,0" FontStyle="Italic"/>
+                               VerticalAlignment="Center" Margin="16,0,0,0" FontStyle="Italic"/>
                                 </StackPanel>
 
-                                <!-- Filter Bar (keep your existing one) -->
+                                <!-- Filter Bar -->
                                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
-                                    <TextBox Width="300" Style="{StaticResource ModernTextBox}" 
-                       Text="🔍 Search applications..." Foreground="#999999" Margin="0,0,16,0"/>
-                                    <ComboBox Name="CategoryFilter" Width="200" Style="{StaticResource ModernComboBox}" 
-                        SelectedIndex="0" SelectionChanged="CategoryFilter_SelectionChanged" Margin="0,0,16,0"/>
+                                    <TextBox Name="SearchTextBox" 
+                                             Width="400"
+                                             MinHeight="40" 
+                                             Margin="0"
+                                             VerticalAlignment="Center"
+                                             VerticalContentAlignment="Center"
+                                             Style="{StaticResource ModernTextBox}"
+                                             TextChanged="SearchTextBox_TextChanged"/>
+
+                                    <ComboBox Name="CategoryFilter" 
+                                              Width="250" 
+                                              MinHeight="40"  
+                                              Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Style="{StaticResource ModernComboBox}" 
+                                              SelectedIndex="0" 
+                                              SelectionChanged="CategoryFilter_SelectionChanged"/>
                                 </StackPanel>
 
-                                <!-- List Header (keep your existing one) -->
+                                <!-- List Header -->
                                 <Border Grid.Row="2" Background="{StaticResource LightBrush}" BorderBrush="#DEE2E6" 
                   BorderThickness="1" CornerRadius="6,6,0,0" Padding="15,10" Margin="0,0,0,0">
                                     <Grid>
@@ -477,11 +506,19 @@
 
                                 <!-- UPDATED: Add MouseDoubleClick to your existing Applications List -->
                                 <ListView Grid.Row="3" Name="ApplicationsList" 
-                      MouseDoubleClick="ApplicationsList_DoubleClick"
-                      BorderThickness="0" Background="Transparent" 
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                      VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling">
+                                   ItemsSource="{Binding}"
+                                    MouseDoubleClick="ApplicationsList_DoubleClick"
+                                    BorderThickness="0" Background="Transparent" 
+                                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                    ScrollViewer.CanContentScroll="True"
+                                    VirtualizingStackPanel.IsVirtualizing="True"
+                                    VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                    ScrollViewer.IsDeferredScrollingEnabled="False">
+                                    <ListView.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel />
+                                        </ItemsPanelTemplate>
+                                    </ListView.ItemsPanel>
 
                                     <!-- Keep all your existing ListView styling and ItemTemplate exactly as it is -->
                                     <ListView.ItemContainerStyle>
@@ -490,6 +527,7 @@
                                             <Setter Property="Padding" Value="0"/>
                                             <Setter Property="Margin" Value="0"/>
                                             <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="IsTabStop" Value="False"/>
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="#F8F9FA"/>
@@ -513,21 +551,19 @@
                                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" 
                                              Foreground="#212529" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Text="{Binding Id}" FontSize="10" Foreground="#6C757D" 
-                                             Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                                                     </StackPanel>
 
                                                     <TextBlock Grid.Column="1" Text="{Binding Version}" FontSize="12" 
-                                         Foreground="#495057" VerticalAlignment="Center" 
-                                         HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                     Foreground="#495057" VerticalAlignment="Center" 
+                                                     HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
 
                                                     <TextBlock Grid.Column="2" Text="{Binding Category}" FontSize="12" 
-                                         Foreground="#495057" VerticalAlignment="Center" 
-                                         HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                     Foreground="#495057" VerticalAlignment="Center" 
+                                                     HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
 
                                                     <Border Grid.Column="3" Background="{StaticResource SuccessBrush}" 
-                                      Width="8" Height="8" CornerRadius="4" 
-                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                      Width="8" Height="8" CornerRadius="4" 
+                                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
@@ -538,22 +574,6 @@
 
                         <!-- ADD THIS: Application Detail View (hidden by default) -->
                         <local:ApplicationDetailView x:Name="ApplicationDetailView" Visibility="Collapsed"/>
-                    </Grid>
-
-                    <!-- UPLOAD HISTORY PAGE -->
-                    <Grid Name="HistoryPage" Visibility="Collapsed">
-                        <Border Style="{StaticResource ModernCard}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                                    <Border Background="#FFF3E0" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
-                                        <TextBlock Text="📝" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Upload History" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock Text="Upload history and logs will be displayed here..." 
-                                         FontSize="14" Foreground="#7F8C8D" FontStyle="Italic"/>
-                            </StackPanel>
-                        </Border>
                     </Grid>
 
                     <!-- SETTINGS PAGE -->

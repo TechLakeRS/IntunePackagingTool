@@ -175,7 +175,7 @@ namespace IntunePackagingTool
             if (_currentStep < 2 && ValidateCurrentStep())
             {
                 // ✅ PERFORMANCE: Share data between steps before moving
-                await ShareDataToNextStep();
+               await ShareDataToNextStep();
                 LoadStep(_currentStep + 1);
             }
             else if (_currentStep == 2)
@@ -195,7 +195,7 @@ namespace IntunePackagingTool
             }
         }
 
-        private async Task ShareDataToNextStep()
+        private Task ShareDataToNextStep()
         {
             // Share data from current step to next step
             if (_currentStep == 0 && _stepControls[1] != null)
@@ -217,6 +217,7 @@ namespace IntunePackagingTool
                     );
                 }
             }
+            return Task.CompletedTask;
         }
 
         private async Task TriggerUploadFromStep3()

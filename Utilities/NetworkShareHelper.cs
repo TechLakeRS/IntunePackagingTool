@@ -20,38 +20,88 @@ namespace IntunePackagingTool.Utilities
                     return null;
                 }
 
+                // First, try to extract version from the app name if it's embedded
+                var (baseName, extractedVersion) = ExtractVersionFromName(appName);
+
+                // Use extracted version if no explicit version provided
+                if (string.IsNullOrEmpty(version) && !string.IsNullOrEmpty(extractedVersion))
+                {
+                    version = extractedVersion;
+                    Debug.WriteLine($"Extracted version '{version}' from name '{appName}'");
+                }
+
+                // Use the base name (without version) for searching
+                var searchName = baseName;
+                Debug.WriteLine($"Searching for base folder: '{searchName}' with version: '{version}'");
+
                 var folders = Directory.GetDirectories(SharePath);
 
-                // Create multiple search patterns to find the folder
-                var searchPatterns = CreateSearchPatterns(appName, version);
+                // Look for exact folder match (case-insensitive)
+                var baseFolder = folders.FirstOrDefault(f =>
+                    string.Equals(Path.GetFileName(f), searchName, StringComparison.OrdinalIgnoreCase));
 
-                foreach (var pattern in searchPatterns)
+                if (baseFolder == null)
                 {
-                    // Try exact match first
-                    var exactMatch = folders.FirstOrDefault(f =>
-                        string.Equals(Path.GetFileName(f), pattern, StringComparison.OrdinalIgnoreCase));
-
-                    if (exactMatch != null)
+                    // Try with underscores replaced by spaces or vice versa
+                    var alternativeNames = new[]
                     {
-                        Debug.WriteLine($"Found exact match: {exactMatch}");
-                        return exactMatch;
+                    searchName.Replace("_", " "),
+                    searchName.Replace(" ", "_"),
+                    searchName.Replace("_", "-"),
+                    searchName.Replace("-", "_")
+                };
+
+                    foreach (var altName in alternativeNames)
+                    {
+                        baseFolder = folders.FirstOrDefault(f =>
+                            string.Equals(Path.GetFileName(f), altName, StringComparison.OrdinalIgnoreCase));
+                        if (baseFolder != null) break;
                     }
                 }
 
-                // If no exact match, try partial matching
-                foreach (var pattern in searchPatterns)
+                if (baseFolder == null)
                 {
-                    var partialMatch = folders.FirstOrDefault(f =>
-                        Path.GetFileName(f).ToLower().Contains(pattern.ToLower()));
-
-                    if (partialMatch != null)
+                    // Try partial match as last resort
+                    baseFolder = folders.FirstOrDefault(f =>
                     {
-                        Debug.WriteLine($"Found partial match: {partialMatch}");
-                        return partialMatch;
-                    }
+                        var folderName = Path.GetFileName(f).ToLower();
+                        var searchLower = searchName.ToLower();
+
+                        // Remove common suffixes for matching
+                        var cleanSearch = searchLower
+                            .Replace("_x64", "")
+                            .Replace("_x86", "")
+                            .Replace("_(user)", "")
+                            .Replace("_user", "");
+
+                        return folderName.Contains(cleanSearch) || cleanSearch.Contains(folderName);
+                    });
                 }
 
-                Debug.WriteLine($"No network share folder found for: {appName}");
+                if (baseFolder != null)
+                {
+                    Debug.WriteLine($"Found base folder: {baseFolder}");
+
+                    // If we have a version, look for the version subfolder
+                    if (!string.IsNullOrEmpty(version))
+                    {
+                        var versionPath = FindVersionFolder(baseFolder, version);
+                        if (versionPath != null)
+                        {
+                            Debug.WriteLine($"Found complete path with version: {versionPath}");
+                            return versionPath;
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"Version folder '{version}' not found in {baseFolder}");
+                        }
+                    }
+
+                    // Return base folder if no version or version not found
+                    return baseFolder;
+                }
+
+                Debug.WriteLine($"No network share folder found for: {searchName}");
                 return null;
             }
             catch (Exception ex)
@@ -61,42 +111,105 @@ namespace IntunePackagingTool.Utilities
             }
         }
 
-        private static List<string> CreateSearchPatterns(string appName, string version)
+        private static (string baseName, string version) ExtractVersionFromName(string fullName)
         {
-            var patterns = new List<string>();
+            if (string.IsNullOrEmpty(fullName))
+                return (fullName, null);
 
-            if (string.IsNullOrEmpty(appName))
-                return patterns;
-
-            // Clean app name variations
-            var cleanName = appName.Trim();
-            var dashName = cleanName.Replace(" ", "-");
-            var noSpaceName = cleanName.Replace(" ", "");
-
-            // Add patterns with and without version
-            patterns.Add(cleanName);
-            patterns.Add(dashName);
-            patterns.Add(noSpaceName);
-
-            if (!string.IsNullOrEmpty(version))
+            // Common version patterns to look for at the end of the name
+            var versionPatterns = new[]
             {
-                var cleanVersion = version.Replace("v", "").Replace("V", "");
-                patterns.Add($"{cleanName}-{version}");
-                patterns.Add($"{dashName}-{version}");
-                patterns.Add($"{cleanName}-{cleanVersion}");
-                patterns.Add($"{dashName}-{cleanVersion}");
-                patterns.Add($"{noSpaceName}-{cleanVersion}");
+            @"_(\d+\.\d+\.\d+\.\d+)$",  // _1.2.3.4
+            @"_(\d+\.\d+\.\d+)$",        // _1.2.3
+            @"_(\d+\.\d+)$",              // _1.2
+            @"_v(\d+\.\d+\.\d+)$",       // _v1.2.3
+            @"_V(\d+\.\d+\.\d+)$",       // _V1.2.3
+            @"\s+(\d+\.\d+\.\d+)$",      // Space before version
+            @"-(\d+\.\d+\.\d+)$"         // -1.2.3
+        };
+
+            foreach (var pattern in versionPatterns)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(fullName, pattern);
+                if (match.Success)
+                {
+                    var version = match.Groups[1].Value;
+                    var baseName = fullName.Substring(0, match.Index);
+                    Debug.WriteLine($"Extracted: base='{baseName}', version='{version}'");
+                    return (baseName, version);
+                }
             }
 
-            return patterns.Distinct().ToList();
+            // No version found in name
+            return (fullName, null);
         }
 
-        public static bool HasPSADTScript(string folderPath)
+        private static string FindVersionFolder(string basePath, string version)
         {
-            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
-                return false;
+            try
+            {
+                if (!Directory.Exists(basePath))
+                {
+                    Debug.WriteLine($"Base path does not exist: {basePath}");
+                    return null;
+                }
 
-            return File.Exists(Path.Combine(folderPath, "Deploy-Application.ps1"));
+                var subFolders = Directory.GetDirectories(basePath);
+                Debug.WriteLine($"Found {subFolders.Length} subfolders in {basePath}");
+
+                // Clean the version for comparison
+                var cleanVersion = version.Trim();
+                var versionVariations = new[]
+                {
+                cleanVersion,
+                cleanVersion.Replace("v", "").Replace("V", ""),
+                $"v{cleanVersion}",
+                $"V{cleanVersion}",
+                cleanVersion.Replace(".", "_"),
+                cleanVersion.Replace("_", ".")
+            };
+
+                // Try exact match with variations
+                foreach (var variant in versionVariations)
+                {
+                    var match = subFolders.FirstOrDefault(f =>
+                        string.Equals(Path.GetFileName(f), variant, StringComparison.OrdinalIgnoreCase));
+
+                    if (match != null)
+                    {
+                        Debug.WriteLine($"Found version folder: {match}");
+                        return match;
+                    }
+                }
+
+                // Try partial match
+                var partialMatch = subFolders.FirstOrDefault(f =>
+                {
+                    var folderName = Path.GetFileName(f).ToLower();
+                    return versionVariations.Any(v => folderName.Contains(v.ToLower()));
+                });
+
+                if (partialMatch != null)
+                {
+                    Debug.WriteLine($"Found partial version match: {partialMatch}");
+                    return partialMatch;
+                }
+
+                Debug.WriteLine($"No version folder found for version: {version}");
+
+                // List available versions for debugging
+                foreach (var folder in subFolders.Take(5))
+                {
+                    Debug.WriteLine($"  Available: {Path.GetFileName(folder)}");
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error finding version folder: {ex.Message}");
+                return null;
+            }
         }
     }
 }

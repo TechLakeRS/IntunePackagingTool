@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
+using System.Threading.Tasks;           
+using System.Windows;
 
 namespace IntunePackagingTool.Models
 {
@@ -36,7 +39,8 @@ namespace IntunePackagingTool.Models
             }
         }
 
-        public string IconType { get; set; }
+        public string IconType { get; set; } = string.Empty;
+       
 
         public BitmapImage IconImage
         {
@@ -83,7 +87,33 @@ namespace IntunePackagingTool.Models
                 IconImage = null;
             }
         }
+       
+        private async void CreateIconImageAsync()
+        {
+            if (_iconData == null || _iconData.Length == 0) return;
 
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.StreamSource = new MemoryStream(_iconData);
+                    bitmap.EndInit();
+                    bitmap.Freeze(); // Make thread-safe
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        IconImage = bitmap;
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Icon load failed: {ex.Message}");
+                }
+            });
+        }
         // Extended Properties from Microsoft Graph API
         public string Owner { get; set; } = "";
         public string Developer { get; set; } = "";
@@ -96,7 +126,7 @@ namespace IntunePackagingTool.Models
         public bool IsAssigned { get; set; } = false;
         public string PrivacyInformationUrl { get; set; } = "";
         public string InformationUrl { get; set; } = "";
-        public string UploadState { get; set; }
+        public string UploadState { get; set; } = string.Empty;
         public string PublishingState { get; set; } = "";
         public string ApplicableArchitectures { get; set; } = "";
         public string AllowedArchitectures { get; set; } = "";
@@ -147,10 +177,10 @@ namespace IntunePackagingTool.Models
     // Keep these supporting classes in the same file
     public class GroupAssignmentIds
     {
-        public string SystemInstallId { get; set; }
-        public string UserInstallId { get; set; }
-        public string SystemUninstallId { get; set; }
-        public string UserUninstallId { get; set; }
+        public string SystemInstallId { get; set; } = string.Empty;
+        public string UserInstallId { get; set; } = string.Empty;
+        public string SystemUninstallId { get; set; } = string.Empty;
+        public string UserUninstallId { get; set; } = string.Empty;
 
         public int Count => new[] { SystemInstallId, UserInstallId, SystemUninstallId, UserUninstallId }
             .Count(id => !string.IsNullOrEmpty(id));
