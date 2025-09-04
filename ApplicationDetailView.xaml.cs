@@ -1,13 +1,8 @@
 ﻿using IntunePackagingTool.Dialogs;
 using IntunePackagingTool.Models;
-using IntunePackagingTool.Services;
 using IntunePackagingTool.Utilities;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -16,8 +11,8 @@ namespace IntunePackagingTool
 {
     public partial class ApplicationDetailView : UserControl
     {
-        public event EventHandler BackToListRequested;
-        private ApplicationDetail _currentApp;
+        public event EventHandler? BackToListRequested;
+        private ApplicationDetail? _currentApp;
 
         public ApplicationDetailView()
         {
@@ -80,7 +75,7 @@ namespace IntunePackagingTool
             ArchitecturesText.Text = string.IsNullOrEmpty(app.ApplicableArchitectures) ? "Not specified" : app.ApplicableArchitectures;
             MinWindowsText.Text = string.IsNullOrEmpty(app.MinimumSupportedWindowsRelease) ? "Not specified" : app.MinimumSupportedWindowsRelease;
 
-            
+
 
             // Install Commands
             InstallCommandText.Text = app.InstallCommand;
@@ -156,8 +151,8 @@ namespace IntunePackagingTool
 
             try
             {
-                
-                var scriptPath = Path.Combine(_currentApp.NetworkSharePath,"application", "Deploy-Application.ps1");
+
+                var scriptPath = Path.Combine(_currentApp.NetworkSharePath, "application", "Deploy-Application.ps1");
 
                 if (File.Exists(scriptPath))
                 {
@@ -255,7 +250,7 @@ namespace IntunePackagingTool
             }
         }
 
-        private async void UpdateApplicationButton_Click(object sender, RoutedEventArgs e)
+        private void UpdateApplicationButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentApp == null)
             {
@@ -304,5 +299,5 @@ namespace IntunePackagingTool
             }
         }
     }
-  
+
 }

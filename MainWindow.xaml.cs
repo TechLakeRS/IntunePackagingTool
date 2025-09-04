@@ -1,21 +1,13 @@
-﻿using IntunePackagingTool.Models;   
-using IntunePackagingTool.Services;  
-using IntunePackagingTool.Utilities; 
-using Microsoft.Win32;
-using System;
-using System.Collections.Generic;
+﻿using IntunePackagingTool.Models;
+using IntunePackagingTool.Services;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Configuration;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Data;
 
 
 
@@ -43,12 +35,12 @@ namespace IntunePackagingTool
             LoadCategoriesDropdown();
             Loaded += async (s, e) => await LoadAllApplicationsAsync();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
-       
+
 
         }
 
         #region Navigation Methods
- 
+
         private void CreateAppNavButton_Click(object sender, RoutedEventArgs e)
         {
             ShowPage("CreateApplication");
@@ -70,7 +62,7 @@ namespace IntunePackagingTool
         private void ShowPage(string pageName)
         {
             // Hide all pages
-           
+
             CreateApplicationPage.Visibility = Visibility.Collapsed;
             ViewApplicationsPage.Visibility = Visibility.Collapsed;
             SettingsPage.Visibility = Visibility.Collapsed;
@@ -152,9 +144,9 @@ namespace IntunePackagingTool
         }
 
 
-        private void ApplicationDetailView_BackToListRequested(object sender, EventArgs e)
+        private void ApplicationDetailView_BackToListRequested(object? sender, EventArgs e)
         {
-           
+
             ApplicationDetailView.Visibility = Visibility.Collapsed;
             ApplicationsListPanel.Visibility = Visibility.Visible;
             PageTitle.Text = "Microsoft Intune Applications";
@@ -167,7 +159,7 @@ namespace IntunePackagingTool
         private void UpdateNavigation(Button activeButton)
         {
             // Reset all nav buttons to normal style
-           
+
             CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
@@ -188,7 +180,7 @@ namespace IntunePackagingTool
         }
 
         // ADD THIS METHOD - Execute search after debounce delay
-        private void SearchTimer_Tick(object sender, EventArgs e)
+        private void SearchTimer_Tick(object? sender, EventArgs e)
         {
             _searchTimer.Stop();
 
@@ -197,38 +189,10 @@ namespace IntunePackagingTool
         }
         #endregion
 
-        #region Quick Action Methods
-        private void QuickCreatePackage_Click(object sender, RoutedEventArgs e)
-        {
-            ShowPage("CreateApplication");
-            UpdateNavigation(CreateAppNavButton);
-        }
 
-        private void QuickBrowsePackages_Click(object sender, RoutedEventArgs e)
-        {
-            ShowPage("ViewApplications");
-            UpdateNavigation(ViewAppsNavButton);
-
-            
-        }
-
-        private void QuickUploadToIntune_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(_currentPackagePath))
-            {
-                MessageBox.Show("Please generate a package first by going to 'Create Package'.", "No Package",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                ShowPage("CreateApplication");
-                UpdateNavigation(CreateAppNavButton);
-                return;
-            }
-
-            UploadButton_Click(sender, e);
-        }
-        #endregion
 
         #region Application Loading Methods
-        
+
         private readonly int _pageSize = 50;
         private int _currentPage = 0;
         private List<IntuneApplication> _allApplications = new List<IntuneApplication>();
@@ -321,7 +285,7 @@ namespace IntunePackagingTool
         private void SetActiveNavButton(Button activeButton)
         {
             // Reset all navigation buttons to inactive style
-            
+
             CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
@@ -335,7 +299,7 @@ namespace IntunePackagingTool
             FilterApplications(); // Just filter, don't reload
         }
 
-        private void FilterApplications(string searchText = null)
+        private void FilterApplications(string? searchText = null)
         {
             if (_applications == null) return;
 
@@ -369,10 +333,10 @@ namespace IntunePackagingTool
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            await LoadAllApplicationsAsync(forceRefresh: true); 
+            await LoadAllApplicationsAsync(forceRefresh: true);
         }
 
-       
+
         #endregion
 
         #region Package Creation Methods
@@ -496,9 +460,9 @@ namespace IntunePackagingTool
                 FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
                 // Extract metadata
-                string productName = versionInfo.ProductName;
-                string companyName = versionInfo.CompanyName;
-                string version = versionInfo.ProductVersion ?? versionInfo.FileVersion;
+                string? productName = versionInfo.ProductName;
+                string? companyName = versionInfo.CompanyName;
+                string? version = versionInfo.ProductVersion ?? versionInfo.FileVersion;
 
                 // Populate UI fields if they're empty
                 if (string.IsNullOrWhiteSpace(AppNameTextBox.Text) && !string.IsNullOrWhiteSpace(productName))
@@ -698,7 +662,7 @@ namespace IntunePackagingTool
 
                 // Use your existing PSADTGenerator
                 var generator = new PSADTGenerator();
-                string packagePath = await generator.CreatePackageAsync( appInfo, psadtOptions);
+                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
                 _currentPackagePath = packagePath;
 
                 // Show success and update UI
@@ -736,17 +700,17 @@ namespace IntunePackagingTool
         private int CountEnabledFeatures(PSADTOptions options)
         {
             int count = 0;
-
             // Use reflection to count enabled boolean properties
             var properties = typeof(PSADTOptions).GetProperties();
             foreach (var prop in properties)
             {
-                if (prop.PropertyType == typeof(bool) && (bool)prop.GetValue(options))
+                if (prop.PropertyType == typeof(bool) &&
+                    prop.GetValue(options) is bool value &&
+                    value)
                 {
                     count++;
                 }
             }
-
             return count;
         }
 
@@ -784,7 +748,7 @@ namespace IntunePackagingTool
             }
         }
 
-        
+
         private void UploadButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -796,7 +760,7 @@ namespace IntunePackagingTool
                     return;
                 }
 
-                
+
                 var uploadWizard = new IntuneUploadWizard
                 {
                     Owner = this,
@@ -809,7 +773,7 @@ namespace IntunePackagingTool
                     PackagePath = _currentPackagePath
                 };
 
-               
+
                 uploadWizard.ShowDialog();
             }
             catch (Exception ex)

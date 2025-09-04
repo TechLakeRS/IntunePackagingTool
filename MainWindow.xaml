@@ -96,7 +96,7 @@
                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Riyadh Sarker" FontSize="12" FontWeight="Medium" Foreground="White"/>
+                            
                             <TextBlock Text="NBB Admin" FontSize="10" Foreground="#BDC3C7"/>
                         </StackPanel>
                     </StackPanel>
@@ -401,7 +401,7 @@
                                         </StackPanel>
                                         <Button Content="📝 Open Script Editor" Name="OpenScriptButton" Click="OpenScriptButton_Click" 
                                         Style="{StaticResource SecondaryButton}"/>
-                                        <TextBlock Text="Customize Deploy-Application.ps1 in PowerShell ISE" FontSize="11" 
+                                        <TextBlock Text="Customize Deploy-Application.ps1 in VSCode" FontSize="11" 
                                         Foreground="#666666" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                     </StackPanel>
                                 </Border>
@@ -410,7 +410,7 @@
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                             <Border Background="{StaticResource SecondaryBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
-                                                <TextBlock Text="2" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <TextBlock Text="3" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <TextBlock Text="Remote Test PSADT script" FontWeight="Medium" VerticalAlignment="Center"/>
                                         </StackPanel>
@@ -426,7 +426,7 @@
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                             <Border Background="{StaticResource PrimaryBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
-                                                <TextBlock Text="3" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <TextBlock Text="4" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <TextBlock Text="Upload to Intune" FontWeight="Medium" VerticalAlignment="Center"/>
                                         </StackPanel>

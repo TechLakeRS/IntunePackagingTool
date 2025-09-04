@@ -9,23 +9,93 @@
 		<SelfContained>true</SelfContained>
 		<PublishSingleFile>true</PublishSingleFile>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		
+		<!-- Version Information -->
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<InformationalVersion>1.0.0-beta</InformationalVersion>
+		
+		<!-- Product Information -->
+		<Product>NBB Intune Packaging Tool</Product>
+		<AssemblyTitle>IntunePackagingTool</AssemblyTitle>
+		<Company>NBB</Company>
+		<Copyright>Copyright © NBB 2025</Copyright>
+		<Description>Application packaging and deployment tool for Microsoft Intune</Description>
+		
+		<!-- Application Settings -->
+		
+		<StartupObject>IntunePackagingTool.App</StartupObject>
+		
+		<!-- Publishing Optimization -->
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<PublishTrimmed>false</PublishTrimmed>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+		
+		<!-- Performance Settings -->
+		<TieredCompilation>true</TieredCompilation>
+		<TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+		
+		<!-- Debug Settings -->
+		<DebugType>embedded</DebugType>
+		<DebugSymbols>true</DebugSymbols>
 	</PropertyGroup>
+	
+	<!-- Package References -->
 	<ItemGroup>
-	  <None Remove="Scripts\RemoteDeployment.ps1" />
+		<!-- For Active Directory user lookup -->
+		<PackageReference Include="System.DirectoryServices.AccountManagement" Version="8.0.0" />
+		
+		<!-- For JSON handling (if not already included) -->
+		<PackageReference Include="System.Text.Json" Version="9.0.8" />
+		
+		<!-- For HTTP operations (if not already included) -->
+		<PackageReference Include="System.Net.Http" Version="4.3.4" />
 	</ItemGroup>
+	
+	<!-- Embedded Resources -->
 	<ItemGroup>
-	  <Content Include="Scripts\RemoteDeployment.ps1">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </Content>
+		<None Remove="Scripts\RemoteDeployment.ps1" />
 	</ItemGroup>
+	
+	<!-- Content Files -->
+	<ItemGroup>
+		<Content Include="Scripts\RemoteDeployment.ps1">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+	
+	<!-- Application Icon (create this file) -->
+	<ItemGroup Condition="Exists('Resources\app.ico')">
+		<Resource Include="Resources\app.ico" />
+	</ItemGroup>
+	
+	<!-- Folders -->
 	<ItemGroup>
 		<Folder Include="Utilities\" />
 		<Folder Include="Views\" />
 		<Folder Include="Dialogs\WizardSteps\" />
+		<Folder Include="Resources\" />
 	</ItemGroup>
+	
+	<!-- XAML Settings -->
 	<ItemGroup>
-	  <Page Update="ApplicationDetailView.xaml">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </Page>
+		<Page Update="ApplicationDetailView.xaml">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</Page>
 	</ItemGroup>
+	
+	<!-- Conditional Debug/Release Settings -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<Optimize>false</Optimize>
+		<WarningLevel>4</WarningLevel>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DefineConstants>TRACE</DefineConstants>
+		<Optimize>true</Optimize>
+		<WarningLevel>4</WarningLevel>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+	</PropertyGroup>
 </Project>

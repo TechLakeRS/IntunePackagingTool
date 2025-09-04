@@ -1,16 +1,12 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Net.NetworkInformation;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 
 namespace IntunePackagingTool
 {
-    /// <summary>
-    /// Interaction logic for RemoteTestWindow.xaml
-    /// </summary>
+   
     public partial class RemoteTestWindow : Window
     {
         private string _currentPackagePath;
@@ -179,8 +175,14 @@ namespace IntunePackagingTool
                         CreateNoWindow = true
                     };
 
-                    using (Process process = Process.Start(psi))
+                    using (Process? process = Process.Start(psi))
                     {
+                        if (process == null)
+                        {
+                            AppendOutput("ERROR: Failed to start process");
+                            return false;
+                        }
+
                         // Read output asynchronously
                         process.OutputDataReceived += (sender, e) =>
                         {
@@ -200,7 +202,6 @@ namespace IntunePackagingTool
 
                         process.BeginOutputReadLine();
                         process.BeginErrorReadLine();
-
                         process.WaitForExit();
 
                         return process.ExitCode == 0 || process.ExitCode == 3010;
@@ -214,7 +215,7 @@ namespace IntunePackagingTool
             });
         }
 
-        // Helper method to check if computer is online
+        //  check if computer is online
         private bool IsComputerOnline(string computerName)
         {
             try
