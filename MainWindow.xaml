@@ -508,7 +508,10 @@
                                 <ListView Grid.Row="3" Name="ApplicationsList" 
                                    ItemsSource="{Binding}"
                                     MouseDoubleClick="ApplicationsList_DoubleClick"
-                                    BorderThickness="0" Background="Transparent" 
+                                    ScrollViewer.ScrollChanged="ApplicationsList_ScrollChanged"
+                                    BorderThickness="0" Background="Transparent"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Top"
                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                     ScrollViewer.CanContentScroll="True"
                                     VirtualizingStackPanel.IsVirtualizing="True"
@@ -643,7 +646,21 @@
                 <!-- Close MainContentGrid -->
             </ScrollViewer>
             <!-- Close ScrollViewer -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
+                <Button Name="PreviousPageButton" Content="◀ Previous" 
+            Click="PreviousPage_Click" 
+            IsEnabled="{Binding CanGoToPreviousPage}"
+            Margin="0,0,10,0"/>
 
+                <TextBlock Text="{Binding CurrentPageDisplay}" 
+               VerticalAlignment="Center" 
+               Margin="10,0"/>
+
+                <Button Name="NextPageButton" Content="Next ▶" 
+            Click="NextPage_Click" 
+            IsEnabled="{Binding CanGoToNextPage}"
+            Margin="10,0,0,0"/>
+            </StackPanel>
             <!-- Status Bar -->
             <Border Grid.Row="2" Background="White" Padding="32,16" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0">
                 <Grid>

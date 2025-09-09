@@ -465,7 +465,7 @@ namespace IntunePackagingTool
             }
         }
 
-        // PACKAGE UPDATE METHOD - Performs the actual update process
+      
         private async Task PerformPackageUpdate(string packagePath)
         {
             try
@@ -509,6 +509,9 @@ namespace IntunePackagingTool
 
                 if (success)
                 {
+                    // ✅ ADD: Invalidate caches after successful update
+                    intuneService.InvalidateApplicationCache(_currentApp.Id);
+
                     StatusText.Text = $"Package updated successfully • {DateTime.Now:HH:mm:ss}";
                     MessageBox.Show($"✅ Package for '{_currentApp.DisplayName}' updated successfully!\n\n" +
                                   $"📦 New .intunewin file uploaded to Intune\n" +

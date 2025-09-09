@@ -17,7 +17,6 @@ namespace IntunePackagingTool
 
     {
         private System.Windows.Threading.DispatcherTimer _searchTimer;
-        private string _pendingSearchText = "";
         private IntuneService _intuneService;
         private PSADTGenerator _psadtGenerator;
         private IntuneUploadService _uploadService;
@@ -25,21 +24,27 @@ namespace IntunePackagingTool
         private string _currentPackagePath = "";
         private SettingsService _settingsService;
         private BatchFileSigner? _batchSigner;
+        private int _currentPage = 1;
+        private const int PageSize = 50;
+        private bool _isLoading = false;
+        private string _currentSearchFilter = "";
+        private string _currentCategoryFilter = "All Categories";
+        private CancellationTokenSource? _loadCancellation;
 
         public MainWindow()
         {
             InitializeComponent();
             _searchTimer = new System.Windows.Threading.DispatcherTimer();
-            _searchTimer.Interval = TimeSpan.FromMilliseconds(300); // 300ms delay
+            _searchTimer.Interval = TimeSpan.FromMilliseconds(500); // 300ms delay
             _searchTimer.Tick += SearchTimer_Tick;
             ShowPage("CreateApplication");
             SetActiveNavButton(CreateAppNavButton);
+            _intuneService = new IntuneService();
             ApplicationsList.ItemsSource = _applications;
             LoadCategoriesDropdown();
-            Loaded += async (s, e) => await LoadAllApplicationsAsync();
+            Loaded += async (s, e) => await LoadApplicationsPagedAsync();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
             _settingsService = new SettingsService();
-            _intuneService = new IntuneService();
             _psadtGenerator = new PSADTGenerator();
             _uploadService = new IntuneUploadService(_intuneService);
             _batchSigner = new BatchFileSigner(certificateName: "NBB Digital Workplace",certificateThumbprint: "B74452FD21BE6AD24CA9D61BCE156FD75E774716");
@@ -206,101 +211,100 @@ namespace IntunePackagingTool
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
 
+      
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             // Stop the timer if it's running
             _searchTimer.Stop();
 
             // Store the search text
-            _pendingSearchText = SearchTextBox.Text;
+            _currentSearchFilter = SearchTextBox.Text?.Trim() ?? ""; 
 
             // Start the timer
             _searchTimer.Start();
         }
 
-       
-        private void SearchTimer_Tick(object? sender, EventArgs e)
+
+      
+        private async void SearchTimer_Tick(object? sender, EventArgs e)
         {
             _searchTimer.Stop();
-
-            FilterApplications(_pendingSearchText);
+            _currentPage = 0; 
+            await LoadApplicationsPagedAsync(); 
         }
         #endregion
 
 
-
         #region Application Loading Methods
 
-        private readonly int _pageSize = 50;
-        private int _currentPage = 0;
+        
+       
         private List<IntuneApplication> _allApplications = new List<IntuneApplication>();
 
         private async Task LoadApplicationsPagedAsync()
         {
             try
             {
+                if (_isLoading) return; // Prevent concurrent calls
+                _isLoading = true;
+
                 ShowStatus($"Loading applications (page {_currentPage + 1})...");
                 ShowProgress(true);
 
-                // Load only if not cached
+                // Load ALL apps only once
                 if (_allApplications.Count == 0)
                 {
-                    _allApplications = await _intuneService.GetApplicationsAsync();
+                    _allApplications = await _intuneService.GetApplicationsAsync(); // Loads all 601 apps
                 }
 
-                // Display only current page
-                var pagedApps = _allApplications
-                    .Skip(_currentPage * _pageSize)
-                    .Take(_pageSize);
+                // Apply filters to the full dataset
+                var filteredApps = _allApplications.AsEnumerable();
 
+                // Search filter
+                if (!string.IsNullOrEmpty(_currentSearchFilter))
+                {
+                    filteredApps = filteredApps.Where(app =>
+                        app.DisplayName.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) ||
+                        app.Publisher.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase));
+                }
+
+                // Category filter - this is the key fix!
+                if (_currentCategoryFilter != "All Categories")
+                {
+                    filteredApps = filteredApps.Where(app => app.Category == _currentCategoryFilter);
+                }
+                // If "All Categories" is selected, show ALL apps (no filter)
+
+                // Get current page from filtered results
+                var pagedApps = filteredApps
+                    .Skip(_currentPage * PageSize)
+                    .Take(PageSize);
+
+                // Update UI
                 _applications.Clear();
                 foreach (var app in pagedApps)
                 {
                     _applications.Add(app);
                 }
 
-                ShowStatus($"Showing {_applications.Count} of {_allApplications.Count} applications");
+                var totalFiltered = filteredApps.Count();
+                ShowStatus($"Showing {_applications.Count} of {totalFiltered} applications");
             }
             finally
             {
+                _isLoading = false;
                 ShowProgress(false);
             }
         }
 
-        private async Task LoadAllApplicationsAsync(bool forceRefresh = false)
+
+
+        private async Task LoadMoreApplicationsAsync()
         {
-            try
-            {
-                ShowStatus("Loading applications from Intune...");
-                ShowProgress(true);
+            if (_isLoading) return;
 
-                // Load ALL apps once
-                var apps = await _intuneService.GetApplicationsAsync(forceRefresh);
-
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    _applications.Clear();
-                    foreach (var app in apps)
-                    {
-                        _applications.Add(app);
-                    }
-
-                    // Set the DataContext for the ListView
-                    ApplicationsList.ItemsSource = _applications;
-
-                    // Force refresh
-                    CollectionViewSource.GetDefaultView(_applications).Refresh();
-                });
-
-                ShowStatus($"Loaded {apps.Count} applications");
-                ShowProgress(false);
-            }
-            catch (Exception ex)
-            {
-                ShowStatus("Failed to load applications");
-                ShowProgress(false);
-                MessageBox.Show($"Error loading applications: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            _currentPage++;
+            await LoadApplicationsPagedAsync();
         }
 
         private void LoadCategoriesDropdown()
@@ -332,48 +336,82 @@ namespace IntunePackagingTool
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
 
-        private void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private bool _initialLoadComplete = false;
+
+        private async void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            FilterApplications(); // Just filter, don't reload
+            _currentCategoryFilter = CategoryFilter.SelectedItem?.ToString() ?? "All Categories";
+            _currentPage = 0; 
+            await LoadApplicationsPagedAsync(); 
         }
 
-        private void FilterApplications(string? searchText = null)
+        private IEnumerable<IntuneApplication> GetFilteredApplications()
         {
-            if (_applications == null) return;
+            var filtered = _allApplications.AsEnumerable();
 
-            var filtered = _applications.AsEnumerable();
-
-            // Apply search filter if provided
-            if (!string.IsNullOrWhiteSpace(searchText))
+            // Search filter
+            if (!string.IsNullOrEmpty(_currentSearchFilter))
             {
-                var lowerSearch = searchText.ToLower();
                 filtered = filtered.Where(app =>
-                    app.DisplayName?.ToLower().Contains(lowerSearch) == true ||
-                    app.Publisher?.ToLower().Contains(lowerSearch) == true ||
-                    app.Version?.ToLower().Contains(lowerSearch) == true);
+                    app.DisplayName.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) ||
+                    app.Publisher.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase));
             }
 
-            // Apply category filter if selected
-            if (CategoryFilter.SelectedItem != null)
+            // Category filter
+            if (_currentCategoryFilter != "All Categories")
             {
-                var selectedCategory = CategoryFilter.SelectedItem.ToString();
-                if (selectedCategory != "All Categories")
-                {
-                    filtered = filtered.Where(app =>
-                        app.Category?.Equals(selectedCategory, StringComparison.OrdinalIgnoreCase) == true);
-                }
+                filtered = filtered.Where(app => app.Category == _currentCategoryFilter);
             }
 
-            // Update the ListView
-            ApplicationsList.ItemsSource = filtered.ToList();
+            return filtered;
         }
+
 
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            await LoadAllApplicationsAsync(forceRefresh: true);
+            await LoadApplicationsPagedAsync(); 
         }
 
+       
+        private async void ApplicationsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            if (_isLoading) return;
+
+            var scrollViewer = e.OriginalSource as ScrollViewer;
+            if (scrollViewer == null) return;
+
+            // Check if we're near the bottom (within 100 pixels)
+            var isNearBottom = scrollViewer.VerticalOffset + scrollViewer.ViewportHeight
+                              >= scrollViewer.ExtentHeight - 100;
+
+            if (isNearBottom && _applications.Count >= PageSize)
+            {
+                await LoadMoreApplicationsAsync();
+            }
+        }
+
+        // Add these button click handlers
+        private async void NextPage_Click(object sender, RoutedEventArgs e)
+        {
+            var filteredCount = GetFilteredApplications().Count();
+            var maxPage = (int)Math.Ceiling((double)filteredCount / PageSize) - 1;
+
+            if (_currentPage < maxPage)
+            {
+                _currentPage++;
+                await LoadApplicationsPagedAsync();
+            }
+        }
+
+        private async void PreviousPage_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPage > 0)
+            {
+                _currentPage--;
+                await LoadApplicationsPagedAsync();
+            }
+        }
 
         #endregion
 

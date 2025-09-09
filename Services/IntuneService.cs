@@ -1,20 +1,13 @@
 
-using IntunePackagingTool.Models; 
-using IntunePackagingTool.WizardSteps;
-using System;
-using System.Collections.Generic;
+using IntunePackagingTool.Models;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media.Imaging;
 
 namespace IntunePackagingTool.Services
 
@@ -34,7 +27,7 @@ namespace IntunePackagingTool.Services
         private readonly string _clientId = "b47987a1-70b4-415a-9a4e-9775473e382b";
         private readonly string _tenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7";
         private readonly string _certificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F";
-       
+
         public string ClientId => _clientId;
         public string TenantId => _tenantId;
         public string CertificateThumbprint => _certificateThumbprint;
@@ -46,11 +39,11 @@ namespace IntunePackagingTool.Services
         {
             if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
             {
-                
+
                 return _accessToken;
             }
 
-           
+
             var certificate = LoadCertificate();
             var assertion = CreateJwtAssertion(certificate);
 
@@ -69,14 +62,14 @@ namespace IntunePackagingTool.Services
 
             if (!response.IsSuccessStatusCode)
             {
-                
+
                 throw new Exception($"Failed to get access token. Status: {response.StatusCode}, Response: {responseText}");
             }
 
             var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseText);
             if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
             {
-               
+
                 throw new Exception("Access token is missing in response");
             }
 
@@ -96,7 +89,7 @@ namespace IntunePackagingTool.Services
             var certificates = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
             if (certificates.Count == 0)
             {
-               
+
                 throw new Exception("Certificate not found");
             }
             return certificates[0];
@@ -172,7 +165,7 @@ namespace IntunePackagingTool.Services
             {
                 Debug.WriteLine("=== GRAPH API CALL ===");
                 Debug.WriteLine("Starting GetApplicationsAsync...");
-                
+
                 var token = await GetAccessTokenAsync();
                 Debug.WriteLine($"✓ Token obtained for Graph API call, length: {token.Length}");
 
@@ -189,18 +182,18 @@ namespace IntunePackagingTool.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     Debug.WriteLine($"✗ Graph API error with categories expand, trying without expand...");
-                    
+
                     // Fallback: try without expand if categories expand fails
                     requestUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps?$filter=isof('microsoft.graph.win32LobApp')&$top=100";
                     Debug.WriteLine($"Fallback request to: {requestUrl}");
-                    
+
                     response = await _sharedHttpClient.GetAsync(requestUrl);
                     responseText = await response.Content.ReadAsStringAsync();
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
                         Debug.WriteLine($"✗ Graph API error response: {responseText}");
-                        
+
                         // Try to parse Graph API error
                         try
                         {
@@ -209,7 +202,7 @@ namespace IntunePackagingTool.Services
                             {
                                 var code = errorObj.TryGetProperty("code", out var codeProp) ? codeProp.GetString() : "Unknown";
                                 var message = errorObj.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Unknown";
-                                
+
                                 Debug.WriteLine($"Graph API Error - Code: {code}, Message: {message}");
                                 throw new Exception($"Graph API Error: {code} - {message}");
                             }
@@ -218,7 +211,7 @@ namespace IntunePackagingTool.Services
                         {
                             Debug.WriteLine("Could not parse Graph API error response");
                         }
-                        
+
                         throw new Exception($"Graph API request failed. Status: {response.StatusCode}, Response: {responseText}");
                     }
                 }
@@ -231,7 +224,7 @@ namespace IntunePackagingTool.Services
                 if (graphResponse?.Value != null)
                 {
                     Debug.WriteLine($"✓ Found {graphResponse.Value.Count} applications in Intune");
-                    
+
                     foreach (var app in graphResponse.Value)
                     {
                         var id = app.GetProperty("id").GetString() ?? "";
@@ -278,21 +271,21 @@ namespace IntunePackagingTool.Services
                 // Handle pagination if there are more results (but limit to avoid timeouts)
                 var hasNextPage = graphResponse?.ODataNextLink != null;
                 var pageCount = 1;
-                
+
                 while (hasNextPage && pageCount < 20) // Allow more pages since we're using smaller batches
                 {
                     Debug.WriteLine($"Getting page {pageCount + 1}...");
-                    
+
                     var nextResponse = await _sharedHttpClient.GetAsync(graphResponse!.ODataNextLink);
                     if (!nextResponse.IsSuccessStatusCode) break;
-                    
+
                     var nextResponseText = await nextResponse.Content.ReadAsStringAsync();
                     var nextGraphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(nextResponseText, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                    
+
                     if (nextGraphResponse?.Value != null)
                     {
                         Debug.WriteLine($"✓ Found {nextGraphResponse.Value.Count} more applications");
-                        
+
                         foreach (var app in nextGraphResponse.Value)
                         {
                             var id = app.GetProperty("id").GetString() ?? "";
@@ -329,7 +322,7 @@ namespace IntunePackagingTool.Services
                             });
                         }
                     }
-                    
+
                     graphResponse = nextGraphResponse;
                     hasNextPage = graphResponse?.ODataNextLink != null;
                     pageCount++;
@@ -342,13 +335,13 @@ namespace IntunePackagingTool.Services
             {
                 Debug.WriteLine($"✗ Error in GetApplicationsAsync: {ex.Message}");
                 Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                
+
                 MessageBox.Show(
                     $"Failed to retrieve applications from Intune:\n\n{ex.Message}\n\nCheck the Debug Output window for detailed logs.",
-                    "Graph API Error", 
-                    MessageBoxButton.OK, 
+                    "Graph API Error",
+                    MessageBoxButton.OK,
                     MessageBoxImage.Error);
-                
+
                 throw;
             }
         }
@@ -366,93 +359,93 @@ namespace IntunePackagingTool.Services
                 TimeSpan.FromMinutes(15));
         }
         public async Task<ApplicationDetail> GetApplicationDetailFromGraphAsync(string intuneAppId)
-         {
+        {
             try
             {
-            Debug.WriteLine($"=== FETCHING APP DETAILS FOR: {intuneAppId} ===");
+                Debug.WriteLine($"=== FETCHING APP DETAILS FOR: {intuneAppId} ===");
 
-            var token = await GetAccessTokenAsync();
-            
-            
+                var token = await GetAccessTokenAsync();
 
-            // Get the complete application details including detection rules in single call
-            var appUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{intuneAppId}";
-            Debug.WriteLine($"Getting complete app details from: {appUrl}");
 
-            var appResponse = await _sharedHttpClient.GetAsync(appUrl);
-            var appResponseText = await appResponse.Content.ReadAsStringAsync();
 
-            if (!appResponse.IsSuccessStatusCode)
-            {
-                throw new Exception($"Failed to get app details: {appResponse.StatusCode} - {appResponseText}");
-            }
+                // Get the complete application details including detection rules in single call
+                var appUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{intuneAppId}";
+                Debug.WriteLine($"Getting complete app details from: {appUrl}");
 
-            var appJson = JsonSerializer.Deserialize<JsonElement>(appResponseText);
+                var appResponse = await _sharedHttpClient.GetAsync(appUrl);
+                var appResponseText = await appResponse.Content.ReadAsStringAsync();
+
+                if (!appResponse.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to get app details: {appResponse.StatusCode} - {appResponseText}");
+                }
+
+                var appJson = JsonSerializer.Deserialize<JsonElement>(appResponseText);
 
                 ApplicationDetail appDetail;
-            try 
-            {
-                // Extract complete app information from Graph API response
-                appDetail = new ApplicationDetail
+                try
                 {
-                // Basic Properties
-                Id = appJson.GetProperty("id").GetString() ?? "",
-                DisplayName = appJson.TryGetProperty("displayName", out var displayNameProp) ? displayNameProp.GetString() ?? "Unknown" : "Unknown",
-                Version = appJson.TryGetProperty("displayVersion", out var versionProp) ? versionProp.GetString() ?? "1.0.0" : "1.0.0",
-                Publisher = appJson.TryGetProperty("publisher", out var publisherProp) ? publisherProp.GetString() ?? "Unknown" : "Unknown",
-                Description = appJson.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? "" : "",
-                InstallCommand = appJson.TryGetProperty("installCommandLine", out var installProp) ? installProp.GetString() ?? "Deploy-Application.exe Install" : "Deploy-Application.exe Install",
-                UninstallCommand = appJson.TryGetProperty("uninstallCommandLine", out var uninstallProp) ? uninstallProp.GetString() ?? "Deploy-Application.exe Uninstall" : "Deploy-Application.exe Uninstall",
-                InstallContext = appJson.TryGetProperty("installContext", out var contextProp) ? contextProp.GetString() ?? "System" : "System",
+                    // Extract complete app information from Graph API response
+                    appDetail = new ApplicationDetail
+                    {
+                        // Basic Properties
+                        Id = appJson.GetProperty("id").GetString() ?? "",
+                        DisplayName = appJson.TryGetProperty("displayName", out var displayNameProp) ? displayNameProp.GetString() ?? "Unknown" : "Unknown",
+                        Version = appJson.TryGetProperty("displayVersion", out var versionProp) ? versionProp.GetString() ?? "1.0.0" : "1.0.0",
+                        Publisher = appJson.TryGetProperty("publisher", out var publisherProp) ? publisherProp.GetString() ?? "Unknown" : "Unknown",
+                        Description = appJson.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? "" : "",
+                        InstallCommand = appJson.TryGetProperty("installCommandLine", out var installProp) ? installProp.GetString() ?? "Deploy-Application.exe Install" : "Deploy-Application.exe Install",
+                        UninstallCommand = appJson.TryGetProperty("uninstallCommandLine", out var uninstallProp) ? uninstallProp.GetString() ?? "Deploy-Application.exe Uninstall" : "Deploy-Application.exe Uninstall",
+                        InstallContext = appJson.TryGetProperty("installContext", out var contextProp) ? contextProp.GetString() ?? "System" : "System",
 
-                // Extended Properties
-                Owner = appJson.TryGetProperty("owner", out var ownerProp) ? ownerProp.GetString() ?? "" : "",
-                Developer = appJson.TryGetProperty("developer", out var devProp) ? devProp.GetString() ?? "" : "",
-                Notes = appJson.TryGetProperty("notes", out var notesProp) ? notesProp.GetString() ?? "" : "",
-                FileName = appJson.TryGetProperty("fileName", out var fileNameProp) ? fileNameProp.GetString() ?? "" : "",
-                
-                // ✅ FIXED: Safe numeric property parsing
-                Size = GetSafeLong(appJson, "size"),
-                MinimumFreeDiskSpaceInMB = GetSafeInt(appJson, "minimumFreeDiskSpaceInMB"),
-                MinimumMemoryInMB = GetSafeInt(appJson, "minimumMemoryInMB"),
-                MinimumNumberOfProcessors = GetSafeInt(appJson, "minimumNumberOfProcessors"),
-                MinimumCpuSpeedInMHz = GetSafeInt(appJson, "minimumCpuSpeedInMHz"),
-                
-                // Boolean properties (these are usually safe)
-                
-                
-                // String properties
-                PrivacyInformationUrl = appJson.TryGetProperty("privacyInformationUrl", out var privacyProp) ? privacyProp.GetString() ?? "" : "",
-                InformationUrl = appJson.TryGetProperty("informationUrl", out var infoProp) ? infoProp.GetString() ?? "" : "",
-                UploadState = appJson.TryGetProperty("uploadState", out var uploadProp)
-                ? (uploadProp.ValueKind == JsonValueKind.Number
-                ? uploadProp.GetInt32().ToString()
-                 : uploadProp.GetString() ?? "")
-                 : "",
-                PublishingState = appJson.TryGetProperty("publishingState", out var publishProp) ? publishProp.GetString() ?? "" : "",
-                ApplicableArchitectures = appJson.TryGetProperty("applicableArchitectures", out var appArchProp) ? appArchProp.GetString() ?? "" : "",
-                AllowedArchitectures = appJson.TryGetProperty("allowedArchitectures", out var allowArchProp) ? allowArchProp.GetString() ?? "" : "",
-                SetupFilePath = appJson.TryGetProperty("setupFilePath", out var setupProp) ? setupProp.GetString() ?? "" : "",
-                MinimumSupportedWindowsRelease = appJson.TryGetProperty("minimumSupportedWindowsRelease", out var winProp) ? winProp.GetString() ?? "" : "",
+                        // Extended Properties
+                        Owner = appJson.TryGetProperty("owner", out var ownerProp) ? ownerProp.GetString() ?? "" : "",
+                        Developer = appJson.TryGetProperty("developer", out var devProp) ? devProp.GetString() ?? "" : "",
+                        Notes = appJson.TryGetProperty("notes", out var notesProp) ? notesProp.GetString() ?? "" : "",
+                        FileName = appJson.TryGetProperty("fileName", out var fileNameProp) ? fileNameProp.GetString() ?? "" : "",
 
-                // Dates (these need special handling too)
-                CreatedDateTime = GetSafeDateTime(appJson, "createdDateTime"),
-                LastModifiedDateTime = GetSafeDateTime(appJson, "lastModifiedDateTime"),
+                        // ✅ FIXED: Safe numeric property parsing
+                        Size = GetSafeLong(appJson, "size"),
+                        MinimumFreeDiskSpaceInMB = GetSafeInt(appJson, "minimumFreeDiskSpaceInMB"),
+                        MinimumMemoryInMB = GetSafeInt(appJson, "minimumMemoryInMB"),
+                        MinimumNumberOfProcessors = GetSafeInt(appJson, "minimumNumberOfProcessors"),
+                        MinimumCpuSpeedInMHz = GetSafeInt(appJson, "minimumCpuSpeedInMHz"),
 
-                Category = "Loading..." // Will be updated later
-            };
+                        // Boolean properties (these are usually safe)
+
+
+                        // String properties
+                        PrivacyInformationUrl = appJson.TryGetProperty("privacyInformationUrl", out var privacyProp) ? privacyProp.GetString() ?? "" : "",
+                        InformationUrl = appJson.TryGetProperty("informationUrl", out var infoProp) ? infoProp.GetString() ?? "" : "",
+                        UploadState = appJson.TryGetProperty("uploadState", out var uploadProp)
+                    ? (uploadProp.ValueKind == JsonValueKind.Number
+                    ? uploadProp.GetInt32().ToString()
+                     : uploadProp.GetString() ?? "")
+                     : "",
+                        PublishingState = appJson.TryGetProperty("publishingState", out var publishProp) ? publishProp.GetString() ?? "" : "",
+                        ApplicableArchitectures = appJson.TryGetProperty("applicableArchitectures", out var appArchProp) ? appArchProp.GetString() ?? "" : "",
+                        AllowedArchitectures = appJson.TryGetProperty("allowedArchitectures", out var allowArchProp) ? allowArchProp.GetString() ?? "" : "",
+                        SetupFilePath = appJson.TryGetProperty("setupFilePath", out var setupProp) ? setupProp.GetString() ?? "" : "",
+                        MinimumSupportedWindowsRelease = appJson.TryGetProperty("minimumSupportedWindowsRelease", out var winProp) ? winProp.GetString() ?? "" : "",
+
+                        // Dates (these need special handling too)
+                        CreatedDateTime = GetSafeDateTime(appJson, "createdDateTime"),
+                        LastModifiedDateTime = GetSafeDateTime(appJson, "lastModifiedDateTime"),
+
+                        Category = "Loading..." // Will be updated later
+                    };
                 }
                 catch (InvalidOperationException ex)
                 {
                     Debug.WriteLine($"❌ JSON parsing failed for app ID: {intuneAppId}");
                     Debug.WriteLine($"❌ Error: {ex.Message}");
                     Debug.WriteLine($"❌ Stack trace: {ex.StackTrace}");
-            
+
                     // Log the raw JSON to see which property is null
                     var debugFileName = $"debug_app_{intuneAppId}_{DateTime.Now:yyyyMMdd_HHmmss}.json";
                     File.WriteAllText(debugFileName, appJson.GetRawText());
                     Debug.WriteLine($"🔍 Raw JSON saved to: {debugFileName}");
-            
+
                     throw;
                 }
 
@@ -480,109 +473,313 @@ namespace IntunePackagingTool.Services
 
                 // Parse role scope tags
                 if (appJson.TryGetProperty("roleScopeTagIds", out var roleTagsProp) && roleTagsProp.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var tag in roleTagsProp.EnumerateArray())
+                {
+                    foreach (var tag in roleTagsProp.EnumerateArray())
+                    {
+                        var tagValue = tag.GetString();
+                        if (!string.IsNullOrEmpty(tagValue))
+                            appDetail.RoleScopeTagIds.Add(tagValue);
+                    }
+                }
+
+                // Parse return codes - this could also cause issues
+                if (appJson.TryGetProperty("returnCodes", out var returnCodesProp) && returnCodesProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var returnCode in returnCodesProp.EnumerateArray())
+                    {
+                        // ✅ FIXED: Safe return code parsing
+                        var code = GetSafeInt(returnCode, "returnCode");
+                        var type = returnCode.TryGetProperty("type", out var typeProp) ? typeProp.GetString() ?? "Unknown" : "Unknown";
+
+                        appDetail.ReturnCodes.Add(new ReturnCode
+                        {
+                            Code = code,
+                            Type = type
+                        });
+                    }
+                }
+
+                Debug.WriteLine($"✓ Basic app info loaded: {appDetail.DisplayName}");
+
+                // Parse detection rules from main response
+                appDetail.DetectionRules = ParseDetectionRulesFromResponse(appJson);
+
+                // Fetch assignments and categories separately 
+                var assignmentsTask = GetAssignedGroupsAsync(intuneAppId);
+                var categoriesTask = GetAppCategoriesAsync(intuneAppId);
+
+                await Task.WhenAll(assignmentsTask, categoriesTask);
+
+                appDetail.AssignedGroups = await assignmentsTask;
+                appDetail.Category = await categoriesTask;
+
+                Debug.WriteLine($"✓ Complete app details loaded for: {appDetail.DisplayName}");
+                return appDetail;
+            }
+            catch (Exception ex)
             {
-                var tagValue = tag.GetString();
-                if (!string.IsNullOrEmpty(tagValue))
-                    appDetail.RoleScopeTagIds.Add(tagValue);
+                Debug.WriteLine($"✗ Error getting app details: {ex.Message}");
+                throw new Exception($"Failed to get application details from Intune: {ex.Message}", ex);
             }
         }
 
-        // Parse return codes - this could also cause issues
-        if (appJson.TryGetProperty("returnCodes", out var returnCodesProp) && returnCodesProp.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var returnCode in returnCodesProp.EnumerateArray())
-            {
-                // ✅ FIXED: Safe return code parsing
-                var code = GetSafeInt(returnCode, "returnCode");
-                var type = returnCode.TryGetProperty("type", out var typeProp) ? typeProp.GetString() ?? "Unknown" : "Unknown";
+       
 
-                appDetail.ReturnCodes.Add(new ReturnCode
+        public async Task<PagedResult<IntuneApplication>> GetApplicationsPagedAsync(
+            int pageNumber = 1,
+            int pageSize = 50,
+            string? searchFilter = null,
+            string? categoryFilter = null,
+            bool forceRefresh = false)
+        {
+            // Create cache key that includes pagination parameters
+            var cacheKey = $"apps_paged_{pageNumber}_{pageSize}_{searchFilter?.GetHashCode()}_{categoryFilter?.GetHashCode()}";
+
+            if (forceRefresh)
+            {
+                _cache.Clear(cacheKey);
+            }
+
+            return await _cache.GetOrAddAsync(cacheKey,
+                async () => await GetApplicationsPagedFromGraphAsync(pageNumber, pageSize, searchFilter, categoryFilter),
+                TimeSpan.FromMinutes(5)); // Shorter cache time for paged results
+        }
+
+        private async Task<PagedResult<IntuneApplication>> GetApplicationsPagedFromGraphAsync(
+            int pageNumber, int pageSize, string? searchFilter, string? categoryFilter)
+        {
+            try
+            {
+                Debug.WriteLine($"=== PAGED GRAPH API CALL - Page {pageNumber} ===");
+
+                var token = await GetAccessTokenAsync();
+
+                // Build the request URL with pagination
+                var skip = (pageNumber - 1) * pageSize;
+                var filterParts = new List<string> { "isof('microsoft.graph.win32LobApp')" };
+
+                // Add search filter if provided
+                if (!string.IsNullOrEmpty(searchFilter))
                 {
-                    Code = code,
-                    Type = type
-                });
+                    var encodedSearch = Uri.EscapeDataString(searchFilter);
+                    filterParts.Add($"(contains(displayName,'{encodedSearch}') or contains(publisher,'{encodedSearch}'))");
+                }
+
+                // Add category filter if provided
+                if (!string.IsNullOrEmpty(categoryFilter) && categoryFilter != "All Categories")
+                {
+                    var encodedCategory = Uri.EscapeDataString(categoryFilter);
+                    filterParts.Add($"categories/any(c:c/displayName eq '{encodedCategory}')");
+                }
+
+                var requestUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
+                                $"?$filter={string.Join(" and ", filterParts)}" +
+                                $"&$expand=categories" +
+                                $"&$top={pageSize}" +
+                                $"&$skip={skip}";
+
+                Debug.WriteLine($"Paged request URL: {requestUrl}");
+
+                var response = await _sharedHttpClient.GetAsync(requestUrl);
+                var responseText = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Fallback without expand if it fails
+                    requestUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
+                                $"?$filter={string.Join(" and ", filterParts)}" +
+                                $"&$top={pageSize}" +
+                                $"&$skip={skip}";
+
+                    response = await _sharedHttpClient.GetAsync(requestUrl);
+                    responseText = await response.Content.ReadAsStringAsync();
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        Debug.WriteLine($"Graph API error: {responseText}");
+                        throw new Exception($"Graph API request failed: {response.StatusCode}");
+                    }
+                }
+
+                var graphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(responseText,
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+                var result = new PagedResult<IntuneApplication>
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Items = new List<IntuneApplication>()
+                };
+
+                if (graphResponse?.Value != null)
+                {
+                    foreach (var app in graphResponse.Value)
+                    {
+                        result.Items.Add(ParseIntuneApplication(app));
+                    }
+                }
+
+                // Get total count
+                result.TotalCount = await GetTotalApplicationCountAsync(searchFilter, categoryFilter);
+
+                Debug.WriteLine($"✓ Loaded page {pageNumber}: {result.Items.Count} apps of {result.TotalCount} total");
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in paged Graph API call: {ex.Message}");
+                throw;
             }
         }
 
-                    Debug.WriteLine($"✓ Basic app info loaded: {appDetail.DisplayName}");
+        // Helper method to get total count
+        private async Task<int> GetTotalApplicationCountAsync(string? searchFilter, string? categoryFilter)
+        {
+            try
+            {
+                var filterParts = new List<string> { "isof('microsoft.graph.win32LobApp')" };
 
-                    // Parse detection rules from main response
-                    appDetail.DetectionRules = ParseDetectionRulesFromResponse(appJson);
-
-                    // Fetch assignments and categories separately 
-                    var assignmentsTask = GetAssignedGroupsAsync(intuneAppId);
-                    var categoriesTask = GetAppCategoriesAsync(intuneAppId);
-
-                    await Task.WhenAll(assignmentsTask, categoriesTask);
-
-                    appDetail.AssignedGroups = await assignmentsTask;
-                    appDetail.Category = await categoriesTask;
-
-                    Debug.WriteLine($"✓ Complete app details loaded for: {appDetail.DisplayName}");
-                    return appDetail;
-                }
-                catch (Exception ex)
+                // Add same filters as main query
+                if (!string.IsNullOrEmpty(searchFilter))
                 {
-                    Debug.WriteLine($"✗ Error getting app details: {ex.Message}");
-                    throw new Exception($"Failed to get application details from Intune: {ex.Message}", ex);
+                    var encodedSearch = Uri.EscapeDataString(searchFilter);
+                    filterParts.Add($"(contains(displayName,'{encodedSearch}') or contains(publisher,'{encodedSearch}'))");
+                }
+
+                if (!string.IsNullOrEmpty(categoryFilter) && categoryFilter != "All Categories")
+                {
+                    var encodedCategory = Uri.EscapeDataString(categoryFilter);
+                    filterParts.Add($"categories/any(c:c/displayName eq '{encodedCategory}')");
+                }
+
+                var countUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
+                              $"?$filter={string.Join(" and ", filterParts)}" +
+                              "&$select=id"; // Minimal selection for counting
+
+                var response = await _sharedHttpClient.GetAsync(countUrl);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseText = await response.Content.ReadAsStringAsync();
+                    var graphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(responseText,
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+                    return graphResponse?.Value?.Count ?? 0;
                 }
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting total count: {ex.Message}");
+            }
 
-                
-                private static long GetSafeLong(JsonElement element, string propertyName)
-                {
-                    if (element.TryGetProperty(propertyName, out var prop))
-                    {
-                        if (prop.ValueKind == JsonValueKind.Number)
-                        {
-                            return prop.GetInt64();
-                        }
-                        else if (prop.ValueKind == JsonValueKind.String)
-                        {
-                            if (long.TryParse(prop.GetString(), out var longValue))
-                                return longValue;
-                        }
-                        // If it's null or any other type, return 0
-                        Debug.WriteLine($"⚠️ Property '{propertyName}' has unexpected type: {prop.ValueKind}");
-                    }
-                    return 0;
-                }
+            return 0; // Fallback
+        }
 
-                private static int GetSafeInt(JsonElement element, string propertyName)
-                {
-                    if (element.TryGetProperty(propertyName, out var prop))
-                    {
-                        if (prop.ValueKind == JsonValueKind.Number)
-                        {
-                            return prop.GetInt32();
-                        }
-                        else if (prop.ValueKind == JsonValueKind.String)
-                        {
-                            if (int.TryParse(prop.GetString(), out var intValue))
-                                return intValue;
-                        }
-                        // If it's null or any other type, return 0
-                        Debug.WriteLine($"⚠️ Property '{propertyName}' has unexpected type: {prop.ValueKind}");
-                    }
-                    return 0;
-                }
+        // Extract app parsing logic into a separate method
+        private IntuneApplication ParseIntuneApplication(JsonElement app)
+        {
+            var id = app.GetProperty("id").GetString() ?? "";
+            var displayName = app.TryGetProperty("displayName", out var dnProp) ? dnProp.GetString() ?? "Unknown" : "Unknown";
+            var version = app.TryGetProperty("displayVersion", out var verProp) ? verProp.GetString() ?? "1.0.0" : "1.0.0";
+            var publisher = app.TryGetProperty("publisher", out var pubProp) ? pubProp.GetString() ?? "Unknown" : "Unknown";
 
-                private static DateTime GetSafeDateTime(JsonElement element, string propertyName)
+            // Category parsing logic
+            var category = "Uncategorized";
+            if (app.TryGetProperty("categories", out var categoriesProp) && categoriesProp.ValueKind == JsonValueKind.Array)
+            {
+                var categoryNames = new List<string>();
+                foreach (var cat in categoriesProp.EnumerateArray())
                 {
-                    if (element.TryGetProperty(propertyName, out var prop))
+                    if (cat.TryGetProperty("displayName", out var catName))
                     {
-                        if (prop.ValueKind == JsonValueKind.String)
-                        {
-                            var dateString = prop.GetString();
-                            if (!string.IsNullOrEmpty(dateString) && DateTime.TryParse(dateString, out var dateValue))
-                                return dateValue;
-                        }
-                        Debug.WriteLine($"⚠️ Property '{propertyName}' has unexpected type: {prop.ValueKind}");
+                        var catNameStr = catName.GetString();
+                        if (!string.IsNullOrWhiteSpace(catNameStr))
+                            categoryNames.Add(catNameStr);
                     }
-                    return DateTime.MinValue;
                 }
+                if (categoryNames.Count > 0)
+                    category = string.Join(", ", categoryNames);
+            }
+
+            return new IntuneApplication
+            {
+                Id = id,
+                DisplayName = displayName,
+                Version = version,
+                Publisher = publisher,
+                Category = category,
+                LastModified = DateTime.Now
+            };
+        }
+
+        // Cache invalidation method for ApplicationDetailView
+        public void InvalidateApplicationCache(string appId)
+        {
+            _cache.Clear($"app_detail_{appId}");
+
+            // Also clear any list caches that might contain this app
+            _cache.ClearPattern("apps_list");
+            _cache.ClearPattern("apps_paged");
+        }
+
+       
+       
+
+        
+        
+
+        private static long GetSafeLong(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number)
+                {
+                    return prop.GetInt64();
+                }
+                else if (prop.ValueKind == JsonValueKind.String)
+                {
+                    if (long.TryParse(prop.GetString(), out var longValue))
+                        return longValue;
+                }
+                // If it's null or any other type, return 0
+                Debug.WriteLine($"⚠️ Property '{propertyName}' has unexpected type: {prop.ValueKind}");
+            }
+            return 0;
+        }
+
+        private static int GetSafeInt(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number)
+                {
+                    return prop.GetInt32();
+                }
+                else if (prop.ValueKind == JsonValueKind.String)
+                {
+                    if (int.TryParse(prop.GetString(), out var intValue))
+                        return intValue;
+                }
+                // If it's null or any other type, return 0
+                Debug.WriteLine($"⚠️ Property '{propertyName}' has unexpected type: {prop.ValueKind}");
+            }
+            return 0;
+        }
+
+        private static DateTime GetSafeDateTime(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.String)
+                {
+                    var dateString = prop.GetString();
+                    if (!string.IsNullOrEmpty(dateString) && DateTime.TryParse(dateString, out var dateValue))
+                        return dateValue;
+                }
+                Debug.WriteLine($"⚠️ Property '{propertyName}' has unexpected type: {prop.ValueKind}");
+            }
+            return DateTime.MinValue;
+        }
 
         private List<DetectionRule> ParseDetectionRulesFromResponse(JsonElement appJson)
         {
@@ -784,8 +981,8 @@ namespace IntunePackagingTool.Services
             try
             {
                 var token = await GetAccessTokenAsync();
-               
-               
+
+
 
                 // First check if group exists
                 var checkUrl = $"https://graph.microsoft.com/v1.0/groups?$filter=displayName eq '{Uri.EscapeDataString(displayName)}'";
@@ -805,7 +1002,7 @@ namespace IntunePackagingTool.Services
                         {
                             throw new InvalidOperationException($"Group '{displayName}' exists but has no ID");
                         }
-                       
+
                         return existingGroupId;
                     }
                 }
@@ -839,7 +1036,7 @@ namespace IntunePackagingTool.Services
                 {
                     throw new InvalidOperationException($"Created group '{displayName}' but response contained no ID. Response: {responseContent}");
                 }
-                
+
                 return groupId;
             }
             catch (Exception ex)
@@ -854,8 +1051,8 @@ namespace IntunePackagingTool.Services
             try
             {
                 var token = await GetAccessTokenAsync();
-               
-                
+
+
 
                 // Create install assignments
                 if (!string.IsNullOrEmpty(groupIds.SystemInstallId))
@@ -918,8 +1115,8 @@ namespace IntunePackagingTool.Services
             }
         }
 
-        
-        
+
+
 
         private async Task<List<AssignedGroup>> GetAssignedGroupsAsync(string appId)
         {
@@ -1109,7 +1306,7 @@ namespace IntunePackagingTool.Services
             return new List<string>();
         }
 
-        public async Task <string>UploadApplicationAsync(ApplicationInfo appInfo, List<DetectionRule>? detectionRules = null)
+        public async Task<string> UploadApplicationAsync(ApplicationInfo appInfo, List<DetectionRule>? detectionRules = null)
         {
             try
             {
