@@ -8,50 +8,111 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 
 
 namespace IntunePackagingTool
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
 
     {
         private System.Windows.Threading.DispatcherTimer _searchTimer;
-        private IntuneService _intuneService;
+        private bool _isInitialized = false;
+        private IntuneService? _intuneService;
         private PSADTGenerator _psadtGenerator;
-        private IntuneUploadService _uploadService;
+        private IntuneUploadService? _uploadService;
         private ObservableCollection<IntuneApplication> _applications = new ObservableCollection<IntuneApplication>();
         private string _currentPackagePath = "";
         private SettingsService _settingsService;
         private BatchFileSigner? _batchSigner;
         private int _currentPage = 1;
-        private const int PageSize = 50;
+        private int PageSize = 50;
         private bool _isLoading = false;
         private string _currentSearchFilter = "";
         private string _currentCategoryFilter = "All Categories";
+        public int CurrentPage => _currentPage;
+        public string CurrentPageDisplay => $"Page {_currentPage} of {MaxPage}";
+        public bool CanGoToPreviousPage => _currentPage > 1;
+        public bool CanGoToNextPage => _currentPage < MaxPage;
+
+        private int MaxPage
+        {
+            get
+            {
+                var filteredCount = GetFilteredApplications().Count();
+                return filteredCount > 0 ? (int)Math.Ceiling((double)filteredCount / PageSize) : 1;
+            }
+        }
         private CancellationTokenSource? _loadCancellation;
 
         public MainWindow()
         {
             InitializeComponent();
             _searchTimer = new System.Windows.Threading.DispatcherTimer();
-            _searchTimer.Interval = TimeSpan.FromMilliseconds(500); // 300ms delay
+            _searchTimer.Interval = TimeSpan.FromMilliseconds(500);
             _searchTimer.Tick += SearchTimer_Tick;
             ShowPage("CreateApplication");
             SetActiveNavButton(CreateAppNavButton);
-            _intuneService = new IntuneService();
+            Debug.WriteLine("=== STARTING INTUNE SERVICE INITIALIZATION ===");
+
+            try
+            {
+                Debug.WriteLine("About to create IntuneService...");
+                _intuneService = new IntuneService();
+                Debug.WriteLine($"IntuneService created successfully: {_intuneService != null}");
+
+                if (_intuneService != null)
+                {
+                    Debug.WriteLine($"TenantId: {_intuneService.TenantId}");
+                    Debug.WriteLine($"ClientId: {_intuneService.ClientId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"CONSTRUCTOR EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                MessageBox.Show($"Constructor failed: {ex.Message}", "Debug", MessageBoxButton.OK);
+                _intuneService = null;
+            }
+
+            Debug.WriteLine($"Final _intuneService state: {_intuneService != null}");
+            Debug.WriteLine("=== END INTUNE SERVICE INITIALIZATION ===");
+
             ApplicationsList.ItemsSource = _applications;
             LoadCategoriesDropdown();
-            Loaded += async (s, e) => await LoadApplicationsPagedAsync();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
             _settingsService = new SettingsService();
             _psadtGenerator = new PSADTGenerator();
-            _uploadService = new IntuneUploadService(_intuneService);
+            if (_intuneService != null)
+            {
+                _uploadService = new IntuneUploadService(_intuneService);
+            }
+           
             _batchSigner = new BatchFileSigner(certificateName: "NBB Digital Workplace",certificateThumbprint: "B74452FD21BE6AD24CA9D61BCE156FD75E774716");
+            this.DataContext = this;
+            DiagnoseIntuneService();
+            _isInitialized = true;
 
         }
 
         #region Navigation Methods
+
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Now it's safe to load data that might show progress/status
+            if (ViewApplicationsPage.Visibility == Visibility.Visible)
+            {
+                await LoadApplicationsPagedAsync();
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         private void CreateAppNavButton_Click(object sender, RoutedEventArgs e)
         {
@@ -74,12 +135,11 @@ namespace IntunePackagingTool
 
         private void ShowPage(string pageName)
         {
-
             CreateApplicationPage.Visibility = Visibility.Collapsed;
             ViewApplicationsPage.Visibility = Visibility.Collapsed;
             SettingsPage.Visibility = Visibility.Collapsed;
+            PaginationPanel.Visibility = Visibility.Collapsed; // Hide by default
 
-            // Show selected page and update header
             switch (pageName)
             {
                 case "CreateApplication":
@@ -89,6 +149,7 @@ namespace IntunePackagingTool
                     break;
                 case "ViewApplications":
                     ViewApplicationsPage.Visibility = Visibility.Visible;
+                    PaginationPanel.Visibility = Visibility.Visible; // Show pagination
                     PageTitle.Text = "Applications";
                     PageSubtitle.Text = "Browse and manage Microsoft Intune applications";
                     SearchTextBox.Focus();
@@ -229,15 +290,13 @@ namespace IntunePackagingTool
         private async void SearchTimer_Tick(object? sender, EventArgs e)
         {
             _searchTimer.Stop();
-            _currentPage = 0; 
+            _currentPage = 1; 
             await LoadApplicationsPagedAsync(); 
         }
         #endregion
 
 
         #region Application Loading Methods
-
-        
        
         private List<IntuneApplication> _allApplications = new List<IntuneApplication>();
 
@@ -245,39 +304,36 @@ namespace IntunePackagingTool
         {
             try
             {
-                if (_isLoading) return; // Prevent concurrent calls
-                _isLoading = true;
+                if (_isLoading) return;
 
-                ShowStatus($"Loading applications (page {_currentPage + 1})...");
+                // Check if initialization is complete
+                if (!_isInitialized)
+                {
+                    Debug.WriteLine("LoadApplicationsPagedAsync called before initialization complete - skipping");
+                    return;
+                }
+
+                if (_intuneService == null)
+                {
+                    Debug.WriteLine("_intuneService is null after initialization - this should not happen");
+                    ShowStatus("IntuneService not available");
+                    MessageBox.Show("IntuneService is not initialized. Please restart the application.", "Service Error");
+                    return;
+                }
+
+                _isLoading = true;
+                ShowStatus($"Loading applications (page {_currentPage})...");
                 ShowProgress(true);
 
-                // Load ALL apps only once
-                if (_allApplications.Count == 0)
-                {
-                    _allApplications = await _intuneService.GetApplicationsAsync(); // Loads all 601 apps
-                }
-
                 // Apply filters to the full dataset
-                var filteredApps = _allApplications.AsEnumerable();
+                var filteredApps = GetFilteredApplications();
 
-                // Search filter
-                if (!string.IsNullOrEmpty(_currentSearchFilter))
-                {
-                    filteredApps = filteredApps.Where(app =>
-                        app.DisplayName.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) ||
-                        app.Publisher.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase));
-                }
-
-                // Category filter - this is the key fix!
-                if (_currentCategoryFilter != "All Categories")
-                {
-                    filteredApps = filteredApps.Where(app => app.Category == _currentCategoryFilter);
-                }
-                // If "All Categories" is selected, show ALL apps (no filter)
+                // Convert to 0-based for Skip calculation
+                var skipCount = (_currentPage - 1) * PageSize;
 
                 // Get current page from filtered results
                 var pagedApps = filteredApps
-                    .Skip(_currentPage * PageSize)
+                    .Skip(skipCount)
                     .Take(PageSize);
 
                 // Update UI
@@ -288,7 +344,12 @@ namespace IntunePackagingTool
                 }
 
                 var totalFiltered = filteredApps.Count();
-                ShowStatus($"Showing {_applications.Count} of {totalFiltered} applications");
+                ShowStatus($"Showing page {_currentPage} of {MaxPage} ({_applications.Count} of {totalFiltered} applications)");
+
+                // Notify property changed for pagination buttons
+                OnPropertyChanged(nameof(CurrentPageDisplay));
+                OnPropertyChanged(nameof(CanGoToPreviousPage));
+                OnPropertyChanged(nameof(CanGoToNextPage));
             }
             finally
             {
@@ -341,7 +402,7 @@ namespace IntunePackagingTool
         private async void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _currentCategoryFilter = CategoryFilter.SelectedItem?.ToString() ?? "All Categories";
-            _currentPage = 0; 
+            _currentPage = 1; 
             await LoadApplicationsPagedAsync(); 
         }
 
@@ -370,28 +431,27 @@ namespace IntunePackagingTool
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            await LoadApplicationsPagedAsync(); 
+            _allApplications.Clear();
+            _currentPage = 1; 
+            await LoadApplicationsPagedAsync();
         }
 
-       
-        private async void ApplicationsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        private async void PageSize_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (_isLoading) return;
-
-            var scrollViewer = e.OriginalSource as ScrollViewer;
-            if (scrollViewer == null) return;
-
-            // Check if we're near the bottom (within 100 pixels)
-            var isNearBottom = scrollViewer.VerticalOffset + scrollViewer.ViewportHeight
-                              >= scrollViewer.ExtentHeight - 100;
-
-            if (isNearBottom && _applications.Count >= PageSize)
+            if (PageSizeCombo.SelectedItem is ComboBoxItem item &&
+                int.TryParse(item.Tag.ToString(), out int newPageSize))
             {
-                await LoadMoreApplicationsAsync();
+                PageSize = newPageSize;
+                _currentPage = 1; // Reset to first page
+                await LoadApplicationsPagedAsync();
             }
         }
+        private async void ApplicationsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            // Infinite scroll disabled - using pagination buttons instead
+        }
 
-        // Add these button click handlers
+        
         private async void NextPage_Click(object sender, RoutedEventArgs e)
         {
             var filteredCount = GetFilteredApplications().Count();
@@ -600,13 +660,9 @@ namespace IntunePackagingTool
                 string fileName = Path.GetFileName(selectedFile);
                 string fileExtension = Path.GetExtension(selectedFile).ToLower();
 
-                // Set the sources path to the selected FILE
+                
                 SourcesPathTextBox.Text = selectedFile;
-
-                // Detect package type based on file extension
                 DetectPackageType(fileExtension, fileName);
-
-                // ✨ NEW: Extract metadata from the file
                 ExtractFileMetadata(selectedFile);
             }
         }
@@ -896,18 +952,44 @@ namespace IntunePackagingTool
         #region Utility Methods
         private void ShowStatus(string message)
         {
-            StatusText.Text = message;
+            if (StatusText != null)
+            {
+                StatusText.Text = message;
+            }
         }
 
         private void ShowProgress(bool show)
         {
-            ProgressBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            if (show)
+            if (ProgressBar != null)
             {
-                ProgressBar.IsIndeterminate = true;
+                ProgressBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                if (show)
+                {
+                    ProgressBar.IsIndeterminate = true;
+                }
             }
         }
+        private void DiagnoseIntuneService()
+        {
+            try
+            {
+                if (_intuneService == null)
+                {
+                    MessageBox.Show("IntuneService is null after initialization attempt", "Debug Info");
+                    return;
+                }
 
+                // Test basic properties
+                var tenantId = _intuneService.TenantId;
+                var clientId = _intuneService.ClientId;
+
+                MessageBox.Show($"IntuneService initialized successfully\nTenant: {tenantId}\nClient: {clientId}", "Debug Info");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"IntuneService diagnostic failed: {ex.Message}", "Debug Info");
+            }
+        }
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);

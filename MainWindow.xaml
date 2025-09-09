@@ -6,7 +6,8 @@
         Title="NBB Application Packaging Tools" 
         Height="900" Width="1400"
         WindowStartupLocation="CenterScreen"
-        Background="#F5F7FA">
+        Background="#F5F7FA"
+        Loaded ="MainWindow_Loaded">
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -72,8 +73,6 @@
                         </StackPanel>
                     </Button>
 
-                   
-
                     <!-- Settings -->
                     <Button Name="SettingsNavButton" Style="{StaticResource SidebarNavButton}" Click="SettingsNavButton_Click">
                         <StackPanel Orientation="Horizontal">
@@ -96,7 +95,6 @@
                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            
                             <TextBlock Text="NBB Admin" FontSize="10" Foreground="#BDC3C7"/>
                         </StackPanel>
                     </StackPanel>
@@ -112,6 +110,8 @@
                 <RowDefinition Height="*"/>
                 <!-- Content -->
                 <RowDefinition Height="Auto"/>
+                <!-- Pagination -->
+                <RowDefinition Height="Auto"/>
                 <!-- Status -->
             </Grid.RowDefinitions>
 
@@ -125,7 +125,6 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="RefreshButton_Click"/>
-                       
                     </StackPanel>
                 </Grid>
             </Border>
@@ -464,10 +463,10 @@
                                VerticalAlignment="Center" Margin="16,0,0,0" FontStyle="Italic"/>
                                 </StackPanel>
 
-                                <!-- Filter Bar -->
+                                <!-- Filter Bar with Page Size -->
                                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
                                     <TextBox Name="SearchTextBox" 
-                                             Width="400"
+                                             Width="350"
                                              MinHeight="40" 
                                              Margin="0"
                                              VerticalAlignment="Center"
@@ -476,7 +475,7 @@
                                              TextChanged="SearchTextBox_TextChanged"/>
 
                                     <ComboBox Name="CategoryFilter" 
-                                              Width="250" 
+                                              Width="200" 
                                               MinHeight="40"  
                                               Margin="10,0,0,0"
                                               VerticalAlignment="Center"
@@ -484,6 +483,22 @@
                                               Style="{StaticResource ModernComboBox}" 
                                               SelectedIndex="0" 
                                               SelectionChanged="CategoryFilter_SelectionChanged"/>
+
+                                    <!-- NEW: Page Size Dropdown -->
+                                    <ComboBox Name="PageSizeCombo" 
+                                              Width="120" 
+                                              MinHeight="40"  
+                                              Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Style="{StaticResource ModernComboBox}" 
+                                              SelectedIndex="1" 
+                                              SelectionChanged="PageSize_Changed">
+                                        <ComboBoxItem Content="25 per page" Tag="25"/>
+                                        <ComboBoxItem Content="50 per page" Tag="50"/>
+                                        <ComboBoxItem Content="100 per page" Tag="100"/>
+                                        <ComboBoxItem Content="200 per page" Tag="200"/>
+                                    </ComboBox>
                                 </StackPanel>
 
                                 <!-- List Header -->
@@ -504,7 +519,7 @@
                                     </Grid>
                                 </Border>
 
-                                <!-- UPDATED: Add MouseDoubleClick to your existing Applications List -->
+                                <!-- Applications List -->
                                 <ListView Grid.Row="3" Name="ApplicationsList" 
                                    ItemsSource="{Binding}"
                                     MouseDoubleClick="ApplicationsList_DoubleClick"
@@ -523,7 +538,6 @@
                                         </ItemsPanelTemplate>
                                     </ListView.ItemsPanel>
 
-                                    <!-- Keep all your existing ListView styling and ItemTemplate exactly as it is -->
                                     <ListView.ItemContainerStyle>
                                         <Style TargetType="ListViewItem">
                                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -550,7 +564,6 @@
                                                         <ColumnDefinition Width="20"/>
                                                     </Grid.ColumnDefinitions>
 
-                                                    <!-- Keep your existing column layout -->
                                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" 
                                              Foreground="#212529" TextTrimming="CharacterEllipsis"/>
@@ -575,11 +588,11 @@
                             </Grid>
                         </Border>
 
-                        <!-- ADD THIS: Application Detail View (hidden by default) -->
+                        <!-- Application Detail View (hidden by default) -->
                         <local:ApplicationDetailView x:Name="ApplicationDetailView" Visibility="Collapsed"/>
                     </Grid>
 
-
+                    <!-- SETTINGS PAGE -->
                     <Grid Name="SettingsPage" Visibility="Collapsed">
                         <Border Style="{StaticResource ModernCard}">
                             <StackPanel Margin="20">
@@ -646,23 +659,52 @@
                 <!-- Close MainContentGrid -->
             </ScrollViewer>
             <!-- Close ScrollViewer -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
-                <Button Name="PreviousPageButton" Content="◀ Previous" 
-            Click="PreviousPage_Click" 
-            IsEnabled="{Binding CanGoToPreviousPage}"
-            Margin="0,0,10,0"/>
 
-                <TextBlock Text="{Binding CurrentPageDisplay}" 
-               VerticalAlignment="Center" 
-               Margin="10,0"/>
+            <!-- Pagination Controls (NEW: Separate Grid Row) -->
+            <Border Grid.Row="2" Background="#F8F9FA" Padding="20,12" Margin="0,0,0,0" 
+                    BorderBrush="#E9ECEF" BorderThickness="0,1,0,0"
+                    Name="PaginationPanel" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
 
-                <Button Name="NextPageButton" Content="Next ▶" 
-            Click="NextPage_Click" 
-            IsEnabled="{Binding CanGoToNextPage}"
-            Margin="10,0,0,0"/>
-            </StackPanel>
+                    <!-- Previous Button -->
+                    <Button Name="PreviousPageButton" 
+                            Content="◀ Previous" 
+                            Click="PreviousPage_Click" 
+                            IsEnabled="{Binding CanGoToPreviousPage}"
+                            Margin="0,0,15,0"
+                            Style="{DynamicResource SecondaryButton}"
+                            MinWidth="100"
+                            Height="36"/>
+
+                    <!-- Page Display -->
+                    <Border Background="White" 
+                            CornerRadius="6" 
+                            Padding="15,8" 
+                            BorderBrush="#DEE2E6" 
+                            BorderThickness="1"
+                            VerticalAlignment="Center" 
+                            Margin="0,0,15,0">
+                        <TextBlock Text="{Binding CurrentPageDisplay}" 
+                                   VerticalAlignment="Center" 
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="#495057"/>
+                    </Border>
+
+                    <!-- Next Button -->
+                    <Button Name="NextPageButton" 
+                            Content="Next ▶" 
+                            Click="NextPage_Click" 
+                            IsEnabled="{Binding CanGoToNextPage}"
+                            Style="{DynamicResource SecondaryButton}"
+                            MinWidth="100"
+                            Height="36"/>
+
+                </StackPanel>
+            </Border>
+
             <!-- Status Bar -->
-            <Border Grid.Row="2" Background="White" Padding="32,16" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0">
+            <Border Grid.Row="3" Background="White" Padding="32,16" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0">
                 <Grid>
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Fill="#27AE60" Width="12" Height="12" Margin="0,0,8,0"/>

@@ -525,9 +525,8 @@ namespace IntunePackagingTool.Services
 
             // In CreateWin32LobAppAsync method, enhance the icon handling section:
 
-            // ADD ICON HANDLING
-            Debug.WriteLine($"=== ICON PROCESSING ===");
-            Debug.WriteLine($"Icon path provided: {iconPath ?? "NULL"}");
+            
+           
 
             if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
             {
