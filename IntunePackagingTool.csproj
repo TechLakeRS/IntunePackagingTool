@@ -39,6 +39,7 @@
 		<!-- Debug Settings -->
 		<DebugType>embedded</DebugType>
 		<DebugSymbols>true</DebugSymbols>
+		<SignAssembly>False</SignAssembly>
 	</PropertyGroup>
 	
 	<!-- Package References -->
@@ -69,13 +70,15 @@
 	<ItemGroup Condition="Exists('Resources\app.ico')">
 		<Resource Include="Resources\app.ico" />
 	</ItemGroup>
-	
+	<PropertyGroup>
+		<ApplicationIcon>Resources\app.ico</ApplicationIcon>
+	</PropertyGroup>
 	<!-- Folders -->
 	<ItemGroup>
-		<Folder Include="Utilities\" />
-		<Folder Include="Views\" />
-		<Folder Include="Dialogs\WizardSteps\" />
 		<Folder Include="Resources\" />
+		<Folder Include="Utilities\" />
+		<Folder Include="Dialogs\WizardSteps\" />
+		<Folder Include="Views\" />
 	</ItemGroup>
 	
 	<!-- XAML Settings -->

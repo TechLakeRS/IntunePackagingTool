@@ -40,15 +40,17 @@ namespace IntunePackagingTool.Services
         public bool CreateInstallMarker { get; set; }
 
         // Package Info
-        public string PackageType { get; set; } // "MSI" or "EXE"
+        public string PackageType { get; set; } = null!;     // "MSI" or "EXE"
     }
 
     public class PSADTGenerator
     {
         private readonly string _baseOutputPath = @"\\nbb.local\sys\SCCMData\IntuneApplications";
         private readonly string _templatePath = @"\\nbb.local\sys\SCCMData\TOOLS\IntunePackagingTool\20250811\Application";
+        public string BaseOutputPath => _baseOutputPath;
+        public string TemplatePath => _templatePath;
 
-        public async Task<string> CreatePackageAsync(ApplicationInfo appInfo, PSADTOptions psadtOptions = null)
+        public async Task<string> CreatePackageAsync(ApplicationInfo appInfo, PSADTOptions? psadtOptions =  null)
         {
             try
             {
@@ -120,7 +122,7 @@ namespace IntunePackagingTool.Services
                 }
 
                 // Modify the Deploy-Application.ps1 in the Application folder with metadata AND cheatsheet functions
-                await ModifyPSADTScriptAsync(packagePath, appInfo, psadtOptions);
+                await ModifyPSADTScriptAsync(packagePath, appInfo, psadtOptions = null!);
 
                 return packagePath;
             }
@@ -291,6 +293,7 @@ namespace IntunePackagingTool.Services
 
         private string UpdateScriptMetadata(string scriptContent, ApplicationInfo appInfo)
         {
+            string currentUser = Environment.UserName;
             // Update the variable declarations section with user's metadata
             var lines = scriptContent.Split('\n').ToList();
 
@@ -321,7 +324,7 @@ namespace IntunePackagingTool.Services
                 }
                 else if (line.Contains("$appScriptAuthor") && (line.StartsWith("[string]") || line.StartsWith("[String]")))
                 {
-                    lines[i] = $"\t[string]$appScriptAuthor = 'NBB Application Packaging Tools'";
+                    lines[i] = $"\t[string]$appScriptAuthor = '{currentUser}'";
                 }
                 // Add ServiceNow SRI if it doesn't exist, or update if it does
                 else if (line.Contains("$ServiceNowSRI") && (line.StartsWith("[string]") || line.StartsWith("[String]")))

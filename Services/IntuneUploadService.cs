@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using IntunePackagingTool.Models;
 
+
 namespace IntunePackagingTool.Services
 {
     public interface IUploadProgress
@@ -25,6 +26,7 @@ namespace IntunePackagingTool.Services
          private string _currentAppId = "";
          private string _currentContentVersionId = "";
         private string _currentFileId = "";
+        public string ConverterPath => @"\\nbb.local\sys\SCCMData\TOOLS\IntunePackagingTool\IntuneWinAppUtil.exe";
 
         public IntuneUploadService(IntuneService intuneService)
         {
@@ -36,7 +38,7 @@ namespace IntunePackagingTool.Services
             if (sharedHttpClient == null)
             {
                 sharedHttpClient = new HttpClient();
-                sharedHttpClient.Timeout = TimeSpan.FromMinutes(30); // Increased for file uploads
+                sharedHttpClient.Timeout = TimeSpan.FromMinutes(30); 
             }
         }
 
@@ -58,12 +60,16 @@ namespace IntunePackagingTool.Services
                 EnsureHttpClient();
                 sharedHttpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
+                // Step 0 - Sign files before conversion
+                progress?.UpdateProgress(10, "Signing application files...");
+                await SignApplicationFilesAsync(packagePath, progress);
+
                 // Step 1: Create the .intunewin file
-                progress?.UpdateProgress(10, "Converting package to .intunewin format...");
+                progress?.UpdateProgress(20, "Converting package to .intunewin format...");
                 await CreateIntuneWinFileAsync(packagePath);
 
                 // Step 2: Find the created .intunewin file
-                progress?.UpdateProgress(15, "Locating .intunewin file...");
+                progress?.UpdateProgress(25, "Locating .intunewin file...");
                 var intuneFolder = Path.Combine(packagePath, "Intune");
                 var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
                 if (intuneWinFiles.Length == 0)
@@ -75,30 +81,30 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"✓ Found .intunewin file: {Path.GetFileName(intuneWinFile)}");
 
                 // Step 3: Extract .intunewin metadata
-                progress?.UpdateProgress(20, "Extracting .intunewin metadata...");
+                progress?.UpdateProgress(30, "Extracting .intunewin metadata...");
                 var intuneWinInfo = ExtractIntuneWinInfo(intuneWinFile);
 
                 // Step 4: Create Win32LobApp
-                progress?.UpdateProgress(25, "Creating application in Intune...");
+                progress?.UpdateProgress(35, "Creating application in Intune...");
                 var appId = await CreateWin32LobAppAsync(appInfo, installCommand, uninstallCommand, description, detectionRules, installContext, intuneWinInfo, iconPath);
 
                 // Step 5: Create content version
-                progress?.UpdateProgress(35, "Creating content version...");
+                progress?.UpdateProgress(45, "Creating content version...");
                 var contentVersionId = await CreateContentVersionAsync(appId);
                 _currentAppId = appId;
                 _currentContentVersionId = contentVersionId;
 
                 // Step 6: Create file entry
-               progress?.UpdateProgress(45, "Creating file entry...");
+               progress?.UpdateProgress(55, "Creating file entry...");
                 var fileId = await CreateFileEntryAsync(appId, contentVersionId, intuneWinInfo);
                 _currentFileId = fileId;
 
                 // Step 7: Wait for Azure Storage URI
-                progress?.UpdateProgress(55, "Getting Azure Storage URI...");
+                progress?.UpdateProgress(65, "Getting Azure Storage URI...");
                 var azureStorageInfo = await WaitForAzureStorageUriAsync(appId, contentVersionId, fileId);
 
                 // Step 8: Upload file to Azure Storage
-                progress?.UpdateProgress(65, "Uploading file to Azure Storage...");
+                progress?.UpdateProgress(75, "Uploading file to Azure Storage...");
                 await UploadFileToAzureStorageAsync(azureStorageInfo.SasUri, intuneWinInfo.EncryptedFilePath, progress);
 
                 // Step 9: Commit the file
@@ -122,6 +128,61 @@ namespace IntunePackagingTool.Services
             catch (Exception ex)
             {
                 throw new Exception($"Failed to upload application to Intune: {ex.Message}", ex);
+            }
+        }
+
+        private async Task SignApplicationFilesAsync(string packagePath, IUploadProgress? progress)
+        {
+            try
+            {
+                var signer = new BatchFileSigner();
+
+                // Check certificate availability
+                if (!signer.ValidateCertificateAvailability())
+                {
+                    progress?.UpdateProgress(10, "Certificate not available - skipping file signing");
+                    Debug.WriteLine("⚠️ Certificate not available for signing");
+                    return;
+                }
+
+                progress?.UpdateProgress(10, "Certificate validated - starting file signing...");
+
+                // Create progress handler for signing
+                var signingProgress = new Progress<BatchFileSigner.SigningProgress>(signingUpdate =>
+                {
+                    if (signingUpdate.TotalFiles > 0)
+                    {
+                        var percentage = (int)((signingUpdate.ProcessedFiles * 100.0) / signingUpdate.TotalFiles);
+                        var currentFile = Path.GetFileName(signingUpdate.CurrentFile);
+                        progress?.UpdateProgress(10 + (percentage / 10), // Scale to 10-15% range
+                            $"Signing files: {signingUpdate.ProcessedFiles}/{signingUpdate.TotalFiles} - {currentFile}");
+                    }
+                });
+
+                // Sign all files in Application folder
+                var result = await signer.SignApplicationFolderAsync(packagePath, signingProgress);
+
+                var successful = result.Results.Count(r => r.Success);
+                var failed = result.Results.Count(r => !r.Success);
+
+                if (failed > 0)
+                {
+                    Debug.WriteLine($"⚠️ Signing completed with {failed} failures out of {result.Results.Count} files");
+                    // Log failed files for debugging
+                    foreach (var failedResult in result.Results.Where(r => !r.Success))
+                    {
+                        Debug.WriteLine($"  Failed: {Path.GetFileName(failedResult.FilePath)} - {failedResult.ErrorMessage}");
+                    }
+                }
+
+                progress?.UpdateProgress(15, $"File signing complete: {successful} files signed successfully");
+                Debug.WriteLine($"✓ File signing completed: {successful} successful, {failed} failed");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"⚠️ File signing failed: {ex.Message}");
+                progress?.UpdateProgress(15, "File signing failed - continuing with upload");
+                // Don't throw - signing is optional, continue with upload
             }
         }
 
@@ -187,8 +248,7 @@ namespace IntunePackagingTool.Services
     {
         using (var archive = ZipFile.OpenRead(intuneWinFilePath))
         {
-            Debug.WriteLine("=== ARCHIVE INSPECTION ===");
-            Debug.WriteLine($"Total files in archive: {archive.Entries.Count}");
+            
             foreach (var entry in archive.Entries)
             {
                 Debug.WriteLine($"  {entry.Name} ({entry.Length:N0} bytes)");
@@ -206,12 +266,11 @@ namespace IntunePackagingTool.Services
 
             var detectionXmlPath = Path.Combine(tempDir, "detection.xml");
             detectionEntry.ExtractToFile(detectionXmlPath);
-            Debug.WriteLine("✓ Extracted detection.xml");
+          
 
             // Step 2: Parse detection.xml
             var xmlContent = File.ReadAllText(detectionXmlPath);
-            Debug.WriteLine("=== DETECTION.XML CONTENT ===");
-            Debug.WriteLine(xmlContent);
+         
 
             var detectionXml = XDocument.Load(detectionXmlPath);
             var appInfo = detectionXml.Root;
@@ -380,12 +439,6 @@ namespace IntunePackagingTool.Services
             {
                 throw new Exception($"Encrypted content file was not extracted properly: {result.EncryptedFilePath}");
             }
-
-            Debug.WriteLine("✅ METADATA EXTRACTION SUCCESSFUL");
-            Debug.WriteLine($"  FileName: {result.FileName}");
-            Debug.WriteLine($"  UnencryptedSize: {result.UnencryptedContentSize:N0} bytes");
-            Debug.WriteLine($"  EncryptedFile: {Path.GetFileName(result.EncryptedFilePath)} ({new FileInfo(result.EncryptedFilePath).Length:N0} bytes)");
-            Debug.WriteLine($"  EncryptionKey: {result.EncryptionInfo.EncryptionKey[..Math.Min(20, result.EncryptionInfo.EncryptionKey.Length)]}...");
             
             return result;
         }
@@ -451,11 +504,15 @@ namespace IntunePackagingTool.Services
                 ["applicableArchitectures"] = "x64",
                 ["fileName"] = intuneWinInfo.FileName,
                 ["setupFilePath"] = "Deploy-Application.exe",
+                ["informationUrl"] = "https://servicemanagement.nbb.be/nbb_portal",
+                ["privacyInformationUrl"] = "https://servicemanagement.nbb.be/nbb_portal",
                 ["installExperience"] = new Dictionary<string, object>
                 {
                     ["runAsAccount"] = installContext,
                     ["deviceRestartBehavior"] = "allow"
                 },
+                
+            
                 ["detectionRules"] = formattedDetectionRules.ToArray(),
                 ["returnCodes"] = new[]
                 {
@@ -520,8 +577,7 @@ namespace IntunePackagingTool.Services
                 WriteIndented = true
             });
 
-            Debug.WriteLine("=== CHECKING FINAL PAYLOAD ===");
-            Debug.WriteLine($"Payload contains 'largeIcon': {json.Contains("\"largeIcon\"")}");
+          
             if (json.Contains("\"largeIcon\""))
             {
                 // Extract just the largeIcon part for verification (first 100 chars of value)
@@ -529,11 +585,9 @@ namespace IntunePackagingTool.Services
                 if (iconIndex > 0)
                 {
                     var iconSection = json.Substring(iconIndex, Math.Min(500, json.Length - iconIndex));
-                    Debug.WriteLine($"Icon section in payload: {iconSection}");
+                    
                 }
             }
-
-            
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await sharedHttpClient!.PostAsync("https://graph.microsoft.com/beta/deviceAppManagement/mobileApps", content);
             var responseText = await response.Content.ReadAsStringAsync();
@@ -546,7 +600,18 @@ namespace IntunePackagingTool.Services
             var createdApp = JsonSerializer.Deserialize<JsonElement>(responseText);
             var appId = createdApp.GetProperty("id").GetString();
 
-            Debug.WriteLine($"✓ Created Win32 app in Intune. ID: {appId}");
+          
+            try
+            {
+                await _intuneService.AssignTestCategoryToAppAsync(appId!);
+                
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"⚠ Failed to assign Test category: {ex.Message}");
+                // Don't fail the entire upload if category assignment fails
+            }
+
             return appId ?? throw new Exception("App ID not returned from creation");
         }
 
@@ -583,8 +648,8 @@ namespace IntunePackagingTool.Services
 
                 Debug.WriteLine($"MIME type: {mimeType}");
 
-                // Return the icon object structure WITHOUT @odata.type
-                // The Graph API expects just type and value for largeIcon
+               
+
                 var iconData = new Dictionary<string, object>
                 {
                     ["type"] = mimeType,
@@ -625,12 +690,9 @@ namespace IntunePackagingTool.Services
 {
     var encryptedSize = new FileInfo(intuneWinInfo.EncryptedFilePath).Length;
 
-    Debug.WriteLine("=== FILE SIZE VALIDATION ===");
-    Debug.WriteLine($"Unencrypted size from XML: {intuneWinInfo.UnencryptedContentSize:N0} bytes");
-    Debug.WriteLine($"Encrypted file actual size: {encryptedSize:N0} bytes");
-    Debug.WriteLine($"File exists: {File.Exists(intuneWinInfo.EncryptedFilePath)}");
+   
 
-    var fileBody = new Dictionary<string, object>
+    var fileBody = new Dictionary<string, object?>
     {
         ["@odata.type"] = "#microsoft.graph.mobileAppContentFile",
         ["name"] = intuneWinInfo.FileName,
@@ -643,8 +705,7 @@ namespace IntunePackagingTool.Services
     var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions/{contentVersionId}/files";
     var json = JsonSerializer.Serialize(fileBody, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
     
-    Debug.WriteLine("=== FILE ENTRY PAYLOAD ===");
-    Debug.WriteLine(json);
+   
     
     var content = new StringContent(json, Encoding.UTF8, "application/json");
     var response = await sharedHttpClient!.PostAsync(url, content);
@@ -658,7 +719,7 @@ namespace IntunePackagingTool.Services
     var fileEntry = JsonSerializer.Deserialize<JsonElement>(responseText);
     var fileId = fileEntry.GetProperty("id").GetString();
 
-    Debug.WriteLine($"✓ Created file entry. ID: {fileId}");
+    
     return fileId ?? throw new Exception("File ID not returned");
 }
 
@@ -666,8 +727,7 @@ namespace IntunePackagingTool.Services
 {
     var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions/{contentVersionId}/files/{fileId}";
     
-    Debug.WriteLine($"=== WAITING FOR AZURE STORAGE URI ===");
-    Debug.WriteLine($"URL: {url}");
+    
     
     for (int attempts = 0; attempts < 120; attempts++) // 20 minutes total
     {
@@ -697,7 +757,7 @@ namespace IntunePackagingTool.Services
             var uploadState = uploadStateProp.GetString() ?? "";
             Debug.WriteLine($"Attempt {attempts + 1}: Upload state = '{uploadState}'");
 
-            // ✅ USE CASE-INSENSITIVE COMPARISONS
+           
             if (uploadState.Equals("AzureStorageUriRequestSuccess", StringComparison.OrdinalIgnoreCase) ||
                 uploadState.Equals("azureStorageUriRequestSuccess", StringComparison.OrdinalIgnoreCase))
             {
@@ -715,13 +775,13 @@ namespace IntunePackagingTool.Services
                 }
             }
 
-            // ✅ HANDLE PENDING STATE (CASE-INSENSITIVE)
+           
             if (uploadState.Equals("AzureStorageUriRequestPending", StringComparison.OrdinalIgnoreCase) ||
                 uploadState.Equals("azureStorageUriRequestPending", StringComparison.OrdinalIgnoreCase))
             {
                 Debug.WriteLine($"⏳ Still pending... (attempt {attempts + 1}/120) - waiting 10 seconds");
-                await Task.Delay(10000); // Wait 10 seconds
-                continue; // ✅ CONTINUE THE LOOP - DON'T THROW EXCEPTION
+                await Task.Delay(10000); 
+                continue; 
             }
             
             // Handle failure states
@@ -739,13 +799,13 @@ namespace IntunePackagingTool.Services
                 throw new Exception("Azure Storage URI request timed out");
             }
 
-            // Handle unknown states - wait and try again
+           
             Debug.WriteLine($"❓ Unknown upload state: '{uploadState}' - will wait and retry");
             
-            // For unknown states, wait a bit longer and try again
-            if (attempts < 115) // Give it more chances for unknown states
+           
+            if (attempts < 115) // 
             {
-                await Task.Delay(15000); // Wait 15 seconds for unknown states
+                await Task.Delay(15000); 
                 continue;
             }
             else
@@ -785,7 +845,7 @@ namespace IntunePackagingTool.Services
             Debug.WriteLine($"Size: {totalSize:N0} bytes");
             Debug.WriteLine($"Chunks: {totalChunks}");
 
-             // ✅ CREATE SEPARATE HTTP CLIENT FOR AZURE STORAGE (NO AUTH HEADER)
+           
             progress?.UpdateProgress(65, $"Starting upload: {Path.GetFileName(filePath)} ({FormatBytes(totalSize)})");
 
             using var azureHttpClient = new HttpClient();
@@ -1005,7 +1065,7 @@ namespace IntunePackagingTool.Services
                 var uploadState = uploadStateProp.GetString() ?? "";
                 Debug.WriteLine($"Attempt {attempts + 1}: Upload state = '{uploadState}'");
 
-                // ✅ USE CASE-INSENSITIVE COMPARISONS
+                
                 if (uploadState.Equals(successState, StringComparison.OrdinalIgnoreCase))
                 {
                     Debug.WriteLine($"✓ File processing completed for stage: {stage}");
@@ -1016,7 +1076,7 @@ namespace IntunePackagingTool.Services
                 {
                     Debug.WriteLine($"⏳ Still processing... (attempt {attempts + 1}/120) - waiting 5 seconds");
                     await Task.Delay(5000); // Wait 5 seconds
-                    continue; // ✅ CONTINUE WAITING
+                    continue; 
                 }
                 
                 // Handle failure states with case-insensitive checks
@@ -1248,6 +1308,82 @@ namespace IntunePackagingTool.Services
             throw new Exception("Timeout waiting for SAS URI renewal");
         }
 
+        public async Task<bool> UpdateExistingApplicationAsync(
+           string existingAppId,
+           string packagePath,
+           IUploadProgress? progress = null)
+        {
+            try
+            {
+                progress?.UpdateProgress(5, "Authenticating with Microsoft Graph...");
+                var token = await _intuneService.GetAccessTokenAsync();
+                EnsureHttpClient();
+                sharedHttpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                // Step 1: Create the .intunewin file
+                progress?.UpdateProgress(10, "Converting package to .intunewin format...");
+                await CreateIntuneWinFileAsync(packagePath);
+
+                // Step 2: Find the created .intunewin file
+                progress?.UpdateProgress(15, "Locating .intunewin file...");
+                var intuneFolder = Path.Combine(packagePath, "Intune");
+                var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
+                if (intuneWinFiles.Length == 0)
+                {
+                    throw new Exception("No .intunewin file found after conversion.");
+                }
+
+                var intuneWinFile = intuneWinFiles[0];
+                Debug.WriteLine($"✓ Found .intunewin file: {Path.GetFileName(intuneWinFile)}");
+
+                // Step 3: Extract .intunewin metadata
+                progress?.UpdateProgress(20, "Extracting .intunewin metadata...");
+                var intuneWinInfo = ExtractIntuneWinInfo(intuneWinFile);
+
+                // Step 4: Create NEW content version for EXISTING app 
+                progress?.UpdateProgress(25, "Creating new content version for existing app...");
+                var contentVersionId = await CreateContentVersionAsync(existingAppId);
+                _currentAppId = existingAppId;  // Use existing app ID
+                _currentContentVersionId = contentVersionId;
+
+                // Step 5: Create file entry
+                progress?.UpdateProgress(35, "Creating file entry...");
+                var fileId = await CreateFileEntryAsync(existingAppId, contentVersionId, intuneWinInfo);
+                _currentFileId = fileId;
+
+                // Step 6: Wait for Azure Storage URI
+                progress?.UpdateProgress(45, "Getting Azure Storage URI...");
+                var azureStorageInfo = await WaitForAzureStorageUriAsync(existingAppId, contentVersionId, fileId);
+
+                // Step 7: Upload file to Azure Storage
+                progress?.UpdateProgress(55, "Uploading file to Azure Storage...");
+                await UploadFileToAzureStorageAsync(azureStorageInfo.SasUri, intuneWinInfo.EncryptedFilePath, progress);
+
+                // Step 8: Commit the file
+                progress?.UpdateProgress(85, "Committing file...");
+                await CommitFileAsync(existingAppId, contentVersionId, fileId, intuneWinInfo.EncryptionInfo);
+
+                // Step 9: Wait for file processing
+                progress?.UpdateProgress(90, "Waiting for file processing...");
+                await WaitForFileProcessingAsync(existingAppId, contentVersionId, fileId, "CommitFile");
+
+                // Step 10: Commit the app with new content version
+                progress?.UpdateProgress(95, "Finalizing application update...");
+                await CommitAppAsync(existingAppId, contentVersionId);
+
+                // Step 11: Cleanup temp files
+                CleanupTempFiles(intuneWinInfo);
+
+                progress?.UpdateProgress(100, "Application updated successfully!");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Failed to update application: {ex.Message}");
+                progress?.UpdateProgress(0, $"Update failed: {ex.Message}");
+                throw new Exception($"Failed to update application in Intune: {ex.Message}", ex);
+            }
+        }
         public void Dispose()
         {
             sharedHttpClient?.Dispose();

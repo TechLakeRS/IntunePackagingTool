@@ -10,29 +10,28 @@ namespace IntunePackagingTool.Services
 
         private class CacheItem
         {
-            public object Value { get; set; }
+            public object? Value { get; set; }
             public DateTime Expiry { get; set; }
         }
 
         public async Task<T> GetOrAddAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null)
         {
-            // Check if cached and not expired
-            if (_cache.TryGetValue(key, out var item) && item.Expiry > DateTime.UtcNow)
+            
+            if (_cache.TryGetValue(key, out var item) &&
+                item.Expiry > DateTime.UtcNow &&
+                item.Value is T typedValue)
             {
-                return (T)item.Value;
+                return typedValue;
             }
 
-            // Get fresh data
             var result = await factory();
-
-            // Cache it
             var expiry = DateTime.UtcNow.Add(expiration ?? TimeSpan.FromMinutes(5));
             _cache[key] = new CacheItem { Value = result, Expiry = expiry };
 
             return result;
         }
 
-        public void Clear(string key = null)
+        public void Clear(string? key = null)
         {
             if (key != null)
                 _cache.TryRemove(key, out _);

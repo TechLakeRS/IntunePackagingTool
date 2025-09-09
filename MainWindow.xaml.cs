@@ -18,10 +18,13 @@ namespace IntunePackagingTool
     {
         private System.Windows.Threading.DispatcherTimer _searchTimer;
         private string _pendingSearchText = "";
-        private IntuneService _intuneService = new IntuneService();
-        private PSADTGenerator _psadtGenerator = new PSADTGenerator();
+        private IntuneService _intuneService;
+        private PSADTGenerator _psadtGenerator;
+        private IntuneUploadService _uploadService;
         private ObservableCollection<IntuneApplication> _applications = new ObservableCollection<IntuneApplication>();
         private string _currentPackagePath = "";
+        private SettingsService _settingsService;
+        private BatchFileSigner? _batchSigner;
 
         public MainWindow()
         {
@@ -35,7 +38,11 @@ namespace IntunePackagingTool
             LoadCategoriesDropdown();
             Loaded += async (s, e) => await LoadAllApplicationsAsync();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
-
+            _settingsService = new SettingsService();
+            _intuneService = new IntuneService();
+            _psadtGenerator = new PSADTGenerator();
+            _uploadService = new IntuneUploadService(_intuneService);
+            _batchSigner = new BatchFileSigner(certificateName: "NBB Digital Workplace",certificateThumbprint: "B74452FD21BE6AD24CA9D61BCE156FD75E774716");
 
         }
 
@@ -56,12 +63,12 @@ namespace IntunePackagingTool
         private void SettingsNavButton_Click(object sender, RoutedEventArgs e)
         {
             ShowPage("Settings");
+            LoadConfigurationDisplay();
             UpdateNavigation(SettingsNavButton);
         }
 
         private void ShowPage(string pageName)
         {
-            // Hide all pages
 
             CreateApplicationPage.Visibility = Visibility.Collapsed;
             ViewApplicationsPage.Visibility = Visibility.Collapsed;
@@ -98,6 +105,42 @@ namespace IntunePackagingTool
             };
             remoteTest.ShowDialog();
         }
+
+
+
+        private void LoadConfigurationDisplay()
+        {
+            // Get values from IntuneService
+            if (_intuneService != null)
+            {
+                TenantIdDisplay.Text = _intuneService.TenantId;
+                ClientIdDisplay.Text = _intuneService.ClientId;
+                ThumbprintDisplay.Text = _intuneService.CertificateThumbprint;
+            }
+
+            // Get values from PSADTGenerator
+            if (_psadtGenerator != null)
+            {
+                PSADTPathDisplay.Text = _psadtGenerator.TemplatePath;
+                OutputPathDisplay.Text = _psadtGenerator.BaseOutputPath;
+            }
+
+            // Get values from IntuneUploadService (fixed underscore)
+            if (_uploadService != null)
+            {
+                
+                UtilPathDisplay.Text = _uploadService.ConverterPath;
+            }
+        }
+
+
+        private void ShowSettingsPage()
+        {
+            
+            CreateApplicationPage.Visibility = Visibility.Collapsed;
+            LoadConfigurationDisplay();
+            SettingsPage.Visibility = Visibility.Visible;
+        }
         private async void ApplicationsList_DoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (ApplicationsList.SelectedItem != null)
@@ -108,25 +151,21 @@ namespace IntunePackagingTool
                 {
                     try
                     {
-                        // Show loading state
+                       
                         StatusText.Text = $"Loading details for {selectedApp.DisplayName} from Microsoft Intune...";
                         ProgressBar.Visibility = Visibility.Visible;
                         ProgressBar.IsIndeterminate = true;
-
-                        // Fetch REAL data from Microsoft Intune using your existing service
                         var appDetail = await _intuneService.GetApplicationDetailAsync(selectedApp.Id);
-
-                        // Hide progress
                         ProgressBar.Visibility = Visibility.Collapsed;
 
                         if (appDetail != null)
                         {
-                            // Hide list and show detail view with REAL data from Intune
+                            
                             ApplicationsListPanel.Visibility = Visibility.Collapsed;
                             ApplicationDetailView.Visibility = Visibility.Visible;
                             ApplicationDetailView.LoadApplicationDetail(appDetail);
 
-                            // Update page title
+                            
                             PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
                             PageSubtitle.Text = "Live data from Microsoft Intune";
                             StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
@@ -179,12 +218,11 @@ namespace IntunePackagingTool
             _searchTimer.Start();
         }
 
-        // ADD THIS METHOD - Execute search after debounce delay
+       
         private void SearchTimer_Tick(object? sender, EventArgs e)
         {
             _searchTimer.Stop();
 
-            // Perform the actual search
             FilterApplications(_pendingSearchText);
         }
         #endregion
@@ -668,6 +706,10 @@ namespace IntunePackagingTool
                 // Show success and update UI
                 PackageStatusPanel.Visibility = Visibility.Visible;
                 PackageStatusText.Text = "✅ Package created successfully!";
+                StatusText.Text = $"Package created successfully • {DateTime.Now:HH:mm:ss}";
+                ProgressBar.IsIndeterminate = true;
+
+
                 PackagePathText.Text = packagePath;
                 OpenPackageFolderButton.Visibility = Visibility.Visible;
 

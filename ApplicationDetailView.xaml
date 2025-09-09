@@ -30,13 +30,13 @@
                     Padding="15,12"
                     FontWeight="Medium"
                     Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
-           
+
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" 
                         VerticalAlignment="Center" Margin="10,12">
                 <Border Width="32" Height="32" Margin="0,0,10,10"
                         Background="White" CornerRadius="4">
-                        <Image x:Name="AppIconImage" 
+                    <Image x:Name="AppIconImage" 
                                Source="{Binding IconImage}" 
                                Width="28" Height="28"
                         RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -49,17 +49,18 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" 
                 VerticalAlignment="Center" Margin="10">
 
-                <!-- Update Button -->
+                <!-- Enhanced Update Button -->
                 <Button Name="UpdateApplicationButton"
-                Content="📦 Update" 
-                Click="UpdateApplicationButton_Click"
-                Background="#2196F3" 
-                Foreground="White"
-                BorderThickness="0"
-                Padding="12,10"
-                Margin="0,0,8,0"
-                FontWeight="Medium"
-                Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+                        Content="🔄 Update Package" 
+                        Click="UpdateApplicationButton_Click"
+                        Background="#2196F3" 
+                        Foreground="White"
+                        BorderThickness="0"
+                        Padding="12,10"
+                        Margin="0,0,8,0"
+                        FontWeight="Medium"
+                        ToolTip="Update this application with the latest files from the network share"
+                        Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
 
                 <!-- Open Script Button -->
                 <Button Name="OpenScriptButton"
@@ -82,7 +83,7 @@
                     <ColumnDefinition Width="15"/>
                     <ColumnDefinition Width="1*"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <!-- Left column -->
                 <StackPanel Grid.Column="0">
                     <!-- Basic Information -->
@@ -354,7 +355,7 @@
                         </StackPanel>
                     </Border>
 
-                  
+
 
                     <!-- URLs & Links -->
                     <Border Background="#F8F9FA" CornerRadius="6" Padding="20" Margin="0,0,0,15"
@@ -382,7 +383,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Network Share Info -->
+                    <!-- Enhanced Network Share Info Section with Manual Browse -->
                     <Border Background="#E8F5E8" CornerRadius="6" Padding="20"
                             BorderBrush="#C8E6C9" BorderThickness="1">
                         <StackPanel>
@@ -390,7 +391,7 @@
                                        FontSize="16" FontWeight="SemiBold" 
                                        Foreground="#2E7D32" Margin="0,0,0,15"/>
 
-                            <TextBlock Text="Network Path:" FontWeight="Medium" 
+                            <TextBlock Text="Package Path:" FontWeight="Medium" 
                                        Margin="0,0,0,5" Foreground="#2E7D32"/>
                             <Border Background="White" CornerRadius="3" Padding="8" Margin="0,0,0,15">
                                 <TextBlock Name="SourcePathText" 
@@ -398,8 +399,9 @@
                                            FontFamily="Consolas" FontSize="11" 
                                            TextWrapping="Wrap"/>
                             </Border>
-                            
-                            <StackPanel Name="ActionButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
+
+                            <!-- Action buttons panel - shown when path is found -->
+                            <StackPanel Name="ActionButtonsPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,10">
                                 <Button Name="OpenFolderButton" Content="📂 Open Folder" 
                                         Click="OpenFolderButton_Click"
                                         Background="#27AE60" Foreground="White"
@@ -411,8 +413,33 @@
                                         Click="CopyPathButton_Click"
                                         Background="#95A5A6" Foreground="White"
                                         BorderThickness="0" Padding="10,6"
+                                        Margin="0,0,10,0"
+                                        Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+
+                                <Button Name="ChangePathButton" Content="🔄 Change Path" 
+                                        Click="BrowsePackageFolderButton_Click"
+                                        Background="#E67E22" Foreground="White"
+                                        BorderThickness="0" Padding="10,6"
+                                        ToolTip="Browse for a different Deploy-Application.exe file"
                                         Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
                             </StackPanel>
+
+                            <!-- Manual browse panel - shown when path is not found -->
+                            <StackPanel Name="ManualBrowsePanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,10">
+                                <Button Name="BrowsePackageButton" Content="📂 Browse for Deploy-Application.exe" 
+                                        Click="BrowsePackageFolderButton_Click"
+                                        Background="#F39C12" Foreground="White"
+                                        BorderThickness="0" Padding="12,8" 
+                                        FontWeight="Medium"
+                                        ToolTip="Manually browse for the Deploy-Application.exe file"
+                                        Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+                            </StackPanel>
+
+                            <!-- Help text -->
+                            <TextBlock Name="PathHelpText" 
+                                       Text="The package folder should contain an 'Application' subfolder with Deploy-Application.exe"
+                                       Foreground="#666" FontSize="11" FontStyle="Italic" 
+                                       TextWrapping="Wrap" Margin="0,5,0,0"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

@@ -22,10 +22,10 @@ namespace IntunePackagingTool.Models
         public string UninstallCommand { get; set; } = "Deploy-Application.exe Uninstall";
         public string NetworkSharePath { get; set; } = "";
 
-        private byte[] _iconData;
-        private BitmapImage _iconImage;
+        private byte[]? _iconData;
+        private BitmapImage? _iconImage;
 
-        public byte[] IconData
+        public byte[]? IconData
         {
             get => _iconData;
             set
@@ -42,7 +42,7 @@ namespace IntunePackagingTool.Models
         public string IconType { get; set; } = string.Empty;
        
 
-        public BitmapImage IconImage
+        public BitmapImage? IconImage
         {
             get => _iconImage;
             private set
@@ -88,32 +88,7 @@ namespace IntunePackagingTool.Models
             }
         }
        
-        private async void CreateIconImageAsync()
-        {
-            if (_iconData == null || _iconData.Length == 0) return;
-
-            await Task.Run(() =>
-            {
-                try
-                {
-                    var bitmap = new BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmap.StreamSource = new MemoryStream(_iconData);
-                    bitmap.EndInit();
-                    bitmap.Freeze(); // Make thread-safe
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        IconImage = bitmap;
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Icon load failed: {ex.Message}");
-                }
-            });
-        }
+       
         // Extended Properties from Microsoft Graph API
         public string Owner { get; set; } = "";
         public string Developer { get; set; } = "";
@@ -166,9 +141,9 @@ namespace IntunePackagingTool.Models
         public string CreatedDateFormatted => CreatedDateTime != DateTime.MinValue ? CreatedDateTime.ToString("MMM dd, yyyy HH:mm") : "Unknown";
         public string LastModifiedFormatted => LastModifiedDateTime != DateTime.MinValue ? LastModifiedDateTime.ToString("MMM dd, yyyy HH:mm") : "Unknown";
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

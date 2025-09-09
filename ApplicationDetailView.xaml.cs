@@ -1,6 +1,7 @@
-﻿using IntunePackagingTool.Dialogs;
+﻿
 using IntunePackagingTool.Models;
 using IntunePackagingTool.Utilities;
+using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -229,7 +230,23 @@ namespace IntunePackagingTool
                 StatusText.Text = "Network path copied to clipboard";
             }
         }
-
+        private void RefreshPathValidation(string path)
+        {
+            if (!string.IsNullOrEmpty(path) && ValidatePackageForUpdate(path))
+            {
+                SourcePathText.Text = path;
+                ActionButtonsPanel.Visibility = Visibility.Visible;
+                ManualBrowsePanel.Visibility = Visibility.Collapsed;
+                PathHelpText.Text = "✅ Package path validated - ready for updates";
+            }
+            else
+            {
+                SourcePathText.Text = string.IsNullOrEmpty(path) ? "❌ No path specified" : "❌ Invalid package structure";
+                ActionButtonsPanel.Visibility = Visibility.Collapsed;
+                ManualBrowsePanel.Visibility = Visibility.Visible;
+                PathHelpText.Text = "⚠️ Please browse for Deploy-Application.exe to enable package updates";
+            }
+        }
         // URL click handlers
         private void PrivacyUrl_Click(object sender, RoutedEventArgs e)
         {
@@ -250,7 +267,7 @@ namespace IntunePackagingTool
             }
         }
 
-        private void UpdateApplicationButton_Click(object sender, RoutedEventArgs e)
+        private async void UpdateApplicationButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentApp == null)
             {
@@ -259,23 +276,300 @@ namespace IntunePackagingTool
                 return;
             }
 
-            var updateDialog = new ApplicationUpdateDialog(_currentApp);
-            updateDialog.Owner = Window.GetWindow(this);
+            string packagePath = "";
 
-            if (updateDialog.ShowDialog() == true && updateDialog.UpdateSuccessful)
+            // Try to use the network share path first
+            if (!string.IsNullOrEmpty(_currentApp.NetworkSharePath) &&
+                ValidatePackageForUpdate(_currentApp.NetworkSharePath))
             {
-                StatusText.Text = "Application updated successfully";
+                packagePath = _currentApp.NetworkSharePath;
+            }
+            else
+            {
+                // Network share not found or invalid, offer manual selection
+                var result = MessageBox.Show(
+                    $"Network share path for '{_currentApp.DisplayName}' was not found or is invalid.\n\n" +
+                    $"Would you like to manually browse for the Deploy-Application.exe file?",
+                    "Network Path Not Found",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
 
-                // Update the current app display with new values
-                _currentApp.DisplayName = updateDialog.NewDisplayName;
-                _currentApp.Description = updateDialog.NewDescription;
-                _currentApp.Category = updateDialog.NewCategory;
+                if (result != MessageBoxResult.Yes)
+                    return;
 
-                // Update UI
-                AppTitleText.Text = updateDialog.NewDisplayName;
-                DescriptionText.Text = updateDialog.NewDescription;
+                packagePath = BrowseForDeployApplicationFile();
+                if (string.IsNullOrEmpty(packagePath))
+                    return; // User cancelled
+            }
 
-                StatusText.Text = $"Updated successfully • {DateTime.Now:HH:mm:ss}";
+            await PerformPackageUpdate(packagePath);
+        }
+
+        // MANUAL BROWSE METHOD - Allows user to select Deploy-Application.exe manually
+        private string BrowseForDeployApplicationFile()
+        {
+            try
+            {
+                var openFileDialog = new OpenFileDialog
+                {
+                    Title = "Select Deploy-Application.exe",
+                    Filter = "Deploy-Application|Deploy-Application.exe|Executable Files|*.exe|All Files|*.*",
+                    FileName = "Deploy-Application.exe",
+                    CheckFileExists = true,
+                    CheckPathExists = true
+                };
+
+                // Try to set initial directory to a reasonable location
+                if (!string.IsNullOrEmpty(_currentApp?.NetworkSharePath))
+                {
+                    try
+                    {
+                        var possiblePath = Path.Combine(_currentApp.NetworkSharePath, "Application");
+                        if (Directory.Exists(possiblePath))
+                        {
+                            openFileDialog.InitialDirectory = possiblePath;
+                        }
+                        else if (Directory.Exists(_currentApp.NetworkSharePath))
+                        {
+                            openFileDialog.InitialDirectory = _currentApp.NetworkSharePath;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    var selectedFile = openFileDialog.FileName;
+
+                    // Validate that it's actually Deploy-Application.exe
+                    if (!Path.GetFileName(selectedFile).Equals("Deploy-Application.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Please select the Deploy-Application.exe file.", "Invalid File",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    // Get the parent directory (should be the Application folder)
+                    var applicationFolder = Path.GetDirectoryName(selectedFile);
+                    if (string.IsNullOrEmpty(applicationFolder))
+                    {
+                        MessageBox.Show("Could not determine application folder from selected file.", "Invalid Path",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    // Get the package root (parent of Application folder)
+                    var packageRoot = Path.GetDirectoryName(applicationFolder);
+                    if (string.IsNullOrEmpty(packageRoot))
+                    {
+                        MessageBox.Show("Could not determine package root folder. Please ensure Deploy-Application.exe is in an 'Application' subfolder.", "Invalid Structure",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    // Validate the structure
+                    if (!ValidateManuallySelectedPackage(packageRoot))
+                        return "";
+
+                    // Update the current app's network share path for future use
+                    _currentApp.NetworkSharePath = packageRoot;
+                    StatusText.Text = $"Using manually selected package: {packageRoot}";
+
+                    return packageRoot;
+                }
+
+                return ""; // User cancelled
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error browsing for file: {ex.Message}", "Browse Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return "";
+            }
+        }
+
+        // VALIDATION METHOD - For manually selected packages
+        private bool ValidateManuallySelectedPackage(string packageRoot)
+        {
+            try
+            {
+                // Check if Application folder exists
+                var applicationFolder = Path.Combine(packageRoot, "Application");
+                if (!Directory.Exists(applicationFolder))
+                {
+                    MessageBox.Show($"Application folder not found at:\n{applicationFolder}\n\nPlease ensure Deploy-Application.exe is located in an 'Application' subfolder.",
+                                  "Invalid Package Structure", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+
+                // Check if Deploy-Application.exe exists
+                var deployAppPath = Path.Combine(applicationFolder, "Deploy-Application.exe");
+                if (!File.Exists(deployAppPath))
+                {
+                    MessageBox.Show($"Deploy-Application.exe not found at:\n{deployAppPath}",
+                                  "Deploy-Application.exe Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+
+                // Show success message with package info
+                var fileInfo = new FileInfo(deployAppPath);
+                var message = $"✅ Package validated successfully!\n\n" +
+                             $"📁 Package Root: {packageRoot}\n" +
+                             $"📄 Deploy-Application.exe: {fileInfo.Length:N0} bytes\n" +
+                             $"📅 Last Modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}\n\n" +
+                             $"Continue with the update?";
+
+                var result = MessageBox.Show(message, "Package Validation Success",
+                    MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+                return result == MessageBoxResult.Yes;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error validating package: {ex.Message}", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        // VALIDATION METHOD - For automatic network path validation (silent)
+        private bool ValidatePackageForUpdate(string networkSharePath)
+        {
+            try
+            {
+                // Check if network path exists
+                if (!Directory.Exists(networkSharePath))
+                {
+                    return false; // Don't show error message here, let caller handle it
+                }
+
+                // Check if Application folder exists
+                var applicationFolder = Path.Combine(networkSharePath, "Application");
+                if (!Directory.Exists(applicationFolder))
+                {
+                    return false;
+                }
+
+                // Check if Deploy-Application.exe exists
+                var deployAppPath = Path.Combine(applicationFolder, "Deploy-Application.exe");
+                if (!File.Exists(deployAppPath))
+                {
+                    return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // PACKAGE UPDATE METHOD - Performs the actual update process
+        private async Task PerformPackageUpdate(string packagePath)
+        {
+            try
+            {
+                // Disable the button and show progress
+                UpdateApplicationButton.IsEnabled = false;
+                UpdateApplicationButton.Content = "Updating...";
+
+                StatusText.Text = "Starting package update...";
+
+                // Show confirmation with package details
+                var deployAppPath = Path.Combine(packagePath, "Application", "Deploy-Application.exe");
+                var fileInfo = new FileInfo(deployAppPath);
+
+                var confirmMessage = $"Update '{_currentApp.DisplayName}' with package from:\n\n" +
+                                   $"📁 {packagePath}\n" +
+                                   $"📄 Deploy-Application.exe ({fileInfo.Length:N0} bytes)\n" +
+                                   $"📅 Modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}\n\n" +
+                                   $"📦 The .intunewin package will be recreated and uploaded\n" +
+                                   $"⚠️  Application metadata will NOT be changed\n\n" +
+                                   $"Continue with update?";
+
+                var result = MessageBox.Show(confirmMessage, "Confirm Package Update",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes)
+                    return;
+
+                // Create progress tracker
+                var progressTracker = new UpdateProgressTracker(this);
+
+                // Create upload service and update
+                var intuneService = new IntunePackagingTool.Services.IntuneService();
+                using var uploadService = new IntunePackagingTool.Services.IntuneUploadService(intuneService);
+
+                var success = await uploadService.UpdateExistingApplicationAsync(
+                    _currentApp.Id,
+                    packagePath,
+                    progressTracker
+                );
+
+                if (success)
+                {
+                    StatusText.Text = $"Package updated successfully • {DateTime.Now:HH:mm:ss}";
+                    MessageBox.Show($"✅ Package for '{_currentApp.DisplayName}' updated successfully!\n\n" +
+                                  $"📦 New .intunewin file uploaded to Intune\n" +
+                                  $"📁 Source: {packagePath}",
+                                  "Update Complete",
+                                  MessageBoxButton.OK,
+                                  MessageBoxImage.Information);
+                }
+                else
+                {
+                    StatusText.Text = "Package update failed";
+                    MessageBox.Show("❌ Failed to update application package", "Update Failed",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "Package update failed";
+                MessageBox.Show($"❌ Error updating application package:\n\n{ex.Message}", "Update Failed",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                UpdateApplicationButton.IsEnabled = true;
+                UpdateApplicationButton.Content = "🔄 Update Package";
+            }
+        }
+
+        // BROWSE BUTTON HANDLER - For manual package folder selection
+        private void BrowsePackageFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            StatusText.Text = "Browsing for Deploy-Application.exe...";
+
+            var packagePath = BrowseForDeployApplicationFile();
+            if (!string.IsNullOrEmpty(packagePath))
+            {
+                // Update the UI to show the manually selected path
+                RefreshPathValidation(packagePath);
+                StatusText.Text = $"Package path set manually: {Path.GetFileName(packagePath)}";
+            }
+            else
+            {
+                StatusText.Text = "Browse cancelled";
+            }
+        }
+
+        private class UpdateProgressTracker : IntunePackagingTool.Services.IUploadProgress
+        {
+            private readonly ApplicationDetailView _view;
+
+            public UpdateProgressTracker(ApplicationDetailView view)
+            {
+                _view = view;
+            }
+
+            public void UpdateProgress(int percentage, string message)
+            {
+                _view.Dispatcher.Invoke(() =>
+                {
+                    _view.StatusText.Text = $"{message} ({percentage}%)";
+                });
             }
         }
 

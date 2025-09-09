@@ -15,13 +15,13 @@ namespace IntunePackagingTool.WizardSteps
 {
     public partial class ReviewUploadStep : UserControl, IUploadProgress, IDisposable
     {
-        public event EventHandler BackRequested;
-        public event EventHandler<UploadCompleteEventArgs> UploadComplete;
+        public event EventHandler? BackRequested;
+        public event EventHandler<UploadCompleteEventArgs>? UploadComplete;
 
         // Required properties for wizard
-        public ApplicationInfo ApplicationInfo { get; set; }
+        public ApplicationInfo ApplicationInfo { get; set; } = null!;
         public ObservableCollection<DetectionRule> DetectionRules { get; set; }
-        public string PackagePath { get; set; }
+        public string PackagePath { get; set; } = null!;
         public string? SelectedIconPath { get; set; }
 
         // Events
@@ -29,8 +29,8 @@ namespace IntunePackagingTool.WizardSteps
         
 
         // Private fields
-        private ApplicationDetail _applicationDetail;
-        private IntuneService _intuneService;
+        private ApplicationDetail _applicationDetail = null!;
+        private IntuneService _intuneService = null!;
         private ObservableCollection<ProgressStep> _progressSteps;
         private bool _isDisposed;
 
@@ -171,7 +171,7 @@ namespace IntunePackagingTool.WizardSteps
             }
         }
 
-        private void UpdateDetectionRulesDisplay(List<DetectionRule> rules = null)
+        private void UpdateDetectionRulesDisplay(List<DetectionRule>? rules = null)
         {
             var rulesToDisplay = rules ?? DetectionRules?.ToList() ?? _applicationDetail?.DetectionRules;
 
@@ -503,7 +503,7 @@ namespace IntunePackagingTool.WizardSteps
             }
         }
 
-        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged(string propertyName)
         {

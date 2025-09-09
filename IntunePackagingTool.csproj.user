@@ -4,7 +4,10 @@
     <_LastSelectedProfileId>C:\Users\admin.sarkerr\source\repos\IntunePackagingTool\Properties\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Update="Views\ApplicationDetailView.xaml.cs">
+    <Compile Update="ApplicationDetailView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="RemoteTestWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

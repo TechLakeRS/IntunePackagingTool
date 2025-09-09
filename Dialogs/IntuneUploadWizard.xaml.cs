@@ -1,13 +1,9 @@
 ﻿using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using IntunePackagingTool.WizardSteps;
-using Microsoft.Win32;
-using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -49,8 +45,6 @@ namespace IntunePackagingTool
             if (ApplicationInfo != null)
             {
                 AppSummaryText.Text = $"{ApplicationInfo.Manufacturer} {ApplicationInfo.Name} v{ApplicationInfo.Version}";
-
-                // Add a default file detection rule (from your original logic)
                 _detectionRules.Add(new DetectionRule
                 {
                     Type = DetectionRuleType.File,
@@ -60,7 +54,7 @@ namespace IntunePackagingTool
                 });
             }
 
-            // Pass detection rules to step controls when they're loaded
+            
             UpdateStepData();
         }
 
@@ -68,7 +62,7 @@ namespace IntunePackagingTool
 
         private void LoadStep(int stepIndex)
         {
-            // ✅ PERFORMANCE: Lazy-load step controls only when needed
+            
             if (_stepControls[stepIndex] == null)
             {
                 _stepControls[stepIndex] = stepIndex switch
@@ -79,11 +73,11 @@ namespace IntunePackagingTool
                     _ => throw new ArgumentException("Invalid step index")
                 };
 
-                // Wire up step events for data sharing
+              
                 SetupStepEvents(_stepControls[stepIndex], stepIndex);
             }
 
-            // ✅ PERFORMANCE: Only one control in visual tree at a time
+            
             StepContentArea.Content = _stepControls[stepIndex];
             _currentStep = stepIndex;
 
@@ -100,7 +94,8 @@ namespace IntunePackagingTool
                     if (stepControl is AppDetailsStep appStep)
                     {
                         appStep.ApplicationInfo = ApplicationInfo;
-                        appStep.ValidationChanged += (valid) => {
+                        appStep.ValidationChanged += (valid) =>
+                        {
                             _step1Valid = valid;
                             UpdateNavigationButtons();
                         };
@@ -113,7 +108,8 @@ namespace IntunePackagingTool
                     {
                         detectionStep.DetectionRules = _detectionRules;
                         detectionStep.ParentWindow = this; // For opening child dialogs
-                        detectionStep.ValidationChanged += (valid) => {
+                        detectionStep.ValidationChanged += (valid) =>
+                        {
                             _step2Valid = valid;
                             UpdateNavigationButtons();
                         };
@@ -123,22 +119,29 @@ namespace IntunePackagingTool
                 case 2:
                     if (stepControl is ReviewUploadStep reviewStep)
                     {
-                        reviewStep.ApplicationInfo = ApplicationInfo;
-                        reviewStep.DetectionRules = _detectionRules;
-                        var intuneFolder = Path.Combine(PackagePath, "Intune");
-                        if (Directory.Exists(intuneFolder))
-                        {
-                            var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
-                            reviewStep.PackagePath = intuneWinFiles.Length > 0 ? intuneWinFiles[0] : PackagePath;
-                        }
-                        else
-                        {
-                            reviewStep.PackagePath = PackagePath;
-                        }
-
                         if (ApplicationInfo != null)
                         {
+                            reviewStep.ApplicationInfo = ApplicationInfo;
                             reviewStep.LoadFromApplicationInfo(ApplicationInfo);
+                        }
+
+                        if (_detectionRules != null)
+                        {
+                            reviewStep.DetectionRules = _detectionRules;
+                        }
+
+                        if (PackagePath != null)
+                        {
+                            var intuneFolder = Path.Combine(PackagePath, "Intune");
+                            if (Directory.Exists(intuneFolder))
+                            {
+                                var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
+                                reviewStep.PackagePath = intuneWinFiles.Length > 0 ? intuneWinFiles[0] : PackagePath;
+                            }
+                            else
+                            {
+                                reviewStep.PackagePath = PackagePath;
+                            }
                         }
                     }
                     break;
@@ -160,7 +163,7 @@ namespace IntunePackagingTool
 
             if (_stepControls[2] is ReviewUploadStep reviewStep)
             {
-                reviewStep.ApplicationInfo = ApplicationInfo;
+                reviewStep.ApplicationInfo = ApplicationInfo!;
                 reviewStep.DetectionRules = _detectionRules;
                 reviewStep.PackagePath = PackagePath;
             }
@@ -175,7 +178,7 @@ namespace IntunePackagingTool
             if (_currentStep < 2 && ValidateCurrentStep())
             {
                 // ✅ PERFORMANCE: Share data between steps before moving
-               await ShareDataToNextStep();
+                await ShareDataToNextStep();
                 LoadStep(_currentStep + 1);
             }
             else if (_currentStep == 2)
@@ -388,9 +391,9 @@ namespace IntunePackagingTool
         }
 
         // This method will be called from DetectionRulesStep when user opens detection dialogs
-       
 
-       
+
+
 
         public void RemoveDetectionRule(DetectionRule rule)
         {
@@ -512,13 +515,13 @@ namespace IntunePackagingTool
 
         #region Public Methods for Step Access (Performance Optimized)
 
-        
+
         public ObservableCollection<DetectionRule> GetDetectionRules()
         {
             return _detectionRules;
         }
 
-        
+
         public void UpdateDetectionRules(ObservableCollection<DetectionRule> newRules)
         {
             _detectionRules.Clear();

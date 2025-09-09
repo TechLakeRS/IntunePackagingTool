@@ -576,23 +576,73 @@
                         <local:ApplicationDetailView x:Name="ApplicationDetailView" Visibility="Collapsed"/>
                     </Grid>
 
-                    <!-- SETTINGS PAGE -->
+
                     <Grid Name="SettingsPage" Visibility="Collapsed">
                         <Border Style="{StaticResource ModernCard}">
-                            <StackPanel>
+                            <StackPanel Margin="20">
+                                <!-- Header -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                                    <Border Background="#F5F5F5" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <Border Background="#2196F3" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
                                         <TextBlock Text="⚙️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Configuration" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBlock Text="Application settings and configuration options will be available here..." 
-                                         FontSize="14" Foreground="#7F8C8D" FontStyle="Italic"/>
+
+                                <!-- Authentication Info -->
+                                <GroupBox Header="Authentication" Margin="0,0,0,15">
+                                    <Grid Margin="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Tenant ID:" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Name="TenantIdDisplay" FontFamily="Consolas"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Client ID:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Name="ClientIdDisplay" FontFamily="Consolas" Margin="0,5,0,0"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Certificate:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Name="ThumbprintDisplay" FontFamily="Consolas" Margin="0,5,0,0"/>
+                                    </Grid>
+                                </GroupBox>
+
+                                <!-- Paths -->
+                                <GroupBox Header="System Paths" Margin="0,0,0,15">
+                                    <Grid Margin="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Output Path:" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Name="OutputPathDisplay" TextWrapping="Wrap"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="PSADT Template:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Name="PSADTPathDisplay" TextWrapping="Wrap" Margin="0,5,0,0"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="IntuneWinAppUtil:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Name="UtilPathDisplay" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                    </Grid>
+                                </GroupBox>
                             </StackPanel>
                         </Border>
                     </Grid>
+
                 </Grid>
+                <!-- Close MainContentGrid -->
             </ScrollViewer>
+            <!-- Close ScrollViewer -->
 
             <!-- Status Bar -->
             <Border Grid.Row="2" Background="White" Padding="32,16" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0">
@@ -608,6 +658,9 @@
                     </StackPanel>
                 </Grid>
             </Border>
+
         </Grid>
+        <!-- Close main content Grid (Grid.Column="1") -->
     </Grid>
+    <!-- Close root Grid -->
 </Window>

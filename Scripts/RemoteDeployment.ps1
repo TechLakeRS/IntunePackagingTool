@@ -1,6 +1,4 @@
-﻿# RemoteDeployment.ps1
-# Simplified remote deployment script for WPF Packaging Tool
-
+﻿
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)]

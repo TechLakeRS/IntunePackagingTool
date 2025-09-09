@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
-using System.Linq;
 
 namespace IntunePackagingTool.Utilities
 {
@@ -10,7 +7,7 @@ namespace IntunePackagingTool.Utilities
     {
         private static readonly string SharePath = @"\\nbb.local\sys\sccmdata\intuneapplications";
 
-        public static string FindApplicationPath(string appName, string version = null)
+        public static string? FindApplicationPath(string appName, string? version = null)
         {
             try
             {
@@ -111,7 +108,7 @@ namespace IntunePackagingTool.Utilities
             }
         }
 
-        private static (string baseName, string version) ExtractVersionFromName(string fullName)
+        private static (string baseName, string? version) ExtractVersionFromName(string fullName)
         {
             if (string.IsNullOrEmpty(fullName))
                 return (fullName, null);
@@ -144,7 +141,7 @@ namespace IntunePackagingTool.Utilities
             return (fullName, null);
         }
 
-        private static string FindVersionFolder(string basePath, string version)
+        private static string? FindVersionFolder(string basePath, string version)
         {
             try
             {

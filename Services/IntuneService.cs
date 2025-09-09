@@ -1,4 +1,4 @@
-using IntunePackagingTool.Dialogs;
+
 using IntunePackagingTool.Models; 
 using IntunePackagingTool.WizardSteps;
 using System;
@@ -21,20 +21,26 @@ namespace IntunePackagingTool.Services
 {
     public class IntuneService : IDisposable
     {
+
         private static readonly HttpClient _sharedHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromMinutes(2)
         };
 
         private readonly CacheService _cache = new CacheService();
-
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
         private bool _disposed = false;
-
         private readonly string _clientId = "b47987a1-70b4-415a-9a4e-9775473e382b";
         private readonly string _tenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7";
         private readonly string _certificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F";
+       
+        public string ClientId => _clientId;
+        public string TenantId => _tenantId;
+        public string CertificateThumbprint => _certificateThumbprint;
+
+
+
 
         public async Task<string> GetAccessTokenAsync()
         {
@@ -383,8 +389,7 @@ namespace IntunePackagingTool.Services
 
             var appJson = JsonSerializer.Deserialize<JsonElement>(appResponseText);
 
-        
-            ApplicationDetail appDetail;
+                ApplicationDetail appDetail;
             try 
             {
                 // Extract complete app information from Graph API response
@@ -414,9 +419,7 @@ namespace IntunePackagingTool.Services
                 MinimumCpuSpeedInMHz = GetSafeInt(appJson, "minimumCpuSpeedInMHz"),
                 
                 // Boolean properties (these are usually safe)
-                IsFeatured = appJson.TryGetProperty("isFeatured", out var featuredProp) && featuredProp.GetBoolean(),
-                IsAssigned = appJson.TryGetProperty("isAssigned", out var assignedProp) && assignedProp.GetBoolean(),
-                AllowAvailableUninstall = appJson.TryGetProperty("allowAvailableUninstall", out var uninstallAvailProp) && uninstallAvailProp.GetBoolean(),
+                
                 
                 // String properties
                 PrivacyInformationUrl = appJson.TryGetProperty("privacyInformationUrl", out var privacyProp) ? privacyProp.GetString() ?? "" : "",
@@ -703,6 +706,79 @@ namespace IntunePackagingTool.Services
             return rules;
         }
 
+        public async Task<bool> AssignTestCategoryToAppAsync(string appId)
+        {
+            try
+            {
+                var token = await GetAccessTokenAsync();
+
+                // First, get the category ID for "Test"
+                var categoriesUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileAppCategories";
+                var response = await _sharedHttpClient.GetAsync(categoriesUrl);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine("Failed to get categories");
+                    return false;
+                }
+
+                var responseText = await response.Content.ReadAsStringAsync();
+                var json = JsonSerializer.Deserialize<JsonElement>(responseText);
+
+                string? testCategoryId = null;
+                if (json.TryGetProperty("value", out var categories))
+                {
+                    foreach (var category in categories.EnumerateArray())
+                    {
+                        if (category.TryGetProperty("displayName", out var name) &&
+                            name.GetString() == "Test")
+                        {
+                            testCategoryId = category.GetProperty("id").GetString();
+                            Debug.WriteLine($"Found Test category with ID: {testCategoryId}");
+                            break;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(testCategoryId))
+                {
+                    Debug.WriteLine("Test category not found in Intune");
+                    return false;
+                }
+
+                // Assign the Test category to the app
+                var assignUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/categories/$ref";
+                var assignPayload = new Dictionary<string, object>
+                {
+                    ["@odata.id"] = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileAppCategories/{testCategoryId}"
+                };
+
+                var assignContent = new StringContent(
+                    JsonSerializer.Serialize(assignPayload),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var assignResponse = await _sharedHttpClient.PostAsync(assignUrl, assignContent);
+
+                if (assignResponse.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine("✓ Successfully assigned Test category to app");
+                    return true;
+                }
+                else
+                {
+                    var errorText = await assignResponse.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"Failed to assign category: {errorText}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error assigning Test category: {ex.Message}");
+                return false;
+            }
+        }
+
         public async Task<string> CreateOrGetGroupAsync(string displayName, string description)
         {
             try
@@ -725,7 +801,11 @@ namespace IntunePackagingTool.Services
                     {
                         // Group exists, return its ID
                         var existingGroupId = groups[0].GetProperty("id").GetString();
-                        Debug.WriteLine($"Group '{displayName}' already exists with ID: {existingGroupId}");
+                        if (existingGroupId == null)
+                        {
+                            throw new InvalidOperationException($"Group '{displayName}' exists but has no ID");
+                        }
+                       
                         return existingGroupId;
                     }
                 }
@@ -736,7 +816,7 @@ namespace IntunePackagingTool.Services
                     displayName = displayName,
                     description = description,
                     mailEnabled = false,
-                    mailNickname = displayName.Replace("_", "-").ToLower(),
+                    mailNickname = Guid.NewGuid().ToString("N").Substring(0, 10), // Always unique, always valid
                     securityEnabled = true
                 };
 
@@ -755,7 +835,11 @@ namespace IntunePackagingTool.Services
                 var responseJson = JsonSerializer.Deserialize<JsonElement>(responseContent);
                 var groupId = responseJson.GetProperty("id").GetString();
 
-                Debug.WriteLine($"Created group '{displayName}' with ID: {groupId}");
+                if (groupId == null)
+                {
+                    throw new InvalidOperationException($"Created group '{displayName}' but response contained no ID. Response: {responseContent}");
+                }
+                
                 return groupId;
             }
             catch (Exception ex)
@@ -804,7 +888,7 @@ namespace IntunePackagingTool.Services
 
         private async Task CreateAssignment(string appId, string groupId, string intent)
         {
-            var assignmentPayload = new Dictionary<string, object>
+            var assignmentPayload = new Dictionary<string, object?>
             {
                 ["@odata.type"] = "#microsoft.graph.mobileAppAssignment",
                 ["intent"] = intent,
@@ -868,7 +952,14 @@ namespace IntunePackagingTool.Services
                                         if (targetObj.TryGetProperty("groupId", out var groupIdProp))
                                         {
                                             var groupId = groupIdProp.GetString();
-                                            groupName = await GetGroupNameAsync(groupId) ?? $"Group ID: {groupId}";
+                                            if (groupId != null)
+                                            {
+                                                groupName = await GetGroupNameAsync(groupId) ?? $"Group ID: {groupId}";
+                                            }
+                                            else
+                                            {
+                                                groupName = "Unknown Group (No ID)";
+                                            }
                                         }
                                         break;
 
@@ -889,7 +980,7 @@ namespace IntunePackagingTool.Services
                             groups.Add(new AssignedGroup
                             {
                                 GroupName = groupName,
-                                AssignmentType = intent
+                                AssignmentType = intent ?? "Unknown",
                             });
                         }
                     }
@@ -913,7 +1004,7 @@ namespace IntunePackagingTool.Services
             return groups;
         }
 
-        private async Task<string> GetGroupNameAsync(string groupId)
+        private async Task<string?> GetGroupNameAsync(string groupId)
         {
             try
             {
@@ -1018,7 +1109,7 @@ namespace IntunePackagingTool.Services
             return new List<string>();
         }
 
-        public async Task <string>UploadApplicationAsync(ApplicationInfo appInfo, List<DetectionRule> detectionRules = null)
+        public async Task <string>UploadApplicationAsync(ApplicationInfo appInfo, List<DetectionRule>? detectionRules = null)
         {
             try
             {
@@ -1046,8 +1137,8 @@ namespace IntunePackagingTool.Services
        string description,
        string category,
        List<DetectionRule> detectionRules,
-       string packagePath = null,
-       string iconPath = null)
+       string? packagePath = null,
+       string? iconPath = null)
         {
             try
             {
@@ -1070,7 +1161,7 @@ namespace IntunePackagingTool.Services
 
                     foreach (var rule in detectionRules)
                     {
-                        object formattedRule = rule.Type switch
+                        object? formattedRule = rule.Type switch
                         {
                             DetectionRuleType.File => new
                             {
