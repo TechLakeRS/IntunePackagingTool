@@ -10,5 +10,8 @@
     <Compile Update="RemoteTestWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="WDACToolsPage.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 </Project>

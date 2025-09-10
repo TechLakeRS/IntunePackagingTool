@@ -72,6 +72,18 @@
                             </StackPanel>
                         </StackPanel>
                     </Button>
+                    <!-- WDAC -->
+                    <Button Name="WDACToolsNavButton" Style="{StaticResource SidebarNavButton}" Click="WDACToolsNavButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#16A085" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                <TextBlock Text="🔒" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="WDAC Tools" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                <TextBlock Text="Security catalogs" FontSize="10" Foreground="#BDC3C7"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
 
                     <!-- Settings -->
                     <Button Name="SettingsNavButton" Style="{StaticResource SidebarNavButton}" Click="SettingsNavButton_Click">
@@ -420,6 +432,36 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- NEW Step 4: Generate WDAC Catalog -->
+                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <Border Background="#16A085" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
+                                                <TextBlock Text="4" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Generate WDAC Catalog" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <Button Name="GenerateCatalogButton" 
+                                                Content="🔒 Generate Security Catalog" 
+                                                Click="GenerateCatalogButton_Click"
+                                                Style="{StaticResource ModernButton}"
+                                                IsEnabled="False"
+                                                ToolTip="Generate WDAC catalog via VM installation monitoring"/>
+
+                                                    <TextBlock Text="Creates security catalog for WDAC (5-10 min)" 
+                                                   FontSize="11" Foreground="#666666" 
+                                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                                        <!-- Status indicator -->
+                                        <StackPanel Name="CatalogStatusPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                            <ProgressBar Name="CatalogProgressBar" Height="4" IsIndeterminate="True"/>
+                                            <TextBlock Name="CatalogStatusText" FontSize="10" 
+                               Foreground="#16A085" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Step 3: Upload to Intune -->
                                 <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16">
                                     <StackPanel>
@@ -660,45 +702,84 @@
             </ScrollViewer>
             <!-- Close ScrollViewer -->
 
-            <!-- Pagination Controls (NEW: Separate Grid Row) -->
+            <!-- Pagination Controls -->
             <Border Grid.Row="2" Background="#F8F9FA" Padding="20,12" Margin="0,0,0,0" 
-                    BorderBrush="#E9ECEF" BorderThickness="0,1,0,0"
-                    Name="PaginationPanel" Visibility="Collapsed">
+        BorderBrush="#E9ECEF" BorderThickness="0,1,0,0"
+        Name="PaginationPanel" Visibility="Collapsed">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
 
                     <!-- Previous Button -->
                     <Button Name="PreviousPageButton" 
-                            Content="◀ Previous" 
-                            Click="PreviousPage_Click" 
-                            IsEnabled="{Binding CanGoToPreviousPage}"
-                            Margin="0,0,15,0"
-                            Style="{DynamicResource SecondaryButton}"
-                            MinWidth="100"
-                            Height="36"/>
+                Click="PreviousPage_Click"
+                Width="100" Height="36"
+                Margin="0,0,15,0"
+                Background="#6C757D"
+                BorderThickness="0"
+                Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                            CornerRadius="6">
+                                    <TextBlock Text="◄" FontWeight="Medium" 
+                                   Foreground="White"
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#5A6268"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.5"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
 
                     <!-- Page Display -->
                     <Border Background="White" 
-                            CornerRadius="6" 
-                            Padding="15,8" 
-                            BorderBrush="#DEE2E6" 
-                            BorderThickness="1"
-                            VerticalAlignment="Center" 
-                            Margin="0,0,15,0">
-                        <TextBlock Text="{Binding CurrentPageDisplay}" 
-                                   VerticalAlignment="Center" 
-                                   FontSize="14"
-                                   FontWeight="Medium"
-                                   Foreground="#495057"/>
+                CornerRadius="6" 
+                Padding="20,8" 
+                BorderBrush="#DEE2E6" 
+                BorderThickness="1"
+                VerticalAlignment="Center" 
+                Margin="0,0,15,0">
+                        <TextBlock Name="PageDisplayText"
+                       Text="Page 1 of 1" 
+                       VerticalAlignment="Center" 
+                       FontSize="14"
+                       FontWeight="Medium"
+                       Foreground="#495057"/>
                     </Border>
 
                     <!-- Next Button -->
                     <Button Name="NextPageButton" 
-                            Content="Next ▶" 
-                            Click="NextPage_Click" 
-                            IsEnabled="{Binding CanGoToNextPage}"
-                            Style="{DynamicResource SecondaryButton}"
-                            MinWidth="100"
-                            Height="36"/>
+                Click="NextPage_Click"
+                Width="100" Height="36"
+                Background="#6C757D"
+                BorderThickness="0"
+                Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                            CornerRadius="6">
+                                    <TextBlock Text=" ►" FontWeight="Medium" 
+                                   Foreground="White"
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#5A6268"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.5"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
 
                 </StackPanel>
             </Border>

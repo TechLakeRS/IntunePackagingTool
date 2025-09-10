@@ -10,109 +10,146 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-
-
+using System.Threading.Tasks;
 
 namespace IntunePackagingTool
 {
     public partial class MainWindow : Window, INotifyPropertyChanged
-
     {
-        private System.Windows.Threading.DispatcherTimer _searchTimer;
-        private bool _isInitialized = false;
-        private IntuneService? _intuneService;
-        private PSADTGenerator _psadtGenerator;
-        private IntuneUploadService? _uploadService;
-        private ObservableCollection<IntuneApplication> _applications = new ObservableCollection<IntuneApplication>();
-        private string _currentPackagePath = "";
-        private SettingsService _settingsService;
-        private BatchFileSigner? _batchSigner;
-        private int _currentPage = 1;
-        private int PageSize = 50;
-        private bool _isLoading = false;
+        #region Private Fields
+
+        // Timer and Search
+        private System.Windows.Threading.DispatcherTimer? _searchTimer;
         private string _currentSearchFilter = "";
         private string _currentCategoryFilter = "All Categories";
-        public int CurrentPage => _currentPage;
-        public string CurrentPageDisplay => $"Page {_currentPage} of {MaxPage}";
-        public bool CanGoToPreviousPage => _currentPage > 1;
-        public bool CanGoToNextPage => _currentPage < MaxPage;
+
+        // Application State
+        private List<IntuneApplication> _allApplications = new List<IntuneApplication>();
+        private ObservableCollection<IntuneApplication> _applications = new ObservableCollection<IntuneApplication>();
+        private bool _applicationsLoaded = false;
+
+        // Services
+        private IntuneService? _intuneService;
+        private PSADTGenerator? _psadtGenerator;
+        private IntuneUploadService? _uploadService;
+        private SettingsService? _settingsService;
+        private BatchFileSigner? _batchSigner;
+        private WDACToolsPage? _wdacToolsPage;
+
+
+        // Pagination
+        private int _currentPage = 1;
+        private int PageSize = 50;
+        private int _totalApplicationCount = 0;
+
+        // Package Management
+        private string _currentPackagePath = "";
+        private string _generatedCatalogPath = "";
+        private bool _catalogGenerated = false;
+
+        #endregion
+
+        #region Properties
 
         private int MaxPage
         {
             get
             {
-                var filteredCount = GetFilteredApplications().Count();
-                return filteredCount > 0 ? (int)Math.Ceiling((double)filteredCount / PageSize) : 1;
+                return _totalApplicationCount > 0 ? (int)Math.Ceiling((double)_totalApplicationCount / PageSize) : 1;
             }
         }
-        private CancellationTokenSource? _loadCancellation;
+
+        public string DetectedPackageType
+        {
+            get
+            {
+                if (DetectedPackageTypeText.Text == "MSI Package") return "MSI";
+                if (DetectedPackageTypeText.Text == "EXE Installer") return "EXE";
+                return "Unknown";
+            }
+        }
+
+        #endregion
+
+        #region Constructor and Initialization
 
         public MainWindow()
         {
             InitializeComponent();
+            InitializeTimer();
+            InitializeServices();
+            InitializeUI();
+           
+
+        }
+
+        private void InitializeTimer()
+        {
             _searchTimer = new System.Windows.Threading.DispatcherTimer();
             _searchTimer.Interval = TimeSpan.FromMilliseconds(500);
             _searchTimer.Tick += SearchTimer_Tick;
-            ShowPage("CreateApplication");
-            SetActiveNavButton(CreateAppNavButton);
-            Debug.WriteLine("=== STARTING INTUNE SERVICE INITIALIZATION ===");
+        }
 
+        private void InitializeServices()
+        {
             try
             {
-                Debug.WriteLine("About to create IntuneService...");
+               
                 _intuneService = new IntuneService();
-                Debug.WriteLine($"IntuneService created successfully: {_intuneService != null}");
-
-                if (_intuneService != null)
-                {
-                    Debug.WriteLine($"TenantId: {_intuneService.TenantId}");
-                    Debug.WriteLine($"ClientId: {_intuneService.ClientId}");
-                }
+               
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CONSTRUCTOR EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                MessageBox.Show($"Constructor failed: {ex.Message}", "Debug", MessageBoxButton.OK);
+               
+                MessageBox.Show($"Failed to initialize Intune Service: {ex.Message}", "Error", MessageBoxButton.OK);
                 _intuneService = null;
             }
 
-            Debug.WriteLine($"Final _intuneService state: {_intuneService != null}");
-            Debug.WriteLine("=== END INTUNE SERVICE INITIALIZATION ===");
-
-            ApplicationsList.ItemsSource = _applications;
-            LoadCategoriesDropdown();
-            ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
             _settingsService = new SettingsService();
             _psadtGenerator = new PSADTGenerator();
+
             if (_intuneService != null)
             {
                 _uploadService = new IntuneUploadService(_intuneService);
             }
-           
-            _batchSigner = new BatchFileSigner(certificateName: "NBB Digital Workplace",certificateThumbprint: "B74452FD21BE6AD24CA9D61BCE156FD75E774716");
-            this.DataContext = this;
-            DiagnoseIntuneService();
-            _isInitialized = true;
 
+            _batchSigner = new BatchFileSigner(
+                certificateName: "NBB Digital Workplace",
+                certificateThumbprint: "B74452FD21BE6AD24CA9D61BCE156FD75E774716"
+            );
         }
 
-        #region Navigation Methods
-
-        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private void InitializeUI()
         {
-            // Now it's safe to load data that might show progress/status
-            if (ViewApplicationsPage.Visibility == Visibility.Visible)
-            {
-                await LoadApplicationsPagedAsync();
-            }
+            ShowPage("CreateApplication");
+            SetActiveNavButton(CreateAppNavButton);
+            ApplicationsList.ItemsSource = _applications;
+            LoadCategoriesDropdown();
+            ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
+            _wdacToolsPage = new WDACToolsPage();
+            this.DataContext = this;
+
         }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Any additional loading logic here
+        }
+
+        #endregion
+
+        #region INotifyPropertyChanged Implementation
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        #endregion
+
+        #region Navigation
 
         private void CreateAppNavButton_Click(object sender, RoutedEventArgs e)
         {
@@ -120,10 +157,19 @@ namespace IntunePackagingTool
             UpdateNavigation(CreateAppNavButton);
         }
 
-        private void ViewAppsNavButton_Click(object sender, RoutedEventArgs e)
+        private async void ViewAppsNavButton_Click(object sender, RoutedEventArgs e)
         {
             ShowPage("ViewApplications");
             UpdateNavigation(ViewAppsNavButton);
+
+            if (!_applicationsLoaded)
+            {
+                await LoadAllApplicationsAsync();
+            }
+            else
+            {
+                ApplyFiltersAndPagination();
+            }
         }
 
         private void SettingsNavButton_Click(object sender, RoutedEventArgs e)
@@ -135,10 +181,17 @@ namespace IntunePackagingTool
 
         private void ShowPage(string pageName)
         {
+            // Hide all existing pages
             CreateApplicationPage.Visibility = Visibility.Collapsed;
             ViewApplicationsPage.Visibility = Visibility.Collapsed;
             SettingsPage.Visibility = Visibility.Collapsed;
-            PaginationPanel.Visibility = Visibility.Collapsed; // Hide by default
+            PaginationPanel.Visibility = Visibility.Collapsed;
+
+            // Hide WDAC Tools if it exists
+            if (_wdacToolsPage != null)
+            {
+                _wdacToolsPage.Visibility = Visibility.Collapsed;
+            }
 
             switch (pageName)
             {
@@ -147,194 +200,123 @@ namespace IntunePackagingTool
                     PageTitle.Text = "Create Package";
                     PageSubtitle.Text = "Build new application packages for Intune deployment";
                     break;
+
                 case "ViewApplications":
                     ViewApplicationsPage.Visibility = Visibility.Visible;
-                    PaginationPanel.Visibility = Visibility.Visible; // Show pagination
+                    PaginationPanel.Visibility = Visibility.Visible;
                     PageTitle.Text = "Applications";
                     PageSubtitle.Text = "Browse and manage Microsoft Intune applications";
                     SearchTextBox.Focus();
                     break;
+
                 case "Settings":
                     SettingsPage.Visibility = Visibility.Visible;
                     PageTitle.Text = "Settings";
                     PageSubtitle.Text = "Configure application settings and preferences";
                     break;
-            }
-        }
 
-        private void btnRemoteTest_Click(object sender, RoutedEventArgs e)
-        {
-            string packagePath = _currentPackagePath;
-            var remoteTest = new RemoteTestWindow(packagePath)
-            {
-                Owner = this
-            };
-            remoteTest.ShowDialog();
-        }
-
-
-
-        private void LoadConfigurationDisplay()
-        {
-            // Get values from IntuneService
-            if (_intuneService != null)
-            {
-                TenantIdDisplay.Text = _intuneService.TenantId;
-                ClientIdDisplay.Text = _intuneService.ClientId;
-                ThumbprintDisplay.Text = _intuneService.CertificateThumbprint;
-            }
-
-            // Get values from PSADTGenerator
-            if (_psadtGenerator != null)
-            {
-                PSADTPathDisplay.Text = _psadtGenerator.TemplatePath;
-                OutputPathDisplay.Text = _psadtGenerator.BaseOutputPath;
-            }
-
-            // Get values from IntuneUploadService (fixed underscore)
-            if (_uploadService != null)
-            {
-                
-                UtilPathDisplay.Text = _uploadService.ConverterPath;
-            }
-        }
-
-
-        private void ShowSettingsPage()
-        {
-            
-            CreateApplicationPage.Visibility = Visibility.Collapsed;
-            LoadConfigurationDisplay();
-            SettingsPage.Visibility = Visibility.Visible;
-        }
-        private async void ApplicationsList_DoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (ApplicationsList.SelectedItem != null)
-            {
-                var selectedApp = ApplicationsList.SelectedItem as IntuneApplication;
-
-                if (selectedApp != null)
-                {
-                    try
+                case "WDACTools":
+                    // Ensure the UserControl is added to the main content area
+                    if (!ContentAreaGrid.Children.Contains(_wdacToolsPage))
                     {
-                       
-                        StatusText.Text = $"Loading details for {selectedApp.DisplayName} from Microsoft Intune...";
-                        ProgressBar.Visibility = Visibility.Visible;
-                        ProgressBar.IsIndeterminate = true;
-                        var appDetail = await _intuneService.GetApplicationDetailAsync(selectedApp.Id);
-                        ProgressBar.Visibility = Visibility.Collapsed;
-
-                        if (appDetail != null)
-                        {
-                            
-                            ApplicationsListPanel.Visibility = Visibility.Collapsed;
-                            ApplicationDetailView.Visibility = Visibility.Visible;
-                            ApplicationDetailView.LoadApplicationDetail(appDetail);
-
-                            
-                            PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
-                            PageSubtitle.Text = "Live data from Microsoft Intune";
-                            StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
-                        }
+                        ContentAreaGrid.Children.Add(_wdacToolsPage);
                     }
-                    catch (Exception ex)
-                    {
-                        ProgressBar.Visibility = Visibility.Collapsed;
-                        StatusText.Text = "Error loading application details";
-                        MessageBox.Show($"Error loading application details from Intune:\n\n{ex.Message}", "Intune API Error",
-                            MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
+                    _wdacToolsPage.Visibility = Visibility.Visible;
+                    PageTitle.Text = "WDAC Security Tools";
+                    PageSubtitle.Text = "Generate and manage security catalogs";
+                    break;
             }
         }
-
-
-        private void ApplicationDetailView_BackToListRequested(object? sender, EventArgs e)
-        {
-
-            ApplicationDetailView.Visibility = Visibility.Collapsed;
-            ApplicationsListPanel.Visibility = Visibility.Visible;
-            PageTitle.Text = "Microsoft Intune Applications";
-            PageSubtitle.Text = "Browse and manage your application packages";
-        }
-
-
-
 
         private void UpdateNavigation(Button activeButton)
         {
-            // Reset all nav buttons to normal style
-
             CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
-            // Set active button to active style
+            WDACToolsNavButton.Style = (Style)FindResource("SidebarNavButton");
+
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
 
-      
-        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void SetActiveNavButton(Button activeButton)
         {
-            // Stop the timer if it's running
-            _searchTimer.Stop();
-
-            // Store the search text
-            _currentSearchFilter = SearchTextBox.Text?.Trim() ?? ""; 
-
-            // Start the timer
-            _searchTimer.Start();
+            CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
+            ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
+            SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
+            activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
 
-
-      
-        private async void SearchTimer_Tick(object? sender, EventArgs e)
+        private void WDACToolsNavButton_Click(object sender, RoutedEventArgs e)
         {
-            _searchTimer.Stop();
-            _currentPage = 1; 
-            await LoadApplicationsPagedAsync(); 
+            ShowPage("WDACTools");
+            UpdateNavigation(WDACToolsNavButton);
         }
+
         #endregion
 
+        #region Application List Management
 
-        #region Application Loading Methods
-       
-        private List<IntuneApplication> _allApplications = new List<IntuneApplication>();
-
-        private async Task LoadApplicationsPagedAsync()
+        private async Task LoadAllApplicationsAsync()
         {
             try
             {
-                if (_isLoading) return;
+                if (_intuneService == null) return;
 
-                // Check if initialization is complete
-                if (!_isInitialized)
-                {
-                    Debug.WriteLine("LoadApplicationsPagedAsync called before initialization complete - skipping");
-                    return;
-                }
-
-                if (_intuneService == null)
-                {
-                    Debug.WriteLine("_intuneService is null after initialization - this should not happen");
-                    ShowStatus("IntuneService not available");
-                    MessageBox.Show("IntuneService is not initialized. Please restart the application.", "Service Error");
-                    return;
-                }
-
-                _isLoading = true;
-                ShowStatus($"Loading applications (page {_currentPage})...");
+                ShowStatus("Loading all applications from Microsoft Intune...");
                 ShowProgress(true);
 
-                // Apply filters to the full dataset
-                var filteredApps = GetFilteredApplications();
+                _allApplications = await _intuneService.GetApplicationsAsync(forceRefresh: false);
+                _applicationsLoaded = true;
 
-                // Convert to 0-based for Skip calculation
-                var skipCount = (_currentPage - 1) * PageSize;
+                Debug.WriteLine($"Loaded {_allApplications.Count} applications into cache");
 
-                // Get current page from filtered results
-                var pagedApps = filteredApps
-                    .Skip(skipCount)
-                    .Take(PageSize);
+                _currentPage = 1;
+                ApplyFiltersAndPagination();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading applications: {ex.Message}");
+                ShowStatus($"Error: {ex.Message}");
+                MessageBox.Show($"Failed to load applications:\n\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                ShowProgress(false);
+            }
+        }
+
+        private void ApplyFiltersAndPagination()
+        {
+            try
+            {
+                var filtered = _allApplications.AsEnumerable();
+
+                // Apply search filter
+                if (!string.IsNullOrEmpty(_currentSearchFilter))
+                {
+                    filtered = filtered.Where(app =>
+                        app.DisplayName.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) ||
+                        app.Publisher.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase));
+                }
+
+                // Apply category filter
+                if (!string.IsNullOrEmpty(_currentCategoryFilter) && _currentCategoryFilter != "All Categories")
+                {
+                    filtered = filtered.Where(app =>
+                        app.Category.Contains(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase));
+                }
+
+                // Sort
+                filtered = filtered.OrderBy(app => app.DisplayName);
+
+                // Get total count after filtering
+                var filteredList = filtered.ToList();
+                _totalApplicationCount = filteredList.Count;
+
+                // Apply pagination
+                var skip = (_currentPage - 1) * PageSize;
+                var pagedApps = filteredList.Skip(skip).Take(PageSize).ToList();
 
                 // Update UI
                 _applications.Clear();
@@ -343,29 +325,22 @@ namespace IntunePackagingTool
                     _applications.Add(app);
                 }
 
-                var totalFiltered = filteredApps.Count();
-                ShowStatus($"Showing page {_currentPage} of {MaxPage} ({_applications.Count} of {totalFiltered} applications)");
+                // Update pagination controls
+                int maxPage = _totalApplicationCount > 0 ? (int)Math.Ceiling((double)_totalApplicationCount / PageSize) : 1;
 
-                // Notify property changed for pagination buttons
-                OnPropertyChanged(nameof(CurrentPageDisplay));
-                OnPropertyChanged(nameof(CanGoToPreviousPage));
-                OnPropertyChanged(nameof(CanGoToNextPage));
+                PageDisplayText.Text = $"Page {_currentPage} of {maxPage}";
+                PreviousPageButton.IsEnabled = _currentPage > 1;
+                NextPageButton.IsEnabled = _currentPage < maxPage;
+
+                ShowStatus($"Showing {pagedApps.Count} of {_totalApplicationCount} applications (Page {_currentPage} of {maxPage})");
+
+                Debug.WriteLine($"Filter applied: {_totalApplicationCount} apps match, showing page {_currentPage}/{maxPage}");
             }
-            finally
+            catch (Exception ex)
             {
-                _isLoading = false;
-                ShowProgress(false);
+                Debug.WriteLine($"Error applying filters: {ex.Message}");
+                ShowStatus($"Error applying filters: {ex.Message}");
             }
-        }
-
-
-
-        private async Task LoadMoreApplicationsAsync()
-        {
-            if (_isLoading) return;
-
-            _currentPage++;
-            await LoadApplicationsPagedAsync();
         }
 
         private void LoadCategoriesDropdown()
@@ -382,129 +357,279 @@ namespace IntunePackagingTool
             CategoryFilter.Items.Add("Test, Business");
             CategoryFilter.Items.Add("Uncategorized");
 
-            CategoryFilter.SelectedIndex = 0; // Default to "All Categories"
+            CategoryFilter.SelectedIndex = 0;
         }
 
-        private void SetActiveNavButton(Button activeButton)
+        #endregion
+
+        #region Application List Event Handlers
+
+        private void ApplicationsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
-            // Reset all navigation buttons to inactive style
-
-            CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
-            ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
-            SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
-
-            // Set the active button to active style
-            activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
+            // Infinite scroll disabled - using pagination buttons instead
         }
 
-        private bool _initialLoadComplete = false;
+        private async void ApplicationsList_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (ApplicationsList.SelectedItem != null)
+            {
+                var selectedApp = ApplicationsList.SelectedItem as IntuneApplication;
+
+                if (selectedApp != null)
+                {
+                    try
+                    {
+                        StatusText.Text = $"Loading details for {selectedApp.DisplayName} from Microsoft Intune...";
+                        ProgressBar.Visibility = Visibility.Visible;
+                        ProgressBar.IsIndeterminate = true;
+                        if (_intuneService == null)
+                        {
+                            MessageBox.Show("Intune service is not initialized", "Error",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+                        var appDetail = await _intuneService.GetApplicationDetailAsync(selectedApp.Id);
+                        ProgressBar.Visibility = Visibility.Collapsed;
+
+                        if (appDetail != null)
+                        {
+                            ApplicationsListPanel.Visibility = Visibility.Collapsed;
+                            ApplicationDetailView.Visibility = Visibility.Visible;
+                            ApplicationDetailView.LoadApplicationDetail(appDetail);
+
+                            PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
+                            PageSubtitle.Text = "Live data from Microsoft Intune";
+                            StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ProgressBar.Visibility = Visibility.Collapsed;
+                        StatusText.Text = "Error loading application details";
+                        MessageBox.Show($"Error loading application details from Intune:\n\n{ex.Message}",
+                            "Intune API Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+        }
+
+        private void ApplicationDetailView_BackToListRequested(object? sender, EventArgs e)
+        {
+            ApplicationDetailView.Visibility = Visibility.Collapsed;
+            ApplicationsListPanel.Visibility = Visibility.Visible;
+            PageTitle.Text = "Microsoft Intune Applications";
+            PageSubtitle.Text = "Browse and manage your application packages";
+        }
+
+        #endregion
+
+        #region Search and Filter Event Handlers
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _searchTimer.Stop();
+            _currentSearchFilter = SearchTextBox.Text?.Trim() ?? "";
+            _searchTimer.Start();
+        }
+
+        private async void SearchTimer_Tick(object? sender, EventArgs e)
+        {
+            _searchTimer.Stop();
+            _currentPage = 1;
+
+            if (_applicationsLoaded)
+            {
+                ApplyFiltersAndPagination();
+            }
+            else
+            {
+                await LoadAllApplicationsAsync();
+            }
+        }
 
         private async void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _currentCategoryFilter = CategoryFilter.SelectedItem?.ToString() ?? "All Categories";
-            _currentPage = 1; 
-            await LoadApplicationsPagedAsync(); 
-        }
+            _currentPage = 1;
 
-        private IEnumerable<IntuneApplication> GetFilteredApplications()
-        {
-            var filtered = _allApplications.AsEnumerable();
-
-            // Search filter
-            if (!string.IsNullOrEmpty(_currentSearchFilter))
+            if (_applicationsLoaded)
             {
-                filtered = filtered.Where(app =>
-                    app.DisplayName.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) ||
-                    app.Publisher.Contains(_currentSearchFilter, StringComparison.OrdinalIgnoreCase));
+                ApplyFiltersAndPagination();
             }
-
-            // Category filter
-            if (_currentCategoryFilter != "All Categories")
+            else
             {
-                filtered = filtered.Where(app => app.Category == _currentCategoryFilter);
+                await LoadAllApplicationsAsync();
             }
-
-            return filtered;
         }
-
-
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            _allApplications.Clear();
-            _currentPage = 1; 
-            await LoadApplicationsPagedAsync();
+            _applicationsLoaded = false;
+            _currentPage = 1;
+            await LoadAllApplicationsAsync();
         }
 
-        private async void PageSize_Changed(object sender, SelectionChangedEventArgs e)
+        #endregion
+
+        #region Pagination Event Handlers
+
+        private void NextPage_Click(object sender, RoutedEventArgs e)
+        {
+            var maxPage = _totalApplicationCount > 0 ?
+                (int)Math.Ceiling((double)_totalApplicationCount / PageSize) : 1;
+
+            if (_currentPage < maxPage)
+            {
+                _currentPage++;
+                ApplyFiltersAndPagination();
+            }
+        }
+
+        private void PreviousPage_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPage > 1)
+            {
+                _currentPage--;
+                ApplyFiltersAndPagination();
+            }
+        }
+
+        private void PageSize_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (PageSizeCombo.SelectedItem is ComboBoxItem item &&
                 int.TryParse(item.Tag.ToString(), out int newPageSize))
             {
                 PageSize = newPageSize;
-                _currentPage = 1; // Reset to first page
-                await LoadApplicationsPagedAsync();
-            }
-        }
-        private async void ApplicationsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
-        {
-            // Infinite scroll disabled - using pagination buttons instead
-        }
+                _currentPage = 1;
 
-        
-        private async void NextPage_Click(object sender, RoutedEventArgs e)
-        {
-            var filteredCount = GetFilteredApplications().Count();
-            var maxPage = (int)Math.Ceiling((double)filteredCount / PageSize) - 1;
-
-            if (_currentPage < maxPage)
-            {
-                _currentPage++;
-                await LoadApplicationsPagedAsync();
-            }
-        }
-
-        private async void PreviousPage_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentPage > 0)
-            {
-                _currentPage--;
-                await LoadApplicationsPagedAsync();
+                if (_applicationsLoaded)
+                {
+                    ApplyFiltersAndPagination();
+                }
             }
         }
 
         #endregion
 
-        #region Package Creation Methods
-        private void OpenPackageFolderButton_Click(object sender, RoutedEventArgs e)
+        #region Package Creation
+
+        private void BrowseSourcesButton_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Select Application Source File",
+                Filter = "All Supported Files (*.msi;*.exe)|*.msi;*.exe|MSI Files (*.msi)|*.msi|EXE Files (*.exe)|*.exe|All Files (*.*)|*.*",
+                FilterIndex = 1
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                string selectedFile = openFileDialog.FileName;
+                string fileName = Path.GetFileName(selectedFile);
+                string fileExtension = Path.GetExtension(selectedFile).ToLower();
+
+                SourcesPathTextBox.Text = selectedFile;
+                DetectPackageType(fileExtension, fileName);
+                ExtractFileMetadata(selectedFile);
+            }
+        }
+
+        private async void GenerateButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ProgressBar.Visibility = Visibility.Visible;
+                StatusText.Text = "Generating package...";
+
+                if (!ValidatePackageInputs()) return;
+
+                var appInfo = CreateApplicationInfo();
+                var psadtOptions = CollectPSADTOptions();
+
+                var generator = new PSADTGenerator();
+                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
+                _currentPackagePath = packagePath;
+
+                ShowPackageSuccess(appInfo, psadtOptions);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error generating package: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = "Package generation failed";
+            }
+            finally
+            {
+                ProgressBar.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void UploadButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 if (string.IsNullOrEmpty(_currentPackagePath))
                 {
-                    MessageBox.Show("No package path available.", "Error",
+                    MessageBox.Show("Please generate a package first.", "No Package",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                if (!Directory.Exists(_currentPackagePath))
+                var uploadWizard = new IntuneUploadWizard
                 {
-                    MessageBox.Show("Package folder no longer exists.", "Folder Not Found",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+                    Owner = this,
+                    ApplicationInfo = new ApplicationInfo
+                    {
+                        Manufacturer = ManufacturerTextBox.Text.Trim(),
+                        Name = AppNameTextBox.Text.Trim(),
+                        Version = VersionTextBox.Text.Trim()
+                    },
+                    PackagePath = _currentPackagePath
+                };
 
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = $"\"{_currentPackagePath}\"",
-                    UseShellExecute = true
-                });
+                uploadWizard.ShowDialog();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error opening folder: {ex.Message}", "Error",
+                MessageBox.Show($"Error opening upload wizard: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        #endregion
+
+        #region WDAC CAT
+        
+        #endregion
+
+        #region Package Creation Helper Methods
+
+        private void DetectPackageType(string fileExtension, string fileName)
+        {
+            switch (fileExtension)
+            {
+                case ".msi":
+                    DetectedPackageTypeIcon.Text = "📦";
+                    DetectedPackageTypeText.Text = "MSI Package";
+                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(39, 174, 96));
+                    PSADTOptionsPanel.Visibility = Visibility.Visible;
+                    AdvancedOptionsExpander.IsExpanded = true;
+                    break;
+
+                case ".exe":
+                    DetectedPackageTypeIcon.Text = "⚙️";
+                    DetectedPackageTypeText.Text = "EXE Installer";
+                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(52, 152, 219));
+                    PSADTOptionsPanel.Visibility = Visibility.Visible;
+                    AdvancedOptionsExpander.IsExpanded = true;
+                    break;
+
+                default:
+                    DetectedPackageTypeIcon.Text = "❓";
+                    DetectedPackageTypeText.Text = "Unknown file type";
+                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(241, 196, 15));
+                    PSADTOptionsPanel.Visibility = Visibility.Collapsed;
+                    break;
             }
         }
 
@@ -525,7 +650,6 @@ namespace IntunePackagingTool
             }
             catch (Exception ex)
             {
-                // If metadata extraction fails, fall back to filename parsing
                 Console.WriteLine($"Metadata extraction failed: {ex.Message}");
                 ExtractMetadataFromFilename(filePath);
             }
@@ -535,7 +659,6 @@ namespace IntunePackagingTool
         {
             try
             {
-                // Create Windows Installer object
                 Type? installerType = Type.GetTypeFromProgID("WindowsInstaller.Installer");
                 if (installerType == null)
                 {
@@ -543,6 +666,7 @@ namespace IntunePackagingTool
                     ExtractMetadataFromFilename(msiPath);
                     return;
                 }
+
                 dynamic? installer = Activator.CreateInstance(installerType);
                 if (installer == null)
                 {
@@ -550,14 +674,13 @@ namespace IntunePackagingTool
                     ExtractMetadataFromFilename(msiPath);
                     return;
                 }
+
                 dynamic database = installer.OpenDatabase(msiPath, 0);
 
-                // Extract metadata
                 string productName = GetMsiProperty(database, "ProductName");
                 string manufacturer = GetMsiProperty(database, "Manufacturer");
                 string version = GetMsiProperty(database, "ProductVersion");
 
-                // Populate UI fields if they're empty
                 if (string.IsNullOrWhiteSpace(AppNameTextBox.Text) && !string.IsNullOrWhiteSpace(productName))
                     AppNameTextBox.Text = productName;
 
@@ -595,12 +718,10 @@ namespace IntunePackagingTool
             {
                 FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
-                // Extract metadata
                 string? productName = versionInfo.ProductName;
                 string? companyName = versionInfo.CompanyName;
                 string? version = versionInfo.ProductVersion ?? versionInfo.FileVersion;
 
-                // Populate UI fields if they're empty
                 if (string.IsNullOrWhiteSpace(AppNameTextBox.Text) && !string.IsNullOrWhiteSpace(productName))
                     AppNameTextBox.Text = CleanProductName(productName);
 
@@ -621,7 +742,6 @@ namespace IntunePackagingTool
         {
             if (string.IsNullOrWhiteSpace(productName)) return "";
 
-            // Remove common installer/setup suffixes
             return productName
                 .Replace(" Setup", "")
                 .Replace(" Installer", "")
@@ -631,7 +751,6 @@ namespace IntunePackagingTool
 
         private void ExtractMetadataFromFilename(string filePath)
         {
-            // Your existing filename parsing logic as fallback
             if (string.IsNullOrWhiteSpace(AppNameTextBox.Text))
             {
                 string appNameFromFile = Path.GetFileNameWithoutExtension(filePath);
@@ -645,198 +764,142 @@ namespace IntunePackagingTool
             }
         }
 
-        private void BrowseSourcesButton_Click(object sender, RoutedEventArgs e)
+        private bool ValidatePackageInputs()
         {
-            var openFileDialog = new Microsoft.Win32.OpenFileDialog
+            if (string.IsNullOrWhiteSpace(AppNameTextBox.Text))
             {
-                Title = "Select Application Source File",
-                Filter = "All Supported Files (*.msi;*.exe)|*.msi;*.exe|MSI Files (*.msi)|*.msi|EXE Files (*.exe)|*.exe|All Files (*.*)|*.*",
-                FilterIndex = 1
+                MessageBox.Show("Please enter an Application Name.", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(SourcesPathTextBox.Text))
+            {
+                MessageBox.Show("Please select a Sources Path.", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (DetectedPackageType == "Unknown")
+            {
+                MessageBox.Show("Please select a valid installer file (.msi or .exe).", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool ValidateInput()
+        {
+            if (string.IsNullOrWhiteSpace(ManufacturerTextBox.Text))
+            {
+                MessageBox.Show("Please enter a manufacturer name.", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                ManufacturerTextBox.Focus();
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(AppNameTextBox.Text))
+            {
+                MessageBox.Show("Please enter an application name.", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppNameTextBox.Focus();
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(VersionTextBox.Text))
+            {
+                MessageBox.Show("Please enter a version number.", "Validation Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                VersionTextBox.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
+        private ApplicationInfo CreateApplicationInfo()
+        {
+            return new ApplicationInfo
+            {
+                Name = AppNameTextBox.Text.Trim(),
+                Manufacturer = string.IsNullOrWhiteSpace(ManufacturerTextBox.Text) ? "Unknown" : ManufacturerTextBox.Text.Trim(),
+                Version = string.IsNullOrWhiteSpace(VersionTextBox.Text) ? "1.0.0" : VersionTextBox.Text.Trim(),
+                SourcesPath = SourcesPathTextBox.Text.Trim(),
+                ServiceNowSRI = ""
             };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                string selectedFile = openFileDialog.FileName;
-                string fileName = Path.GetFileName(selectedFile);
-                string fileExtension = Path.GetExtension(selectedFile).ToLower();
-
-                
-                SourcesPathTextBox.Text = selectedFile;
-                DetectPackageType(fileExtension, fileName);
-                ExtractFileMetadata(selectedFile);
-            }
         }
 
-        private void DetectPackageType(string fileExtension, string fileName)
+        private PSADTOptions? CollectPSADTOptions()
         {
-            switch (fileExtension)
+            if (!AdvancedOptionsExpander.IsExpanded || PSADTOptionsPanel.Visibility != Visibility.Visible)
+                return null;
+
+            return new PSADTOptions
             {
-                case ".msi":
-                    DetectedPackageTypeIcon.Text = "📦";
-                    DetectedPackageTypeText.Text = "MSI Package";
-                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(39, 174, 96)); // Success green
+                PackageType = DetectedPackageType,
 
-                    // Show PSADT options and expand Advanced Options
-                    PSADTOptionsPanel.Visibility = Visibility.Visible;
-                    AdvancedOptionsExpander.IsExpanded = true;
-                    break;
+                // Installation Options
+                SilentInstall = SilentInstallCheck?.IsChecked ?? false,
+                SuppressRestart = SuppressRestartCheck?.IsChecked ?? false,
+                AllUsersInstall = AllUsersInstallCheck?.IsChecked ?? false,
+                VerboseLogging = VerboseLoggingCheck?.IsChecked ?? false,
 
-                case ".exe":
-                    DetectedPackageTypeIcon.Text = "⚙️";
-                    DetectedPackageTypeText.Text = "EXE Installer";
-                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(52, 152, 219)); // Primary blue
+                // User Interaction
+                CloseRunningApps = CloseRunningAppsCheck?.IsChecked ?? false,
+                AllowUserDeferrals = AllowUserDeferralsCheck?.IsChecked ?? false,
+                CheckDiskSpace = CheckDiskSpaceCheck?.IsChecked ?? false,
+                ShowProgress = ShowProgressCheck?.IsChecked ?? false,
 
-                    // Show PSADT options and expand Advanced Options
-                    PSADTOptionsPanel.Visibility = Visibility.Visible;
-                    AdvancedOptionsExpander.IsExpanded = true;
-                    break;
+                // Prerequisites
+                CheckDotNet = CheckDotNetCheck?.IsChecked ?? false,
+                ImportCertificates = ImportCertificatesCheck?.IsChecked ?? false,
+                CheckVCRedist = CheckVCRedistCheck?.IsChecked ?? false,
+                RegisterDLLs = RegisterDLLsCheck?.IsChecked ?? false,
 
-                default:
-                    DetectedPackageTypeIcon.Text = "❓";
-                    DetectedPackageTypeText.Text = "Unknown file type";
-                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(241, 196, 15)); // Warning yellow
+                // File & Registry Operations
+                CopyToAllUsers = CopyToAllUsersCheck?.IsChecked ?? false,
+                SetHKCUAllUsers = SetHKCUAllUsersCheck?.IsChecked ?? false,
+                SetCustomRegistry = SetCustomRegistryCheck?.IsChecked ?? false,
+                CopyConfigFiles = CopyConfigFilesCheck?.IsChecked ?? false,
 
-                    // Hide PSADT options for unknown types
-                    PSADTOptionsPanel.Visibility = Visibility.Collapsed;
-                    break;
-            }
+                // Shortcuts & Cleanup
+                DesktopShortcut = DesktopShortcutCheck?.IsChecked ?? false,
+                StartMenuEntry = StartMenuEntryCheck?.IsChecked ?? false,
+                RemovePreviousVersions = RemovePreviousVersionsCheck?.IsChecked ?? false,
+                CreateInstallMarker = CreateInstallMarkerCheck?.IsChecked ?? false
+            };
         }
 
-        // Optional: Property to get the detected package type for use in generation logic
-        public string DetectedPackageType
+        private void ShowPackageSuccess(ApplicationInfo appInfo, PSADTOptions? psadtOptions)
         {
-            get
-            {
-                if (DetectedPackageTypeText.Text == "MSI Package") return "MSI";
-                if (DetectedPackageTypeText.Text == "EXE Installer") return "EXE";
-                return "Unknown";
-            }
-        }
+            PackageStatusPanel.Visibility = Visibility.Visible;
+            PackageStatusText.Text = "✅ Package created successfully!";
+            StatusText.Text = $"Package created successfully • {DateTime.Now:HH:mm:ss}";
+            ProgressBar.IsIndeterminate = true;
 
-        private async void GenerateButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Show progress
-                ProgressBar.Visibility = Visibility.Visible;
-                StatusText.Text = "Generating package...";
+            PackagePathText.Text = _currentPackagePath;
+            OpenPackageFolderButton.Visibility = Visibility.Visible;
 
-                // Validate inputs
-                if (string.IsNullOrWhiteSpace(AppNameTextBox.Text))
-                {
-                    MessageBox.Show("Please enter an Application Name.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+            int enabledFeatures = psadtOptions != null ? CountEnabledFeatures(psadtOptions) : 0;
+            string featuresText = enabledFeatures > 0 ? $" with {enabledFeatures} PSADT cheatsheet functions" : "";
 
-                if (string.IsNullOrWhiteSpace(SourcesPathTextBox.Text))
-                {
-                    MessageBox.Show("Please select a Sources Path.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+            MessageBox.Show($"Package '{appInfo.Manufacturer}_{appInfo.Name}' v{appInfo.Version} created successfully!\n\n" +
+                           $"📦 Package Type: {DetectedPackageType}\n" +
+                           $"⚙️ PSADT Features: {enabledFeatures} enabled\n" +
+                           $"📁 Location: {_currentPackagePath}\n\n" +
+                           $"The Deploy-Application.ps1 script has been generated{featuresText}.",
+                           "Package Generation Complete",
+                           MessageBoxButton.OK,
+                           MessageBoxImage.Information);
 
-                if (DetectedPackageType == "Unknown")
-                {
-                    MessageBox.Show("Please select a valid installer file (.msi or .exe).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                // Create ApplicationInfo object
-                var appInfo = new ApplicationInfo
-                {
-                    Name = AppNameTextBox.Text.Trim(),
-                    Manufacturer = string.IsNullOrWhiteSpace(ManufacturerTextBox.Text) ? "Unknown" : ManufacturerTextBox.Text.Trim(),
-                    Version = string.IsNullOrWhiteSpace(VersionTextBox.Text) ? "1.0.0" : VersionTextBox.Text.Trim(),
-                    SourcesPath = SourcesPathTextBox.Text.Trim(),
-                    ServiceNowSRI = "" // You can add this field to your UI if needed
-                };
-
-                // Collect PSADT options from UI checkboxes (only if Advanced Options are expanded and visible)
-                PSADTOptions? psadtOptions = null;
-
-                if (AdvancedOptionsExpander.IsExpanded && PSADTOptionsPanel.Visibility == Visibility.Visible)
-                {
-                    psadtOptions = new PSADTOptions
-                    {
-                        // Package Info
-                        PackageType = DetectedPackageType,
-
-                        // Installation Options
-                        SilentInstall = SilentInstallCheck?.IsChecked ?? false,
-                        SuppressRestart = SuppressRestartCheck?.IsChecked ?? false,
-                        AllUsersInstall = AllUsersInstallCheck?.IsChecked ?? false,
-                        VerboseLogging = VerboseLoggingCheck?.IsChecked ?? false,
-
-                        // User Interaction
-                        CloseRunningApps = CloseRunningAppsCheck?.IsChecked ?? false,
-                        AllowUserDeferrals = AllowUserDeferralsCheck?.IsChecked ?? false,
-                        CheckDiskSpace = CheckDiskSpaceCheck?.IsChecked ?? false,
-                        ShowProgress = ShowProgressCheck?.IsChecked ?? false,
-
-                        // Prerequisites
-                        CheckDotNet = CheckDotNetCheck?.IsChecked ?? false,
-                        ImportCertificates = ImportCertificatesCheck?.IsChecked ?? false,
-                        CheckVCRedist = CheckVCRedistCheck?.IsChecked ?? false,
-                        RegisterDLLs = RegisterDLLsCheck?.IsChecked ?? false,
-
-                        // File & Registry Operations
-                        CopyToAllUsers = CopyToAllUsersCheck?.IsChecked ?? false,
-                        SetHKCUAllUsers = SetHKCUAllUsersCheck?.IsChecked ?? false,
-                        SetCustomRegistry = SetCustomRegistryCheck?.IsChecked ?? false,
-                        CopyConfigFiles = CopyConfigFilesCheck?.IsChecked ?? false,
-
-                        // Shortcuts & Cleanup
-                        DesktopShortcut = DesktopShortcutCheck?.IsChecked ?? false,
-                        StartMenuEntry = StartMenuEntryCheck?.IsChecked ?? false,
-                        RemovePreviousVersions = RemovePreviousVersionsCheck?.IsChecked ?? false,
-                        CreateInstallMarker = CreateInstallMarkerCheck?.IsChecked ?? false
-                    };
-                }
-
-                // Use your existing PSADTGenerator
-                var generator = new PSADTGenerator();
-                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
-                _currentPackagePath = packagePath;
-
-                // Show success and update UI
-                PackageStatusPanel.Visibility = Visibility.Visible;
-                PackageStatusText.Text = "✅ Package created successfully!";
-                StatusText.Text = $"Package created successfully • {DateTime.Now:HH:mm:ss}";
-                ProgressBar.IsIndeterminate = true;
-
-
-                PackagePathText.Text = packagePath;
-                OpenPackageFolderButton.Visibility = Visibility.Visible;
-
-                // Count enabled features
-                int enabledFeatures = psadtOptions != null ? CountEnabledFeatures(psadtOptions) : 0;
-                string featuresText = enabledFeatures > 0 ? $" with {enabledFeatures} PSADT cheatsheet functions" : "";
-
-                MessageBox.Show($"Package '{appInfo.Manufacturer}_{appInfo.Name}' v{appInfo.Version} created successfully!\n\n" +
-                               $"📦 Package Type: {DetectedPackageType}\n" +
-                               $"⚙️ PSADT Features: {enabledFeatures} enabled\n" +
-                               $"📁 Location: {packagePath}\n\n" +
-                               $"The Deploy-Application.ps1 script has been generated{featuresText}.",
-                               "Package Generation Complete",
-                               MessageBoxButton.OK,
-                               MessageBoxImage.Information);
-
-                StatusText.Text = $"Package created successfully{featuresText} • {DateTime.Now:HH:mm:ss}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error generating package: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                StatusText.Text = "Package generation failed";
-            }
-            finally
-            {
-                ProgressBar.Visibility = Visibility.Collapsed;
-            }
+            StatusText.Text = $"Package created successfully{featuresText} • {DateTime.Now:HH:mm:ss}";
         }
 
         private int CountEnabledFeatures(PSADTOptions options)
         {
             int count = 0;
-            // Use reflection to count enabled boolean properties
             var properties = typeof(PSADTOptions).GetProperties();
             foreach (var prop in properties)
             {
@@ -848,6 +911,42 @@ namespace IntunePackagingTool
                 }
             }
             return count;
+        }
+
+        #endregion
+
+        #region Package Actions Event Handlers
+
+        private void OpenPackageFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_currentPackagePath))
+                {
+                    MessageBox.Show("No package path available.", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!Directory.Exists(_currentPackagePath))
+                {
+                    MessageBox.Show("Package folder no longer exists.", "Folder Not Found",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{_currentPackagePath}\"",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening folder: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void OpenScriptButton_Click(object sender, RoutedEventArgs e)
@@ -884,72 +983,55 @@ namespace IntunePackagingTool
             }
         }
 
-
-        private void UploadButton_Click(object sender, RoutedEventArgs e)
+        private void btnRemoteTest_Click(object sender, RoutedEventArgs e)
         {
-            try
+            string packagePath = _currentPackagePath;
+            var remoteTest = new RemoteTestWindow(packagePath)
             {
-                if (string.IsNullOrEmpty(_currentPackagePath))
-                {
-                    MessageBox.Show("Please generate a package first.", "No Package",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+                Owner = this
+            };
+            remoteTest.ShowDialog();
+        }
 
+        #endregion
 
-                var uploadWizard = new IntuneUploadWizard
-                {
-                    Owner = this,
-                    ApplicationInfo = new ApplicationInfo
-                    {
-                        Manufacturer = ManufacturerTextBox.Text.Trim(),
-                        Name = AppNameTextBox.Text.Trim(),
-                        Version = VersionTextBox.Text.Trim()
-                    },
-                    PackagePath = _currentPackagePath
-                };
+        #region Settings Management
 
-
-                uploadWizard.ShowDialog();
+        private void LoadConfigurationDisplay()
+        {
+            // Get values from IntuneService
+            if (_intuneService != null)
+            {
+                TenantIdDisplay.Text = _intuneService.TenantId;
+                ClientIdDisplay.Text = _intuneService.ClientId;
+                ThumbprintDisplay.Text = _intuneService.CertificateThumbprint;
             }
-            catch (Exception ex)
+
+            // Get values from PSADTGenerator
+            if (_psadtGenerator != null)
             {
-                MessageBox.Show($"Error opening upload wizard: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                PSADTPathDisplay.Text = _psadtGenerator.TemplatePath;
+                OutputPathDisplay.Text = _psadtGenerator.BaseOutputPath;
+            }
+
+            // Get values from IntuneUploadService
+            if (_uploadService != null)
+            {
+                UtilPathDisplay.Text = _uploadService.ConverterPath;
             }
         }
 
-        private bool ValidateInput()
+        private void ShowSettingsPage()
         {
-            if (string.IsNullOrWhiteSpace(ManufacturerTextBox.Text))
-            {
-                MessageBox.Show("Please enter a manufacturer name.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                ManufacturerTextBox.Focus();
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(AppNameTextBox.Text))
-            {
-                MessageBox.Show("Please enter an application name.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                AppNameTextBox.Focus();
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(VersionTextBox.Text))
-            {
-                MessageBox.Show("Please enter a version number.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                VersionTextBox.Focus();
-                return false;
-            }
-
-            return true;
+            CreateApplicationPage.Visibility = Visibility.Collapsed;
+            LoadConfigurationDisplay();
+            SettingsPage.Visibility = Visibility.Visible;
         }
+
         #endregion
 
         #region Utility Methods
+
         private void ShowStatus(string message)
         {
             if (StatusText != null)
@@ -969,6 +1051,7 @@ namespace IntunePackagingTool
                 }
             }
         }
+
         private void DiagnoseIntuneService()
         {
             try
@@ -979,7 +1062,6 @@ namespace IntunePackagingTool
                     return;
                 }
 
-                // Test basic properties
                 var tenantId = _intuneService.TenantId;
                 var clientId = _intuneService.ClientId;
 
@@ -990,11 +1072,17 @@ namespace IntunePackagingTool
                 MessageBox.Show($"IntuneService diagnostic failed: {ex.Message}", "Debug Info");
             }
         }
+
+        #endregion
+
+        #region Cleanup
+
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
             _intuneService?.Dispose();
         }
+
         #endregion
     }
 }
