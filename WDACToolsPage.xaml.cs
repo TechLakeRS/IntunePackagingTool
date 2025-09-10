@@ -1,78 +1,95 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 
 namespace IntunePackagingTool
 {
     public partial class WDACToolsPage : UserControl
     {
-        private ObservableCollection<CatalogTask> _catalogTasks;
-        private readonly string _scriptPath = @"\\nbb.local\SYS\SCCMData\SCRIPTS\Intune\CreateSecurityCatalog\CreateSecurityCatalog.ps1";
+        private readonly ObservableCollection<CatalogTask> _catalogTasks;
+        private readonly WDACService _wdacService;
         private bool _isProcessing = false;
+
+        public ObservableCollection<CatalogTask> CatalogTasks => _catalogTasks;
+        public bool IsProcessing
+        {
+            get => _isProcessing;
+            private set
+            {
+                _isProcessing = value;
+                UpdateUIState();
+            }
+        }
 
         public WDACToolsPage()
         {
             InitializeComponent();
             _catalogTasks = new ObservableCollection<CatalogTask>();
+            _wdacService = new WDACService();
+
+            DataContext = this;
             CatalogQueueGrid.ItemsSource = _catalogTasks;
         }
 
-        // Generate catalog from a single folder
+        #region Event Handlers
+
         private async void GenerateFromFolder_Click(object sender, RoutedEventArgs e)
         {
-            var folderDialog = new System.Windows.Forms.FolderBrowserDialog
+            if (IsProcessing)
             {
-                Description = "Select application folder containing Deploy-Application.exe",
-                ShowNewFolderButton = false
+                MessageBox.Show("A catalog generation is already in progress.",
+                    "Processing", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Use the SelectFolderByFile method to select the folder by selecting Deploy-Application.exe
+            var appFolder = SelectFolderByFile(
+                "Select application folder",
+                "Deploy-Application.exe");
+
+            if (string.IsNullOrEmpty(appFolder))
+                return;
+
+            // Validate folder structure
+            if (!ValidatePackageFolder(appFolder))
+                return;
+
+            // Parse application info and create task
+            var appInfo = WDACService.ParseApplicationInfo(appFolder);
+            var task = new CatalogTask
+            {
+                AppName = appInfo.Name,
+                Version = appInfo.Version,
+                PackagePath = appFolder,
+                Status = "Queued",
+                IsSelected = true
             };
 
-            if (folderDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            _catalogTasks.Add(task);
+
+            // Auto-start if this is the only task
+            if (_catalogTasks.Count == 1 && !IsProcessing)
             {
-                var appFolder = folderDialog.SelectedPath;
-                var deployAppPath = Path.Combine(appFolder, "Deploy-Application.exe");
-
-                if (!File.Exists(deployAppPath))
-                {
-                    MessageBox.Show("Deploy-Application.exe not found in selected folder.",
-                        "Invalid Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                // Extract app info from folder name or prompt user
-                var folderName = Path.GetFileName(appFolder);
-                var appInfo = ParseApplicationInfo(folderName);
-
-                var task = new CatalogTask
-                {
-                    AppName = appInfo.Name,
-                    Version = appInfo.Version,
-                    PackagePath = appFolder,
-                    Status = "Queued",
-                    IsSelected = true
-                };
-
-                _catalogTasks.Add(task);
-
-                // Auto-start if this is the only task
-                if (_catalogTasks.Count == 1 && !_isProcessing)
-                {
-                    await ProcessSelectedTasks();
-                }
+                await ProcessSelectedTasks();
             }
         }
 
-        // Batch process multiple packages
         private async void BatchProcess_Click(object sender, RoutedEventArgs e)
         {
+            if (IsProcessing)
+            {
+                MessageBox.Show("A catalog generation is already in progress.",
+                    "Processing", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             var openFileDialog = new OpenFileDialog
             {
                 Title = "Select packages list (CSV or TXT)",
@@ -80,47 +97,49 @@ namespace IntunePackagingTool
                 CheckFileExists = true
             };
 
-            if (openFileDialog.ShowDialog() == true)
+            if (openFileDialog.ShowDialog() != true)
+                return;
+
+            try
             {
-                try
-                {
-                    var lines = File.ReadAllLines(openFileDialog.FileName);
+                var lines = await File.ReadAllLinesAsync(openFileDialog.FileName);
+                var addedCount = 0;
 
-                    foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
+                foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
+                {
+                    var task = ParseBatchLine(line);
+                    if (task != null && Directory.Exists(task.PackagePath))
                     {
-                        // Expected format: "AppName,Version,Path" or just "Path"
-                        var parts = line.Split(',');
-
-                        string path = parts.Length == 3 ? parts[2].Trim() : parts[0].Trim();
-
-                        if (Directory.Exists(path))
-                        {
-                            var task = new CatalogTask
-                            {
-                                AppName = parts.Length >= 2 ? parts[0].Trim() : Path.GetFileName(path),
-                                Version = parts.Length >= 2 ? parts[1].Trim() : "1.0.0",
-                                PackagePath = path,
-                                Status = "Queued",
-                                IsSelected = true
-                            };
-
-                            _catalogTasks.Add(task);
-                        }
+                        _catalogTasks.Add(task);
+                        addedCount++;
                     }
+                }
 
-                    MessageBox.Show($"Added {_catalogTasks.Count} packages to queue.",
-                        "Batch Import", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
+                MessageBox.Show($"Added {addedCount} packages to queue.",
+                    "Batch Import", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                if (addedCount > 0 && !IsProcessing)
                 {
-                    MessageBox.Show($"Error loading file: {ex.Message}",
-                        "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    var result = MessageBox.Show(
+                        "Do you want to start processing the batch now?",
+                        "Start Processing",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        await ProcessSelectedTasks();
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading file: {ex.Message}",
+                    "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        // Validate existing catalogs
-        private void ValidateCatalogs_Click(object sender, RoutedEventArgs e)
+        private async void ValidateCatalogs_Click(object sender, RoutedEventArgs e)
         {
             var openFileDialog = new OpenFileDialog
             {
@@ -129,66 +148,62 @@ namespace IntunePackagingTool
                 Multiselect = true
             };
 
-            if (openFileDialog.ShowDialog() == true)
+            if (openFileDialog.ShowDialog() != true)
+                return;
+
+            var results = new System.Text.StringBuilder();
+            results.AppendLine("CATALOG VALIDATION RESULTS");
+            results.AppendLine("=" + new string('=', 50));
+
+            foreach (var catFile in openFileDialog.FileNames)
             {
-                var results = new System.Text.StringBuilder();
-
-                foreach (var catFile in openFileDialog.FileNames)
+                try
                 {
-                    try
-                    {
-                        // Run validation PowerShell command
-                        using (var process = new Process())
-                        {
-                            process.StartInfo = new ProcessStartInfo
-                            {
-                                FileName = "powershell.exe",
-                                Arguments = $"-Command \"Test-CiCatalog -CatalogFilePath '{catFile}'\"",
-                                RedirectStandardOutput = true,
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            };
-
-                            process.Start();
-                            var output = process.StandardOutput.ReadToEnd();
-                            process.WaitForExit();
-
-                            var status = process.ExitCode == 0 ? "✅ Valid" : "❌ Invalid";
-                            results.AppendLine($"{Path.GetFileName(catFile)}: {status}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        results.AppendLine($"{Path.GetFileName(catFile)}: ❌ Error - {ex.Message}");
-                    }
+                    var isValid = await _wdacService.ValidateCatalogAsync(catFile);
+                    var status = isValid ? "✅ Valid" : "❌ Invalid";
+                    results.AppendLine($"{Path.GetFileName(catFile)}: {status}");
                 }
-
-                MessageBox.Show(results.ToString(), "Catalog Validation Results",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                catch (Exception ex)
+                {
+                    results.AppendLine($"{Path.GetFileName(catFile)}: ❌ Error - {ex.Message}");
+                }
             }
+
+            MessageBox.Show(results.ToString(), "Catalog Validation Results",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // Process selected tasks
+        #endregion
+
+        #region Processing Methods
+
         private async Task ProcessSelectedTasks()
         {
-            var selectedTasks = _catalogTasks.Where(t => t.IsSelected && t.Status == "Queued").ToList();
+            var selectedTasks = _catalogTasks
+                .Where(t => t.IsSelected && t.Status == "Queued")
+                .ToList();
 
             if (!selectedTasks.Any())
             {
-                MessageBox.Show("No tasks selected for processing.", "Nothing to Process",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("No tasks selected for processing.",
+                    "Nothing to Process",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
-            _isProcessing = true;
+            IsProcessing = true;
 
             try
             {
-                foreach (var task in selectedTasks)
-                {
-                    task.Status = "Processing...";
+                var progress = new Progress<WDACService.BatchProgress>(UpdateBatchProgress);
+                var results = await _wdacService.GenerateBatchCatalogsAsync(selectedTasks, progress);
 
-                    var result = await GenerateCatalogAsync(task);
+                // Update task statuses based on results
+                for (int i = 0; i < selectedTasks.Count && i < results.Count; i++)
+                {
+                    var task = selectedTasks[i];
+                    var result = results[i];
 
                     if (result.Success)
                     {
@@ -202,126 +217,325 @@ namespace IntunePackagingTool
                     }
                 }
 
-                var successful = selectedTasks.Count(t => t.Status.StartsWith("✅"));
-                MessageBox.Show($"Processing complete!\n\nSuccessful: {successful}/{selectedTasks.Count}",
-                    "Batch Processing Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowProcessingResults(selectedTasks);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during batch processing: {ex.Message}",
+                    "Processing Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
-                _isProcessing = false;
+                IsProcessing = false;
             }
         }
 
-        // Generate catalog for a single task
-        private async Task<CatalogResult> GenerateCatalogAsync(CatalogTask task)
+        
+
+        #endregion
+
+        #region Helper Methods
+
+        private bool ValidatePackageFolder(string folderPath)
         {
-            return await Task.Run(() =>
+            var deployAppPath = Path.Combine(folderPath, "Application", "Deploy-Application.exe");
+
+            if (!File.Exists(deployAppPath))
             {
-                try
+                // Check root folder as fallback
+                deployAppPath = Path.Combine(folderPath, "Deploy-Application.exe");
+
+                if (!File.Exists(deployAppPath))
                 {
-                    var process = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = "powershell.exe",
-                            Arguments = $"-ExecutionPolicy Bypass -File \"{_scriptPath}\" " +
-                                      $"-ApplicationPath \"{task.PackagePath}\"",
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        }
-                    };
-
-                    process.Start();
-                    process.WaitForExit();
-
-                    if (process.ExitCode == 0)
-                    {
-                        // Parse output to get catalog path
-                        var output = process.StandardOutput.ReadToEnd();
-                        // Extract catalog path from output...
-
-                        return new CatalogResult
-                        {
-                            Success = true,
-                            CatalogPath = ExtractCatalogPath(output),
-                            Hash = ExtractHash(output)
-                        };
-                    }
-                    else
-                    {
-                        return new CatalogResult
-                        {
-                            Success = false,
-                            ErrorMessage = process.StandardError.ReadToEnd()
-                        };
-                    }
+                    MessageBox.Show(
+                        "Deploy-Application.exe not found in the selected folder.\n\n" +
+                        "Expected locations:\n" +
+                        "• [Folder]\\Application\\Deploy-Application.exe\n" +
+                        "• [Folder]\\Deploy-Application.exe",
+                        "Invalid Folder",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return false;
                 }
-                catch (Exception ex)
+            }
+
+            return true;
+        }
+
+        private CatalogTask? ParseBatchLine(string line)
+        {
+            try
+            {
+                var parts = line.Split(',').Select(p => p.Trim()).ToArray();
+
+                if (parts.Length == 3)
                 {
-                    return new CatalogResult
+                    // Format: AppName,Version,Path
+                    return new CatalogTask
                     {
-                        Success = false,
-                        ErrorMessage = ex.Message
+                        AppName = parts[0],
+                        Version = parts[1],
+                        PackagePath = parts[2],
+                        Status = "Queued",
+                        IsSelected = true
                     };
+                }
+                else if (parts.Length == 1)
+                {
+                    // Format: Path only
+                    var appInfo = WDACService.ParseApplicationInfo(parts[0]);
+                    return new CatalogTask
+                    {
+                        AppName = appInfo.Name,
+                        Version = appInfo.Version,
+                        PackagePath = parts[0],
+                        Status = "Queued",
+                        IsSelected = true
+                    };
+                }
+            }
+            catch
+            {
+                // Ignore malformed lines
+            }
+
+            return null;
+        }
+
+        private void UpdateBatchProgress(WDACService.BatchProgress progress)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                // Update UI with batch progress
+                // You could add a progress bar or status label here
+                var statusMessage = $"Processing {progress.CurrentTask}/{progress.TotalTasks}: {progress.CurrentTaskName}";
+
+                // Find the task and update its status
+                var task = _catalogTasks.FirstOrDefault(t => t.AppName == progress.CurrentTaskName);
+                if (task != null && !string.IsNullOrEmpty(progress.CurrentMessage))
+                {
+                    task.Status = progress.CurrentMessage;
                 }
             });
         }
 
-        // Helper methods
-        private ApplicationInfo ParseApplicationInfo(string folderName)
+        private void ShowProcessingResults(IList<CatalogTask> tasks)
         {
-            // Try to parse "Manufacturer_AppName_Version" format
-            var parts = folderName.Split('_');
+            var successful = tasks.Count(t => t.Status.StartsWith("✅"));
+            var failed = tasks.Count(t => t.Status.StartsWith("❌"));
 
-            return new ApplicationInfo
+            var message = $"Processing complete!\n\n" +
+                         $"✅ Successful: {successful}\n" +
+                         $"❌ Failed: {failed}\n" +
+                         $"📊 Total: {tasks.Count}";
+
+            MessageBox.Show(message, "Batch Processing Complete",
+                MessageBoxButton.OK,
+                successful == tasks.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
+        private void UpdateUIState()
+        {
+            Dispatcher.Invoke(() =>
             {
-                Manufacturer = parts.Length > 0 ? parts[0] : "Unknown",
-                Name = parts.Length > 1 ? parts[1] : folderName,
-                Version = parts.Length > 2 ? parts[2] : "1.0.0"
+                // Update button states based on processing status
+                // This could be bound to IsEnabled properties in XAML
+            });
+        }
+
+        #endregion
+
+        #region Folder Selection Methods
+
+        /// <summary>
+        /// Select folder by navigating to a specific file
+        /// </summary>
+        private string SelectFolderByFile(string description, string targetFileName = "Deploy-Application.exe")
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = $"{description} - Navigate to folder and select {targetFileName}",
+                Filter = $"{targetFileName}|{targetFileName}|Executable files (*.exe)|*.exe|All files (*.*)|*.*",
+                CheckFileExists = true
             };
-        }
 
-        private string ExtractCatalogPath(string output)
-        {
-            // Parse the PowerShell output to find the catalog path
-            var lines = output.Split('\n');
-            foreach (var line in lines)
+            if (dialog.ShowDialog() == true)
             {
-                if (line.Contains(".cat"))
+                // Get the directory of the selected file
+                var dir = Path.GetDirectoryName(dialog.FileName);
+
+                // If they selected Deploy-Application.exe in Application subfolder, go up one level
+                if (dir?.EndsWith("\\Application") == true)
                 {
-                    // Extract path from line
-                    return line.Trim();
+                    return Directory.GetParent(dir)?.FullName ?? dir;
                 }
+
+                return dir ?? "";
             }
+
             return "";
         }
 
-        private string ExtractHash(string output)
+        /// <summary>
+        /// Alternative: Select any file in a folder to get the folder path
+        /// </summary>
+        private string SelectFolder(string description)
         {
-            // Parse the PowerShell output to find the hash
-            var lines = output.Split('\n');
-            foreach (var line in lines)
+            var dialog = new OpenFileDialog
             {
-                if (line.Contains("Hash:"))
-                {
-                    return line.Split(':')[1].Trim();
-                }
+                Title = description + " (Select any file in the target folder)",
+                Filter = "All files (*.*)|*.*",
+                CheckFileExists = false,
+                CheckPathExists = true,
+                ValidateNames = false,
+                FileName = "Folder Selection"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                return Path.GetDirectoryName(dialog.FileName) ?? "";
             }
+
             return "";
         }
 
-        // Context menu for grid
+        /// <summary>
+        /// Alternative: Use a textbox input with browse button
+        /// </summary>
+        private string ShowFolderInputDialog(string title, string message)
+        {
+            var inputWindow = new Window
+            {
+                Title = title,
+                Width = 500,
+                Height = 200,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Window.GetWindow(this),
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var grid = new Grid { Margin = new Thickness(15) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var messageBlock = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            Grid.SetRow(messageBlock, 0);
+            grid.Children.Add(messageBlock);
+
+            var pathPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            Grid.SetRow(pathPanel, 1);
+
+            var pathTextBox = new TextBox
+            {
+                Width = 380,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            pathPanel.Children.Add(pathTextBox);
+
+            var browseButton = new Button
+            {
+                Content = "Browse...",
+                Width = 80
+            };
+            // Add event handler with += operator
+            browseButton.Click += (s, e) =>
+            {
+                    var folder = SelectFolderByFile("Select application folder", "Deploy-Application.exe");
+                    if (!string.IsNullOrEmpty(folder))
+                    {
+                        pathTextBox.Text = folder;
+                    }
+                
+            };
+            pathPanel.Children.Add(browseButton);
+            grid.Children.Add(pathPanel);
+
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 20, 0, 0)
+            };
+            Grid.SetRow(buttonPanel, 3);
+
+            var okButton = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                Margin = new Thickness(0, 0, 10, 0),
+                IsDefault = true
+            };
+            okButton.Click += (s, e) =>
+            {
+                inputWindow.DialogResult = true;
+                inputWindow.Close();
+            };
+            buttonPanel.Children.Add(okButton);
+
+            var cancelButton = new Button
+            {
+                Content = "Cancel",
+                Width = 80,
+                IsCancel = true
+            };
+            buttonPanel.Children.Add(cancelButton);
+            grid.Children.Add(buttonPanel);
+
+            inputWindow.Content = grid;
+
+            if (inputWindow.ShowDialog() == true)
+            {
+                return pathTextBox.Text;
+            }
+
+            return "";
+        }
+
+        #endregion
+
+        #region Context Menu
+
         private void CatalogQueueGrid_MouseRightButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             var menu = new ContextMenu();
 
-            var processItem = new MenuItem { Header = "Process Selected" };
+            // Process Selected
+            var processItem = new MenuItem { Header = "🚀 Process Selected" };
             processItem.Click += async (s, args) => await ProcessSelectedTasks();
+            processItem.IsEnabled = !IsProcessing;
             menu.Items.Add(processItem);
 
-            var removeItem = new MenuItem { Header = "Remove Selected" };
+            menu.Items.Add(new Separator());
+
+            // Select All
+            var selectAllItem = new MenuItem { Header = "✅ Select All" };
+            selectAllItem.Click += (s, args) =>
+            {
+                foreach (var task in _catalogTasks)
+                    task.IsSelected = true;
+            };
+            menu.Items.Add(selectAllItem);
+
+            // Deselect All
+            var deselectAllItem = new MenuItem { Header = "⬜ Deselect All" };
+            deselectAllItem.Click += (s, args) =>
+            {
+                foreach (var task in _catalogTasks)
+                    task.IsSelected = false;
+            };
+            menu.Items.Add(deselectAllItem);
+
+            menu.Items.Add(new Separator());
+
+            // Remove Selected
+            var removeItem = new MenuItem { Header = "🗑️ Remove Selected" };
             removeItem.Click += (s, args) =>
             {
                 var selected = _catalogTasks.Where(t => t.IsSelected).ToList();
@@ -330,40 +544,61 @@ namespace IntunePackagingTool
             };
             menu.Items.Add(removeItem);
 
+            // Clear Completed
+            var clearCompletedItem = new MenuItem { Header = "🧹 Clear Completed" };
+            clearCompletedItem.Click += (s, args) =>
+            {
+                var completed = _catalogTasks
+                    .Where(t => t.Status.StartsWith("✅") || t.Status.StartsWith("❌"))
+                    .ToList();
+                foreach (var task in completed)
+                    _catalogTasks.Remove(task);
+            };
+            menu.Items.Add(clearCompletedItem);
+
+            menu.Items.Add(new Separator());
+
+            // Export Results
+            var exportItem = new MenuItem { Header = "💾 Export Results to CSV" };
+            exportItem.Click += ExportResults_Click;
+            menu.Items.Add(exportItem);
+
             menu.IsOpen = true;
         }
-    }
 
-    // Data model for catalog tasks
-    public class CatalogTask : INotifyPropertyChanged
-    {
-        private string _status = "Queued";
-        private bool _isSelected = false;
-
-        public bool IsSelected
+        private void ExportResults_Click(object sender, RoutedEventArgs e)
         {
-            get => _isSelected;
-            set { _isSelected = value; OnPropertyChanged(); }
+            var saveDialog = new SaveFileDialog
+            {
+                Title = "Export Catalog Results",
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                FileName = $"WDAC_Catalogs_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            };
+
+            if (saveDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    var csv = new System.Text.StringBuilder();
+                    csv.AppendLine("AppName,Version,Status,CatalogPath,Hash");
+
+                    foreach (var task in _catalogTasks)
+                    {
+                        csv.AppendLine($"\"{task.AppName}\",\"{task.Version}\",\"{task.Status}\",\"{task.CatalogPath}\",\"{task.Hash}\"");
+                    }
+
+                    File.WriteAllText(saveDialog.FileName, csv.ToString());
+                    MessageBox.Show("Results exported successfully!", "Export Complete",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error exporting results: {ex.Message}", "Export Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
 
-        public string AppName { get; set; }
-        public string Version { get; set; }
-        public string PackagePath { get; set; }
-
-        public string Status
-        {
-            get => _status;
-            set { _status = value; OnPropertyChanged(); }
-        }
-
-        public string CatalogPath { get; set; }
-        public string Hash { get; set; }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        #endregion
     }
 }

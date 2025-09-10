@@ -72,6 +72,7 @@
 	</ItemGroup>
 	<PropertyGroup>
 		<ApplicationIcon>Resources\app.ico</ApplicationIcon>
+		<UseWindowsForms>False</UseWindowsForms>
 	</PropertyGroup>
 	<!-- Folders -->
 	<ItemGroup>

@@ -9,10 +9,11 @@ namespace IntunePackagingTool.Services
     public class SettingsService
     {
         private readonly string _settingsFile;
-        private AppSettings _settings;
+        private AppSettings? _settings;
 
         public SettingsService()
         {
+
             // Use portable path
             var appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

@@ -24,9 +24,9 @@ namespace IntunePackagingTool.Services
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
         private bool _disposed = false;
-        private readonly string _clientId = "";
-        private readonly string _tenantId = "";
-        private readonly string _certificateThumbprint = "";
+        private readonly string _clientId = "b47987a1-70b4-415a-9a4e-9775473e382b";
+        private readonly string _tenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7";
+        private readonly string _certificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F";
 
         public string ClientId => _clientId;
         public string TenantId => _tenantId;
@@ -155,196 +155,76 @@ namespace IntunePackagingTool.Services
             }
 
             return await _cache.GetOrAddAsync("apps_list",
-                async () => await GetApplicationsFromGraphAsync(),
+                async () => await GetAllApplicationsFromGraphAsync(),
                 TimeSpan.FromMinutes(10));
         }
 
-        public async Task<List<IntuneApplication>> GetApplicationsFromGraphAsync()
+        private async Task<List<IntuneApplication>> GetAllApplicationsFromGraphAsync()
         {
             try
             {
-                Debug.WriteLine("=== GRAPH API CALL ===");
-                Debug.WriteLine("Starting GetApplicationsAsync...");
+                Debug.WriteLine("=== FETCHING ALL APPLICATIONS FROM GRAPH ===");
 
                 var token = await GetAccessTokenAsync();
-                Debug.WriteLine($"✓ Token obtained for Graph API call, length: {token.Length}");
 
-                // Try with smaller batch and expand categories - if it fails, we'll fallback
-                var requestUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps?$filter=isof('microsoft.graph.win32LobApp')&$expand=categories&$top=100";
-                Debug.WriteLine($"Making Graph API request to: {requestUrl}");
+                var apps = new List<IntuneApplication>();
 
-                var response = await _sharedHttpClient.GetAsync(requestUrl);
-                var responseText = await response.Content.ReadAsStringAsync();
+                // Start with first page
+                var requestUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
+                                "?$filter=isof('microsoft.graph.win32LobApp')" +
+                                "&$expand=categories" +
+                                "&$top=100" +  // Get 100 at a time
+                                "&$orderby=displayName";
 
-                Debug.WriteLine($"Graph API response status: {response.StatusCode}");
-                Debug.WriteLine($"Graph API response length: {responseText.Length}");
-
-                if (!response.IsSuccessStatusCode)
+                while (!string.IsNullOrEmpty(requestUrl))
                 {
-                    Debug.WriteLine($"✗ Graph API error with categories expand, trying without expand...");
+                    Debug.WriteLine($"Fetching batch from: {requestUrl}");
 
-                    // Fallback: try without expand if categories expand fails
-                    requestUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps?$filter=isof('microsoft.graph.win32LobApp')&$top=100";
-                    Debug.WriteLine($"Fallback request to: {requestUrl}");
-
-                    response = await _sharedHttpClient.GetAsync(requestUrl);
-                    responseText = await response.Content.ReadAsStringAsync();
+                    var response = await _sharedHttpClient.GetAsync(requestUrl);
+                    var responseText = await response.Content.ReadAsStringAsync();
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        Debug.WriteLine($"✗ Graph API error response: {responseText}");
+                        // Try without categories expand if it fails
+                        requestUrl = requestUrl.Replace("&$expand=categories", "");
+                        response = await _sharedHttpClient.GetAsync(requestUrl);
+                        responseText = await response.Content.ReadAsStringAsync();
 
-                        // Try to parse Graph API error
-                        try
+                        if (!response.IsSuccessStatusCode)
                         {
-                            var errorResponse = JsonSerializer.Deserialize<JsonElement>(responseText);
-                            if (errorResponse.TryGetProperty("error", out var errorObj))
-                            {
-                                var code = errorObj.TryGetProperty("code", out var codeProp) ? codeProp.GetString() : "Unknown";
-                                var message = errorObj.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Unknown";
-
-                                Debug.WriteLine($"Graph API Error - Code: {code}, Message: {message}");
-                                throw new Exception($"Graph API Error: {code} - {message}");
-                            }
+                            Debug.WriteLine($"Failed to fetch applications: {response.StatusCode}");
+                            throw new Exception($"Failed to fetch applications: {response.StatusCode}");
                         }
-                        catch (JsonException)
-                        {
-                            Debug.WriteLine("Could not parse Graph API error response");
-                        }
-
-                        throw new Exception($"Graph API request failed. Status: {response.StatusCode}, Response: {responseText}");
                     }
-                }
 
-                Debug.WriteLine("✓ Graph API request successful, parsing response...");
+                    var graphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(responseText,
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
-                var graphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(responseText, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                var apps = new List<IntuneApplication>();
-
-                if (graphResponse?.Value != null)
-                {
-                    Debug.WriteLine($"✓ Found {graphResponse.Value.Count} applications in Intune");
-
-                    foreach (var app in graphResponse.Value)
+                    if (graphResponse?.Value != null)
                     {
-                        var id = app.GetProperty("id").GetString() ?? "";
-                        var displayName = app.TryGetProperty("displayName", out var dnProp) ? dnProp.GetString() ?? "Unknown" : "Unknown";
-                        var version = app.TryGetProperty("displayVersion", out var verProp) ? verProp.GetString() ?? "1.0.0" : "1.0.0";
-                        var publisher = app.TryGetProperty("publisher", out var pubProp) ? pubProp.GetString() ?? "Unknown" : "Unknown";
-
-                        // Try to get real categories from Intune if they were expanded
-                        var category = "Uncategorized"; // Default
-                        if (app.TryGetProperty("categories", out var categoriesProp) && categoriesProp.ValueKind == JsonValueKind.Array)
+                        foreach (var app in graphResponse.Value)
                         {
-                            var categoryNames = new List<string>();
-                            foreach (var cat in categoriesProp.EnumerateArray())
-                            {
-                                if (cat.TryGetProperty("displayName", out var catName))
-                                {
-                                    var catNameStr = catName.GetString();
-                                    if (!string.IsNullOrWhiteSpace(catNameStr))
-                                        categoryNames.Add(catNameStr);
-                                }
-                            }
-                            if (categoryNames.Count > 0)
-                                category = string.Join(", ", categoryNames);
+                            apps.Add(ParseIntuneApplication(app));
                         }
 
-                        Debug.WriteLine($"  App: {displayName} v{version} by {publisher} - Category: {category}");
-
-                        apps.Add(new IntuneApplication
-                        {
-                            Id = id,
-                            DisplayName = displayName,
-                            Version = version,
-                            Publisher = publisher,
-                            Category = category,
-                            LastModified = DateTime.Now
-                        });
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine("⚠ No applications found in response");
-                }
-
-                // Handle pagination if there are more results (but limit to avoid timeouts)
-                var hasNextPage = graphResponse?.ODataNextLink != null;
-                var pageCount = 1;
-
-                while (hasNextPage && pageCount < 20) // Allow more pages since we're using smaller batches
-                {
-                    Debug.WriteLine($"Getting page {pageCount + 1}...");
-
-                    var nextResponse = await _sharedHttpClient.GetAsync(graphResponse!.ODataNextLink);
-                    if (!nextResponse.IsSuccessStatusCode) break;
-
-                    var nextResponseText = await nextResponse.Content.ReadAsStringAsync();
-                    var nextGraphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(nextResponseText, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-
-                    if (nextGraphResponse?.Value != null)
-                    {
-                        Debug.WriteLine($"✓ Found {nextGraphResponse.Value.Count} more applications");
-
-                        foreach (var app in nextGraphResponse.Value)
-                        {
-                            var id = app.GetProperty("id").GetString() ?? "";
-                            var displayName = app.TryGetProperty("displayName", out var dnProp) ? dnProp.GetString() ?? "Unknown" : "Unknown";
-                            var version = app.TryGetProperty("displayVersion", out var verProp) ? verProp.GetString() ?? "1.0.0" : "1.0.0";
-                            var publisher = app.TryGetProperty("publisher", out var pubProp) ? pubProp.GetString() ?? "Unknown" : "Unknown";
-
-                            // Try to get real categories
-                            var category = "Uncategorized"; // Default
-                            if (app.TryGetProperty("categories", out var categoriesProp) && categoriesProp.ValueKind == JsonValueKind.Array)
-                            {
-                                var categoryNames = new List<string>();
-                                foreach (var cat in categoriesProp.EnumerateArray())
-                                {
-                                    if (cat.TryGetProperty("displayName", out var catName))
-                                    {
-                                        var catNameStr = catName.GetString();
-                                        if (!string.IsNullOrWhiteSpace(catNameStr))
-                                            categoryNames.Add(catNameStr);
-                                    }
-                                }
-                                if (categoryNames.Count > 0)
-                                    category = string.Join(", ", categoryNames);
-                            }
-
-                            apps.Add(new IntuneApplication
-                            {
-                                Id = id,
-                                DisplayName = displayName,
-                                Version = version,
-                                Publisher = publisher,
-                                Category = category,
-                                LastModified = DateTime.Now
-                            });
-                        }
+                        Debug.WriteLine($"Fetched {graphResponse.Value.Count} apps, total so far: {apps.Count}");
                     }
 
-                    graphResponse = nextGraphResponse;
-                    hasNextPage = graphResponse?.ODataNextLink != null;
-                    pageCount++;
+                    // Get next page URL if exists
+                    requestUrl = graphResponse?.ODataNextLink ?? "";
                 }
 
-                Debug.WriteLine($"✓ Successfully processed {apps.Count} applications across {pageCount} pages");
+                Debug.WriteLine($"✓ Successfully fetched {apps.Count} total applications");
+
                 return apps.OrderBy(a => a.DisplayName).ToList();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"✗ Error in GetApplicationsAsync: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-
-                MessageBox.Show(
-                    $"Failed to retrieve applications from Intune:\n\n{ex.Message}\n\nCheck the Debug Output window for detailed logs.",
-                    "Graph API Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-
+                Debug.WriteLine($"Error fetching all applications: {ex.Message}");
                 throw;
             }
         }
+
         public async Task<ApplicationDetail> GetApplicationDetailAsync(string intuneAppId, bool forceRefresh = false)
         {
             var cacheKey = $"app_detail_{intuneAppId}";
@@ -523,158 +403,6 @@ namespace IntunePackagingTool.Services
             }
         }
 
-       
-
-        public async Task<PagedResult<IntuneApplication>> GetApplicationsPagedAsync(
-            int pageNumber = 1,
-            int pageSize = 50,
-            string? searchFilter = null,
-            string? categoryFilter = null,
-            bool forceRefresh = false)
-        {
-            // Create cache key that includes pagination parameters
-            var cacheKey = $"apps_paged_{pageNumber}_{pageSize}_{searchFilter?.GetHashCode()}_{categoryFilter?.GetHashCode()}";
-
-            if (forceRefresh)
-            {
-                _cache.Clear(cacheKey);
-            }
-
-            return await _cache.GetOrAddAsync(cacheKey,
-                async () => await GetApplicationsPagedFromGraphAsync(pageNumber, pageSize, searchFilter, categoryFilter),
-                TimeSpan.FromMinutes(5)); // Shorter cache time for paged results
-        }
-
-        private async Task<PagedResult<IntuneApplication>> GetApplicationsPagedFromGraphAsync(
-            int pageNumber, int pageSize, string? searchFilter, string? categoryFilter)
-        {
-            try
-            {
-                Debug.WriteLine($"=== PAGED GRAPH API CALL - Page {pageNumber} ===");
-
-                var token = await GetAccessTokenAsync();
-
-                // Build the request URL with pagination
-                var skip = (pageNumber - 1) * pageSize;
-                var filterParts = new List<string> { "isof('microsoft.graph.win32LobApp')" };
-
-                // Add search filter if provided
-                if (!string.IsNullOrEmpty(searchFilter))
-                {
-                    var encodedSearch = Uri.EscapeDataString(searchFilter);
-                    filterParts.Add($"(contains(displayName,'{encodedSearch}') or contains(publisher,'{encodedSearch}'))");
-                }
-
-                // Add category filter if provided
-                if (!string.IsNullOrEmpty(categoryFilter) && categoryFilter != "All Categories")
-                {
-                    var encodedCategory = Uri.EscapeDataString(categoryFilter);
-                    filterParts.Add($"categories/any(c:c/displayName eq '{encodedCategory}')");
-                }
-
-                var requestUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
-                                $"?$filter={string.Join(" and ", filterParts)}" +
-                                $"&$expand=categories" +
-                                $"&$top={pageSize}" +
-                                $"&$skip={skip}";
-
-                Debug.WriteLine($"Paged request URL: {requestUrl}");
-
-                var response = await _sharedHttpClient.GetAsync(requestUrl);
-                var responseText = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    // Fallback without expand if it fails
-                    requestUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
-                                $"?$filter={string.Join(" and ", filterParts)}" +
-                                $"&$top={pageSize}" +
-                                $"&$skip={skip}";
-
-                    response = await _sharedHttpClient.GetAsync(requestUrl);
-                    responseText = await response.Content.ReadAsStringAsync();
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        Debug.WriteLine($"Graph API error: {responseText}");
-                        throw new Exception($"Graph API request failed: {response.StatusCode}");
-                    }
-                }
-
-                var graphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(responseText,
-                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-
-                var result = new PagedResult<IntuneApplication>
-                {
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    Items = new List<IntuneApplication>()
-                };
-
-                if (graphResponse?.Value != null)
-                {
-                    foreach (var app in graphResponse.Value)
-                    {
-                        result.Items.Add(ParseIntuneApplication(app));
-                    }
-                }
-
-                // Get total count
-                result.TotalCount = await GetTotalApplicationCountAsync(searchFilter, categoryFilter);
-
-                Debug.WriteLine($"✓ Loaded page {pageNumber}: {result.Items.Count} apps of {result.TotalCount} total");
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error in paged Graph API call: {ex.Message}");
-                throw;
-            }
-        }
-
-        // Helper method to get total count
-        private async Task<int> GetTotalApplicationCountAsync(string? searchFilter, string? categoryFilter)
-        {
-            try
-            {
-                var filterParts = new List<string> { "isof('microsoft.graph.win32LobApp')" };
-
-                // Add same filters as main query
-                if (!string.IsNullOrEmpty(searchFilter))
-                {
-                    var encodedSearch = Uri.EscapeDataString(searchFilter);
-                    filterParts.Add($"(contains(displayName,'{encodedSearch}') or contains(publisher,'{encodedSearch}'))");
-                }
-
-                if (!string.IsNullOrEmpty(categoryFilter) && categoryFilter != "All Categories")
-                {
-                    var encodedCategory = Uri.EscapeDataString(categoryFilter);
-                    filterParts.Add($"categories/any(c:c/displayName eq '{encodedCategory}')");
-                }
-
-                var countUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps" +
-                              $"?$filter={string.Join(" and ", filterParts)}" +
-                              "&$select=id"; // Minimal selection for counting
-
-                var response = await _sharedHttpClient.GetAsync(countUrl);
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseText = await response.Content.ReadAsStringAsync();
-                    var graphResponse = JsonSerializer.Deserialize<GraphResponse<JsonElement>>(responseText,
-                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-
-                    return graphResponse?.Value?.Count ?? 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error getting total count: {ex.Message}");
-            }
-
-            return 0; // Fallback
-        }
-
         // Extract app parsing logic into a separate method
         private IntuneApplication ParseIntuneApplication(JsonElement app)
         {
@@ -722,11 +450,6 @@ namespace IntunePackagingTool.Services
             _cache.ClearPattern("apps_paged");
         }
 
-       
-       
-
-        
-        
 
         private static long GetSafeLong(JsonElement element, string propertyName)
         {
@@ -1114,8 +837,6 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"Created {intent} assignment for group {groupId}");
             }
         }
-
-
 
 
         private async Task<List<AssignedGroup>> GetAssignedGroupsAsync(string appId)

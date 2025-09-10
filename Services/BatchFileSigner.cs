@@ -188,7 +188,7 @@ namespace IntunePackagingTool.Services
         {
             try
             {
-                var cert = X509Certificate.CreateFromSignedFile(filePath);
+                var cert = X509CertificateLoader.LoadCertificateFromFile(filePath);
                 return cert != null;
             }
             catch
