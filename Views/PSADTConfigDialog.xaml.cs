@@ -135,6 +135,10 @@ namespace IntunePackagingTool.Views
                 SuppressRestart = SuppressRestartCheck.IsChecked ?? false,
                 AllUsersInstall = AllUsersInstallCheck.IsChecked ?? false,
                 VerboseLogging = VerboseLoggingCheck.IsChecked ?? false,
+                UserInstall = UserInstallCheck?.IsChecked ?? false,
+                WaitForProcessCompletion = WaitForProcessCompletionCheck.IsChecked ?? false,
+                ImportRegFile = ImportRegFileCheck.IsChecked ?? false,
+                UninstallPreviousByCode = UninstallPreviousByCodeCheck.IsChecked ?? false,
 
                 // User Interaction
                 CloseRunningApps = CloseRunningAppsCheck.IsChecked ?? false,
@@ -153,12 +157,19 @@ namespace IntunePackagingTool.Views
                 SetHKCUAllUsers = SetHKCUAllUsersCheck.IsChecked ?? false,
                 SetCustomRegistry = SetCustomRegistryCheck.IsChecked ?? false,
                 CopyConfigFiles = CopyConfigFilesCheck.IsChecked ?? false,
+                RemoveSpecificFiles = RemoveSpecificFilesCheck.IsChecked ?? false, 
+                RemoveEmptyFolders = RemoveEmptyFoldersCheck.IsChecked ?? false,
+                ModifyFilePermissions = ModifyFilePermissionsCheck.IsChecked ?? false,
 
                 // Shortcuts & Cleanup
                 DesktopShortcut = DesktopShortcutCheck.IsChecked ?? false,
                 StartMenuEntry = StartMenuEntryCheck.IsChecked ?? false,
                 RemovePreviousVersions = RemovePreviousVersionsCheck.IsChecked ?? false,
-                CreateInstallMarker = CreateInstallMarkerCheck.IsChecked ?? false
+                CreateInstallMarker = CreateInstallMarkerCheck.IsChecked ?? false,
+                AddToPath = AddToPathCheck.IsChecked ?? false,
+                UnregisterDLLs = UnregisterDLLsCheck.IsChecked ?? false,
+                ImportDrivers = ImportDriversCheck.IsChecked ?? false,
+             
             };
 
             DialogResult = true;

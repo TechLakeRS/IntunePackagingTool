@@ -70,6 +70,9 @@
                             <StackPanel>
                                 <TextBlock Text="BASIC OPTIONS" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,12"/>
                                 <UniformGrid Columns="2">
+                                    <CheckBox Name="UserInstallCheck" Content="User Install (No Admin)" Margin="0,0,0,8"
+                                    ToolTip="Install without admin rights - Sets RequireAdmin to False"
+                                    Foreground="#E67E22" FontWeight="SemiBold"/>
                                     <CheckBox Name="SilentInstallCheck" 
                                              Content="Silent Installation" 
                                              Margin="0,0,0,8"

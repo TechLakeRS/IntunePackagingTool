@@ -213,12 +213,12 @@
 
                                         <!-- PSADT Configuration Section -->
                                         <Border Grid.Row="2" Grid.ColumnSpan="2" 
-                    Name="PSADTConfigSection"
-                    Background="#F8F9FA" 
-                    CornerRadius="8" 
-                    Padding="20" 
-                    Margin="0,16,0,0"
-                    Visibility="Collapsed">
+                                Name="PSADTConfigSection"
+                                Background="#F8F9FA" 
+                                CornerRadius="8" 
+                                Padding="20" 
+                                Margin="0,16,0,0"
+                                Visibility="Collapsed">
                                             <Grid>
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto"/>
@@ -242,11 +242,11 @@
 
                                                 <!-- PSADT Configuration Button/Status -->
                                                 <Border Grid.Row="1" 
-                            Background="White" 
-                            BorderBrush="#3498DB" 
-                            BorderThickness="1" 
-                            CornerRadius="6" 
-                            Padding="16">
+                                                        Background="White" 
+                                                        BorderBrush="#3498DB" 
+                                                        BorderThickness="1" 
+                                                        CornerRadius="6" 
+                                                        Padding="16">
                                                     <Grid>
                                                         <StackPanel Orientation="Horizontal">
                                                             <Border Background="#E3F2FD" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
@@ -255,27 +255,27 @@
                                                             <StackPanel VerticalAlignment="Center">
                                                                 <TextBlock Text="PSADT Configuration" FontSize="14" FontWeight="SemiBold"/>
                                                                 <TextBlock Name="PSADTStatusText" 
-                                               Text="Not configured - Click to select deployment options" 
-                                               FontSize="11" 
-                                               Foreground="#6C757D"/>
+                                                                   Text="Not configured - Click to select deployment options" 
+                                                                   FontSize="11" 
+                                                                   Foreground="#6C757D"/>
                                                             </StackPanel>
                                                         </StackPanel>
 
                                                         <Button Name="ConfigurePSADTButton" 
-                                    HorizontalAlignment="Right"
-                                    Content="Configure Options"
-                                    Style="{StaticResource ModernButton}"
-                                    Background="#3498DB"
-                                    Padding="16,8"
-                                    Click="ConfigurePSADT_Click"/>
+                                                HorizontalAlignment="Right"
+                                                Content="Configure Options"
+                                                Style="{StaticResource ModernButton}"
+                                                Background="#3498DB"
+                                                Padding="16,8"
+                                                Click="ConfigurePSADT_Click"/>
                                                     </Grid>
                                                 </Border>
 
                                                 <!-- Configuration Summary -->
                                                 <Grid Grid.Row="2" 
-                          Name="PSADTSummaryPanel" 
-                          Visibility="Collapsed" 
-                          Margin="0,16,0,0">
+                                                  Name="PSADTSummaryPanel" 
+                                                  Visibility="Collapsed" 
+                                                  Margin="0,16,0,0">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="*"/>

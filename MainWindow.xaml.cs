@@ -72,6 +72,11 @@ namespace IntunePackagingTool
                 if (DetectedPackageTypeText.Text == "EXE Installer") return "EXE";
                 return "Unknown";
             }
+            private set
+            {
+                // Store the value if needed
+                _detectedPackageType = value;
+            }
         }
 
         #endregion
@@ -556,13 +561,17 @@ namespace IntunePackagingTool
                 if (!ValidatePackageInputs()) return;
 
                 var appInfo = CreateApplicationInfo();
-                
+                var psadtOptions = CollectPSADTOptions();
+
+                // Store the options for later use
+                _currentPSADTOptions = psadtOptions;
 
                 var generator = new PSADTGenerator();
-                string packagePath = await generator.CreatePackageAsync(appInfo);
+                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
                 _currentPackagePath = packagePath;
 
-               
+                
+                ShowPackageSuccess(appInfo, psadtOptions);
             }
             catch (Exception ex)
             {
@@ -713,11 +722,13 @@ namespace IntunePackagingTool
             {
                 DetectedPackageTypeIcon.Text = "📦";
                 DetectedPackageTypeText.Text = "MSI Package";
+                
             }
             else if (extension == ".exe")
             {
                 DetectedPackageTypeIcon.Text = "⚙️";
                 DetectedPackageTypeText.Text = "EXE Installer";
+
             }
             else
             {
@@ -885,34 +896,7 @@ namespace IntunePackagingTool
             return true;
         }
 
-        private bool ValidateInput()
-        {
-            if (string.IsNullOrWhiteSpace(ManufacturerTextBox.Text))
-            {
-                MessageBox.Show("Please enter a manufacturer name.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                ManufacturerTextBox.Focus();
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(AppNameTextBox.Text))
-            {
-                MessageBox.Show("Please enter an application name.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                AppNameTextBox.Focus();
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(VersionTextBox.Text))
-            {
-                MessageBox.Show("Please enter a version number.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                VersionTextBox.Focus();
-                return false;
-            }
-
-            return true;
-        }
+    
 
         private ApplicationInfo CreateApplicationInfo()
         {
@@ -926,10 +910,6 @@ namespace IntunePackagingTool
             };
         }
 
-       
-
-        
-
         private void ShowPackageSuccess(ApplicationInfo appInfo, PSADTOptions? psadtOptions)
         {
             PackageStatusPanel.Visibility = Visibility.Visible;
@@ -940,22 +920,8 @@ namespace IntunePackagingTool
             PackagePathText.Text = _currentPackagePath;
             OpenPackageFolderButton.Visibility = Visibility.Visible;
 
-            // Enable the Generate WDAC Catalog button now that we have a package
-
-
             int enabledFeatures = _currentPSADTOptions != null ? CountEnabledFeatures(_currentPSADTOptions) : 0;
             string featuresText = enabledFeatures > 0 ? $" with {enabledFeatures} PSADT cheatsheet functions" : "";
-
-            MessageBox.Show($"Package '{appInfo.Manufacturer}_{appInfo.Name}' v{appInfo.Version} created successfully!\n\n" +
-                           $"📦 Package Type: {DetectedPackageType}\n" +
-                           $"⚙️ PSADT Features: {enabledFeatures} enabled\n" +
-                           $"📁 Location: {_currentPackagePath}\n\n" +
-                           $"The Deploy-Application.ps1 script has been generated{featuresText}.\n\n" +
-                           $"You can now generate a WDAC security catalog for this package.",
-                           "Package Generation Complete",
-                           MessageBoxButton.OK,
-                           MessageBoxImage.Information);
-
             StatusText.Text = $"Package created successfully{featuresText} • {DateTime.Now:HH:mm:ss}";
         }
 
