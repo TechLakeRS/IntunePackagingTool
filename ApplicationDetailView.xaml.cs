@@ -247,7 +247,7 @@ namespace IntunePackagingTool
                 PathHelpText.Text = "⚠️ Please browse for Deploy-Application.exe to enable package updates";
             }
         }
-        // URL click handlers
+        
         private void PrivacyUrl_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(_currentApp?.PrivacyInformationUrl))
@@ -276,19 +276,21 @@ namespace IntunePackagingTool
                 return;
             }
 
+            // Capture the reference
+            var currentApp = _currentApp;
             string packagePath = "";
 
             // Try to use the network share path first
-            if (!string.IsNullOrEmpty(_currentApp.NetworkSharePath) &&
-                ValidatePackageForUpdate(_currentApp.NetworkSharePath))
+            if (!string.IsNullOrEmpty(currentApp.NetworkSharePath) &&
+                ValidatePackageForUpdate(currentApp.NetworkSharePath))
             {
-                packagePath = _currentApp.NetworkSharePath;
+                packagePath = currentApp.NetworkSharePath;
             }
             else
             {
                 // Network share not found or invalid, offer manual selection
                 var result = MessageBox.Show(
-                    $"Network share path for '{_currentApp.DisplayName}' was not found or is invalid.\n\n" +
+                    $"Network share path for '{currentApp.DisplayName}' was not found or is invalid.\n\n" +
                     $"Would you like to manually browse for the Deploy-Application.exe file?",
                     "Network Path Not Found",
                     MessageBoxButton.YesNo,
@@ -305,7 +307,6 @@ namespace IntunePackagingTool
             await PerformPackageUpdate(packagePath);
         }
 
-        // MANUAL BROWSE METHOD - Allows user to select Deploy-Application.exe manually
         private string BrowseForDeployApplicationFile()
         {
             try
@@ -320,7 +321,7 @@ namespace IntunePackagingTool
                 };
 
                 // Try to set initial directory to a reasonable location
-                if (!string.IsNullOrEmpty(_currentApp?.NetworkSharePath))
+                if (_currentApp != null && !string.IsNullOrEmpty(_currentApp.NetworkSharePath))
                 {
                     try
                     {
@@ -372,7 +373,10 @@ namespace IntunePackagingTool
                         return "";
 
                     // Update the current app's network share path for future use
-                    _currentApp.NetworkSharePath = packageRoot;
+                    if (_currentApp != null)
+                    {
+                        _currentApp.NetworkSharePath = packageRoot;
+                    }
                     StatusText.Text = $"Using manually selected package: {packageRoot}";
 
                     return packageRoot;
@@ -388,7 +392,6 @@ namespace IntunePackagingTool
             }
         }
 
-        // VALIDATION METHOD - For manually selected packages
         private bool ValidateManuallySelectedPackage(string packageRoot)
         {
             try
@@ -432,7 +435,7 @@ namespace IntunePackagingTool
             }
         }
 
-        // VALIDATION METHOD - For automatic network path validation (silent)
+       
         private bool ValidatePackageForUpdate(string networkSharePath)
         {
             try
@@ -465,9 +468,20 @@ namespace IntunePackagingTool
             }
         }
 
-      
+
         private async Task PerformPackageUpdate(string packagePath)
         {
+            // Early null check and capture the reference
+            if (_currentApp == null)
+            {
+                MessageBox.Show("No application selected.", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Capture the current app in a local non-nullable variable
+            var currentApp = _currentApp;
+
             try
             {
                 // Disable the button and show progress
@@ -480,7 +494,8 @@ namespace IntunePackagingTool
                 var deployAppPath = Path.Combine(packagePath, "Application", "Deploy-Application.exe");
                 var fileInfo = new FileInfo(deployAppPath);
 
-                var confirmMessage = $"Update '{_currentApp.DisplayName}' with package from:\n\n" +
+                // Now use currentApp instead of _currentApp
+                var confirmMessage = $"Update '{currentApp.DisplayName}' with package from:\n\n" +
                                    $"📁 {packagePath}\n" +
                                    $"📄 Deploy-Application.exe ({fileInfo.Length:N0} bytes)\n" +
                                    $"📅 Modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}\n\n" +
@@ -501,8 +516,9 @@ namespace IntunePackagingTool
                 var intuneService = new IntunePackagingTool.Services.IntuneService();
                 using var uploadService = new IntunePackagingTool.Services.IntuneUploadService(intuneService);
 
+                // Use currentApp.Id instead of _currentApp.Id
                 var success = await uploadService.UpdateExistingApplicationAsync(
-                    _currentApp.Id,
+                    currentApp.Id,
                     packagePath,
                     progressTracker
                 );
@@ -510,10 +526,10 @@ namespace IntunePackagingTool
                 if (success)
                 {
                     // ✅ ADD: Invalidate caches after successful update
-                    intuneService.InvalidateApplicationCache(_currentApp.Id);
+                    intuneService.InvalidateApplicationCache(currentApp.Id);
 
                     StatusText.Text = $"Package updated successfully • {DateTime.Now:HH:mm:ss}";
-                    MessageBox.Show($"✅ Package for '{_currentApp.DisplayName}' updated successfully!\n\n" +
+                    MessageBox.Show($"✅ Package for '{currentApp.DisplayName}' updated successfully!\n\n" +
                                   $"📦 New .intunewin file uploaded to Intune\n" +
                                   $"📁 Source: {packagePath}",
                                   "Update Complete",
@@ -540,7 +556,7 @@ namespace IntunePackagingTool
             }
         }
 
-        // BROWSE BUTTON HANDLER - For manual package folder selection
+
         private void BrowsePackageFolderButton_Click(object sender, RoutedEventArgs e)
         {
             StatusText.Text = "Browsing for Deploy-Application.exe...";

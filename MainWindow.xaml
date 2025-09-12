@@ -203,160 +203,121 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <TextBox Name="SourcesPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,8,0"/>
+                                                <TextBox Name="SourcesPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" 
+                             Margin="0,0,8,0" TextChanged="SourcesPath_TextChanged"/>
                                                 <Button Name="BrowseSourcesButton" Grid.Column="1" Content="📁 Browse..." 
-                                                Click="BrowseSourcesButton_Click" Style="{StaticResource SecondaryButton}" 
-                                                VerticalAlignment="Stretch" MinWidth="100"/>
+                            Click="BrowseSourcesButton_Click" Style="{StaticResource SecondaryButton}" 
+                            VerticalAlignment="Stretch" MinWidth="100"/>
                                             </Grid>
                                         </StackPanel>
 
-                                        <!-- Advanced Options Expander -->
-                                        <Expander Grid.Row="2" Grid.ColumnSpan="2" Name="AdvancedOptionsExpander" 
-                                           Header="Advanced Options" IsExpanded="False" Margin="0,16,0,0"
-                                           Background="Transparent" BorderThickness="0">
-                                            <Expander.HeaderTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Border Background="#F8F9FA" Width="24" Height="24" CornerRadius="6" Margin="0,0,8,0">
-                                                            <TextBlock Text="⚙️" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <!-- PSADT Configuration Section -->
+                                        <Border Grid.Row="2" Grid.ColumnSpan="2" 
+                    Name="PSADTConfigSection"
+                    Background="#F8F9FA" 
+                    CornerRadius="8" 
+                    Padding="20" 
+                    Margin="0,16,0,0"
+                    Visibility="Collapsed">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Package Detection -->
+                                                <Grid Grid.Row="0" Margin="0,0,0,20">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Detected Package Type" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
+                                                        <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Name="DetectedPackageTypeIcon" Text="❓" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                                <TextBlock Name="DetectedPackageTypeText" Text="Select source file to detect type" 
+                                               FontSize="14" Foreground="#6C757D" VerticalAlignment="Center" FontWeight="Medium"/>
+                                                            </StackPanel>
                                                         </Border>
-                                                        <TextBlock Text="{Binding}" FontSize="14" FontWeight="Medium" Foreground="#495057" VerticalAlignment="Center"/>
                                                     </StackPanel>
-                                                </DataTemplate>
-                                            </Expander.HeaderTemplate>
+                                                </Grid>
 
-                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,8,0,0">
-                                                <StackPanel>
-                                                    <!-- Package Type Detection -->
-                                                    <Grid Margin="0,0,0,20">
-                                                        <StackPanel>
-                                                            <TextBlock Text="Detected Package Type" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
-                                                            <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12">
-                                                                <StackPanel Orientation="Horizontal">
-                                                                    <TextBlock Name="DetectedPackageTypeIcon" Text="❓" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                                    <TextBlock Name="DetectedPackageTypeText" Text="Select source file to detect type" 
-                                                         FontSize="14" Foreground="#6C757D" VerticalAlignment="Center" FontWeight="Medium"/>
-                                                                </StackPanel>
+                                                <!-- PSADT Configuration Button/Status -->
+                                                <Border Grid.Row="1" 
+                            Background="White" 
+                            BorderBrush="#3498DB" 
+                            BorderThickness="1" 
+                            CornerRadius="6" 
+                            Padding="16">
+                                                    <Grid>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Border Background="#E3F2FD" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                                                <TextBlock Text="⚙️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                             </Border>
+                                                            <StackPanel VerticalAlignment="Center">
+                                                                <TextBlock Text="PSADT Configuration" FontSize="14" FontWeight="SemiBold"/>
+                                                                <TextBlock Name="PSADTStatusText" 
+                                               Text="Not configured - Click to select deployment options" 
+                                               FontSize="11" 
+                                               Foreground="#6C757D"/>
+                                                            </StackPanel>
                                                         </StackPanel>
+
+                                                        <Button Name="ConfigurePSADTButton" 
+                                    HorizontalAlignment="Right"
+                                    Content="Configure Options"
+                                    Style="{StaticResource ModernButton}"
+                                    Background="#3498DB"
+                                    Padding="16,8"
+                                    Click="ConfigurePSADT_Click"/>
                                                     </Grid>
+                                                </Border>
 
-                                                    <!-- PSADT Installation Options -->
-                                                    <StackPanel Name="PSADTOptionsPanel" Visibility="Collapsed">
+                                                <!-- Configuration Summary -->
+                                                <Grid Grid.Row="2" 
+                          Name="PSADTSummaryPanel" 
+                          Visibility="Collapsed" 
+                          Margin="0,16,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
 
-                                                        <!-- Installation Options -->
-                                                        <StackPanel Margin="0,0,0,20">
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                                                <Border Background="#3498DB" Width="20" Height="20" CornerRadius="4" Margin="0,0,8,0">
-                                                                    <TextBlock Text="🔧" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <TextBlock Text="Installation Options" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-
-                                                            <UniformGrid Columns="2" Margin="16,0,0,0">
-                                                                <CheckBox Name="SilentInstallCheck" Content="Silent Installation"  Margin="0,0,0,8" 
-                                                      ToolTip="Run without user interaction (/quiet)"/>
-                                                                <CheckBox Name="SuppressRestartCheck" Content="Suppress Restart"  Margin="0,0,0,8"
-                                                      ToolTip="Prevent automatic system restart (/norestart)"/>
-                                                                <CheckBox Name="AllUsersInstallCheck" Content="Install for All Users"  Margin="0,0,0,8"
-                                                      ToolTip="System-wide installation (ALLUSERS=1)"/>
-                                                                <CheckBox Name="VerboseLoggingCheck" Content="Verbose Logging" Margin="0,0,0,8"
-                                                      ToolTip="Detailed installation logs"/>
-                                                            </UniformGrid>
+                                                    <Border Grid.Column="0" Background="White" BorderBrush="#E9ECEF" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,8,0">
+                                                        <StackPanel>
+                                                            <TextBlock Name="SelectedOptionsCount" Text="0" 
+                                           FontSize="20" FontWeight="Bold" 
+                                           Foreground="#3498DB" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="Options" FontSize="10" Foreground="#95A5A6" HorizontalAlignment="Center"/>
                                                         </StackPanel>
+                                                    </Border>
 
-                                                        <!-- User Interaction -->
-                                                        <StackPanel Margin="0,0,0,20">
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                                                <Border Background="#E74C3C" Width="20" Height="20" CornerRadius="4" Margin="0,0,8,0">
-                                                                    <TextBlock Text="👥" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <TextBlock Text="User Interaction" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-
-                                                            <UniformGrid Columns="2" Margin="16,0,0,0">
-                                                                <CheckBox Name="CloseRunningAppsCheck" Content="Close Running Applications"  Margin="0,0,0,8"
-                                                                    ToolTip="Show-InstallationWelcome -CloseApps"/>
-                                                                <CheckBox Name="AllowUserDeferralsCheck" Content="Allow User Deferrals" Margin="0,0,0,8"
-                                                                    ToolTip="Allow users to postpone installation"/>
-                                                                <CheckBox Name="CheckDiskSpaceCheck" Content="Check Disk Space"  Margin="0,0,0,8"
-                                                                    ToolTip="Validate sufficient disk space"/>
-                                                                <CheckBox Name="ShowProgressCheck" Content="Show Installation Progress" Margin="0,0,0,8"
-                                                                    ToolTip="Display progress dialog"/>
-                                                            </UniformGrid>
+                                                    <Border Grid.Column="1" Background="White" BorderBrush="#E9ECEF" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,8,0">
+                                                        <StackPanel>
+                                                            <TextBlock Name="EstimatedScriptSize" Text="0KB" 
+                                           FontSize="20" FontWeight="Bold" 
+                                           Foreground="#27AE60" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="Script Size" FontSize="10" Foreground="#95A5A6" HorizontalAlignment="Center"/>
                                                         </StackPanel>
+                                                    </Border>
 
-                                                        <!-- Prerequisites -->
-                                                        <StackPanel Margin="0,0,0,20">
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                                                <Border Background="#F39C12" Width="20" Height="20" CornerRadius="4" Margin="0,0,8,0">
-                                                                    <TextBlock Text="🔍" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <TextBlock Text="Prerequisites" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-
-                                                            <UniformGrid Columns="2" Margin="16,0,0,0">
-                                                                <CheckBox Name="CheckDotNetCheck" Content="Check .NET Framework"  Margin="0,0,0,8"
-                                                                ToolTip="Auto-install .NET if version lower than 4.5.2"/>
-                                                                <CheckBox Name="ImportCertificatesCheck" Content="Import Certificates" Margin="0,0,0,8"
-                                                                ToolTip="Add certs to Trusted Publishers store"/>
-                                                                <CheckBox Name="CheckVCRedistCheck" Content="Check VC++ Redistributables" Margin="0,0,0,8"
-                                                                ToolTip="Validate VC++ runtime dependencies"/>
-                                                                <CheckBox Name="RegisterDLLsCheck" Content="Register DLL Modules" Margin="0,0,0,8"
-                                                                ToolTip="Register COM components (Register-DLL)"/>
-                                                            </UniformGrid>
+                                                    <Border Grid.Column="2" Background="White" BorderBrush="#E9ECEF" BorderThickness="1" CornerRadius="6" Padding="12">
+                                                        <StackPanel>
+                                                            <TextBlock Name="InjectionCount" Text="0" 
+                                           FontSize="20" FontWeight="Bold" 
+                                           Foreground="#9B59B6" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="Injections" FontSize="10" Foreground="#95A5A6" HorizontalAlignment="Center"/>
                                                         </StackPanel>
-
-                                                        <!-- File & Registry Operations -->
-                                                        <StackPanel Margin="0,0,0,20">
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                                                <Border Background="#9B59B6" Width="20" Height="20" CornerRadius="4" Margin="0,0,8,0">
-                                                                    <TextBlock Text="📁" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <TextBlock Text="File and Registry Operations" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-
-                                                            <UniformGrid Columns="2" Margin="16,0,0,0">
-                                                                <CheckBox Name="CopyToAllUsersCheck" Content="Copy Files to All User Profiles" Margin="0,0,0,8"
-                                                                ToolTip="Get-UserProfiles | ForEach Profile"/>
-                                                                <CheckBox Name="SetHKCUAllUsersCheck" Content="Set HKCU Registry for All Users" Margin="0,0,0,8"
-                                                                 ToolTip="Invoke-HKCURegistrySettingsForAllUsers"/>
-                                                                <CheckBox Name="SetCustomRegistryCheck" Content="Set Custom Registry Keys" Margin="0,0,0,8"
-                                                                ToolTip="Set-RegistryKey for custom settings"/>
-                                                                <CheckBox Name="CopyConfigFilesCheck" Content="Copy Configuration Files" Margin="0,0,0,8"
-                                                                ToolTip="Copy-File for custom configs"/>
-                                                            </UniformGrid>
-                                                        </StackPanel>
-
-                                                        <!-- Shortcuts & Cleanup -->
-                                                        <StackPanel Margin="0,0,0,0">
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                                                <Border Background="#27AE60" Width="20" Height="20" CornerRadius="4" Margin="0,0,8,0">
-                                                                    <TextBlock Text="🔗" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <TextBlock Text="Shortcuts and Cleanup" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-
-                                                            <UniformGrid Columns="2" Margin="16,0,0,0">
-                                                                <CheckBox Name="DesktopShortcutCheck" Content="Desktop Shortcut" Margin="0,0,0,8"
-                                                                 ToolTip="New-Shortcut on $envCommonDesktop"/>
-                                                                <CheckBox Name="StartMenuEntryCheck" Content="Start Menu Entry"  Margin="0,0,0,8"
-                                                                ToolTip="New-Shortcut in $envCommonStartMenuPrograms"/>
-                                                                <CheckBox Name="RemovePreviousVersionsCheck" Content="Remove Previous Versions" Margin="0,0,0,8"
-                                                                 ToolTip="Remove-MSIApplications for old versions"/>
-                                                                <CheckBox Name="CreateInstallMarkerCheck" Content="Create Install Marker" Margin="0,0,0,8"
-                                                                ToolTip="Registry marker for detection"/>
-                                                            </UniformGrid>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Border>
-                                        </Expander>
+                                                    </Border>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
                                     </Grid>
+                                    <!-- Close the main Grid -->
                                 </StackPanel>
                             </Border>
+                            <!-- Close Application Information Border -->
 
-                            <!-- Package Status -->
+                            <!-- Package Status - SEPARATE BORDER -->
                             <Border Name="PackageStatusPanel" Style="{StaticResource ModernCard}" Visibility="Collapsed">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
@@ -369,8 +330,8 @@
                                     <TextBlock Name="PackageStatusText" Text="Package not created yet" FontSize="14" Margin="0,0,0,8"/>
                                     <TextBlock Name="PackagePathText" Text="" FontSize="12" Foreground="#666666" Margin="0,0,0,16"/>
                                     <Button Name="OpenPackageFolderButton" Content="📂 Open Package Folder" 
-                                    Style="{StaticResource SecondaryButton}" Click="OpenPackageFolderButton_Click"
-                                    Visibility="Collapsed" HorizontalAlignment="Left"/>
+                Style="{StaticResource SecondaryButton}" Click="OpenPackageFolderButton_Click"
+                Visibility="Collapsed" HorizontalAlignment="Left"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -429,36 +390,6 @@
                                                 Content="🖥️ Remote Test" 
                                                 Click="btnRemoteTest_Click"
                                                 Style="{StaticResource ModernButton}"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- NEW Step 4: Generate WDAC Catalog -->
-                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                            <Border Background="#16A085" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
-                                                <TextBlock Text="4" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                            <TextBlock Text="Generate WDAC Catalog" FontWeight="Medium" VerticalAlignment="Center"/>
-                                        </StackPanel>
-
-                                        <Button Name="GenerateCatalogButton" 
-                                                Content="🔒 Generate Security Catalog" 
-                                                Click="GenerateCatalogButton_Click"
-                                                Style="{StaticResource ModernButton}"
-                                                IsEnabled="False"
-                                                ToolTip="Generate WDAC catalog via VM installation monitoring"/>
-
-                                                    <TextBlock Text="Creates security catalog for WDAC (5-10 min)" 
-                                                   FontSize="11" Foreground="#666666" 
-                                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
-
-                                        <!-- Status indicator -->
-                                        <StackPanel Name="CatalogStatusPanel" Visibility="Collapsed" Margin="0,8,0,0">
-                                            <ProgressBar Name="CatalogProgressBar" Height="4" IsIndeterminate="True"/>
-                                            <TextBlock Name="CatalogStatusText" FontSize="10" 
-                               Foreground="#16A085" Margin="0,4,0,0"/>
-                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 

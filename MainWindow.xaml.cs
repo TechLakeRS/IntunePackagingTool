@@ -1,5 +1,6 @@
 ﻿using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
+using IntunePackagingTool.Views;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -48,6 +49,8 @@ namespace IntunePackagingTool
         private string _currentPackagePath = "";
         private string _generatedCatalogPath = "";
         private bool _catalogGenerated = false;
+        private PSADTOptions? _currentPSADTOptions = null;
+        private string _detectedPackageType = "";
 
         #endregion
 
@@ -553,13 +556,13 @@ namespace IntunePackagingTool
                 if (!ValidatePackageInputs()) return;
 
                 var appInfo = CreateApplicationInfo();
-                var psadtOptions = CollectPSADTOptions();
+                
 
                 var generator = new PSADTGenerator();
-                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
+                string packagePath = await generator.CreatePackageAsync(appInfo);
                 _currentPackagePath = packagePath;
 
-                ShowPackageSuccess(appInfo, psadtOptions);
+               
             }
             catch (Exception ex)
             {
@@ -605,42 +608,125 @@ namespace IntunePackagingTool
             }
         }
 
+        private PSADTOptions CollectPSADTOptions()
+        {
+            // If options were configured via dialog, return those
+            if (_currentPSADTOptions != null)
+                return _currentPSADTOptions;
+
+            // Otherwise return default empty options
+            return new PSADTOptions
+            {
+                PackageType = DetectedPackageType
+            };
+        }
+
+        private void SourcesPath_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(SourcesPathTextBox.Text) && File.Exists(SourcesPathTextBox.Text))
+            {
+                PSADTConfigSection.Visibility = Visibility.Visible;
+
+                var extension = Path.GetExtension(SourcesPathTextBox.Text).ToLower();
+                DetectedPackageTypeIcon.Text = extension switch
+                {
+                    ".msi" => "📦",
+                    ".exe" => "⚙️",
+                    _ => "❓"
+                };
+
+                DetectedPackageTypeText.Text = extension switch
+                {
+                    ".msi" => "MSI Package",
+                    ".exe" => "EXE Installer",
+                    _ => "Unknown Package Type"
+                };
+            }
+        }
+
+
+        private void ConfigurePSADT_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new PSADTConfigDialog();
+            dialog.Owner = this;
+
+            // Pass package info
+            dialog.SetPackageInfo(
+                ManufacturerTextBox.Text,
+                AppNameTextBox.Text,
+                VersionTextBox.Text,
+                _detectedPackageType);
+
+            // Load existing options if any
+            if (_currentPSADTOptions != null)
+                dialog.LoadOptions(_currentPSADTOptions);
+
+            if (dialog.ShowDialog() == true)
+            {
+                _currentPSADTOptions = dialog.SelectedOptions;
+                UpdatePSADTSummary();
+            }
+        }
+        private void UpdatePSADTSummary()
+        {
+            if (_currentPSADTOptions == null)
+            {
+                PSADTStatusText.Text = "Not configured - Click to select deployment options";
+                PSADTSummaryPanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // Count selected options
+            int count = 0;
+            var properties = typeof(PSADTOptions).GetProperties();
+            foreach (var prop in properties)
+            {
+                if (prop.PropertyType == typeof(bool) && (bool)prop.GetValue(_currentPSADTOptions))
+                    count++;
+            }
+
+            // Update UI
+            PSADTStatusText.Text = $"Configured - {count} options selected";
+            PSADTStatusText.Foreground = new SolidColorBrush(Color.FromRgb(39, 174, 96));
+
+            SelectedOptionsCount.Text = count.ToString();
+            EstimatedScriptSize.Text = $"~{8 + (count * 2)}KB";
+            InjectionCount.Text = Math.Ceiling(count / 2.0).ToString();
+
+            PSADTSummaryPanel.Visibility = Visibility.Visible;
+            ConfigurePSADTButton.Content = "Modify Options";
+        }
+
         #endregion
 
         #region WDAC CAT
-        
+
         #endregion
 
         #region Package Creation Helper Methods
 
-        private void DetectPackageType(string fileExtension, string fileName)
+        private void DetectPackageType(string extension, string fileName)
         {
-            switch (fileExtension)
+            PSADTConfigSection.Visibility = Visibility.Visible;  // Changed from PSADTOptionsPanel
+
+            if (extension == ".msi")
             {
-                case ".msi":
-                    DetectedPackageTypeIcon.Text = "📦";
-                    DetectedPackageTypeText.Text = "MSI Package";
-                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(39, 174, 96));
-                    PSADTOptionsPanel.Visibility = Visibility.Visible;
-                    AdvancedOptionsExpander.IsExpanded = true;
-                    break;
-
-                case ".exe":
-                    DetectedPackageTypeIcon.Text = "⚙️";
-                    DetectedPackageTypeText.Text = "EXE Installer";
-                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(52, 152, 219));
-                    PSADTOptionsPanel.Visibility = Visibility.Visible;
-                    AdvancedOptionsExpander.IsExpanded = true;
-                    break;
-
-                default:
-                    DetectedPackageTypeIcon.Text = "❓";
-                    DetectedPackageTypeText.Text = "Unknown file type";
-                    DetectedPackageTypeText.Foreground = new SolidColorBrush(Color.FromRgb(241, 196, 15));
-                    PSADTOptionsPanel.Visibility = Visibility.Collapsed;
-                    break;
+                DetectedPackageTypeIcon.Text = "📦";
+                DetectedPackageTypeText.Text = "MSI Package";
+            }
+            else if (extension == ".exe")
+            {
+                DetectedPackageTypeIcon.Text = "⚙️";
+                DetectedPackageTypeText.Text = "EXE Installer";
+            }
+            else
+            {
+                PSADTConfigSection.Visibility = Visibility.Collapsed;  // Changed
+                DetectedPackageTypeIcon.Text = "❓";
+                DetectedPackageTypeText.Text = "Unknown package type";
             }
         }
+
 
         private void ExtractFileMetadata(string filePath)
         {
@@ -840,46 +926,7 @@ namespace IntunePackagingTool
             };
         }
 
-        private PSADTOptions? CollectPSADTOptions()
-        {
-            if (!AdvancedOptionsExpander.IsExpanded || PSADTOptionsPanel.Visibility != Visibility.Visible)
-                return null;
-
-            return new PSADTOptions
-            {
-                PackageType = DetectedPackageType,
-
-                // Installation Options
-                SilentInstall = SilentInstallCheck?.IsChecked ?? false,
-                SuppressRestart = SuppressRestartCheck?.IsChecked ?? false,
-                AllUsersInstall = AllUsersInstallCheck?.IsChecked ?? false,
-                VerboseLogging = VerboseLoggingCheck?.IsChecked ?? false,
-
-                // User Interaction
-                CloseRunningApps = CloseRunningAppsCheck?.IsChecked ?? false,
-                AllowUserDeferrals = AllowUserDeferralsCheck?.IsChecked ?? false,
-                CheckDiskSpace = CheckDiskSpaceCheck?.IsChecked ?? false,
-                ShowProgress = ShowProgressCheck?.IsChecked ?? false,
-
-                // Prerequisites
-                CheckDotNet = CheckDotNetCheck?.IsChecked ?? false,
-                ImportCertificates = ImportCertificatesCheck?.IsChecked ?? false,
-                CheckVCRedist = CheckVCRedistCheck?.IsChecked ?? false,
-                RegisterDLLs = RegisterDLLsCheck?.IsChecked ?? false,
-
-                // File & Registry Operations
-                CopyToAllUsers = CopyToAllUsersCheck?.IsChecked ?? false,
-                SetHKCUAllUsers = SetHKCUAllUsersCheck?.IsChecked ?? false,
-                SetCustomRegistry = SetCustomRegistryCheck?.IsChecked ?? false,
-                CopyConfigFiles = CopyConfigFilesCheck?.IsChecked ?? false,
-
-                // Shortcuts & Cleanup
-                DesktopShortcut = DesktopShortcutCheck?.IsChecked ?? false,
-                StartMenuEntry = StartMenuEntryCheck?.IsChecked ?? false,
-                RemovePreviousVersions = RemovePreviousVersionsCheck?.IsChecked ?? false,
-                CreateInstallMarker = CreateInstallMarkerCheck?.IsChecked ?? false
-            };
-        }
+       
 
         
 
@@ -894,9 +941,9 @@ namespace IntunePackagingTool
             OpenPackageFolderButton.Visibility = Visibility.Visible;
 
             // Enable the Generate WDAC Catalog button now that we have a package
-            GenerateCatalogButton.IsEnabled = true;
 
-            int enabledFeatures = psadtOptions != null ? CountEnabledFeatures(psadtOptions) : 0;
+
+            int enabledFeatures = _currentPSADTOptions != null ? CountEnabledFeatures(_currentPSADTOptions) : 0;
             string featuresText = enabledFeatures > 0 ? $" with {enabledFeatures} PSADT cheatsheet functions" : "";
 
             MessageBox.Show($"Package '{appInfo.Manufacturer}_{appInfo.Name}' v{appInfo.Version} created successfully!\n\n" +
@@ -1009,169 +1056,7 @@ namespace IntunePackagingTool
         }
 
 
-        private async void GenerateCatalogButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Check if a package has been generated first
-                if (string.IsNullOrEmpty(_currentPackagePath))
-                {
-                    MessageBox.Show(
-                        "Please generate a package first before creating a WDAC catalog.",
-                        "No Package Available",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // Check if the package path exists
-                if (!Directory.Exists(_currentPackagePath))
-                {
-                    MessageBox.Show(
-                        "Package folder no longer exists. Please regenerate the package.",
-                        "Package Not Found",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // Confirm with user
-                var confirmResult = MessageBox.Show(
-                    $"Generate WDAC security catalog for:\n\n" +
-                    $"{Path.GetFileName(_currentPackagePath)}\n\n" +
-                    $"This process will:\n" +
-                    $"• Install the application in a VM\n" +
-                    $"• Monitor all file operations\n" +
-                    $"• Generate a security catalog (.cat file)\n" +
-                    $"• Take approximately 5-10 minutes\n\n" +
-                    $"Continue?",
-                    "Generate WDAC Catalog",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (confirmResult != MessageBoxResult.Yes)
-                    return;
-
-                // Update UI to show processing
-                CatalogStatusPanel.Visibility = Visibility.Visible;
-                CatalogStatusText.Text = "Initializing catalog generation...";
-                CatalogProgressBar.IsIndeterminate = true;
-                GenerateCatalogButton.IsEnabled = false;
-
-                // Create a catalog task
-                var appInfo = CreateApplicationInfo();
-                var catalogTask = new CatalogTask
-                {
-                    AppName = appInfo.Name,
-                    Version = appInfo.Version,
-                    PackagePath = _currentPackagePath,
-                    Status = "Processing..."
-                };
-
-                // Create progress handler
-                var progress = new Progress<string>(message =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        CatalogStatusText.Text = message;
-                    });
-                });
-
-                // Generate the catalog using WDACService
-                var wdacService = new WDACService();
-                var catalogResult = await wdacService.GenerateCatalogAsync(catalogTask, progress);
-
-                if (catalogResult.Success)
-                {
-                    _generatedCatalogPath = catalogResult.CatalogPath;
-                    _catalogGenerated = true;
-
-                    CatalogStatusText.Text = "✅ Catalog generated successfully!";
-                    CatalogStatusText.Foreground = new SolidColorBrush(Colors.Green);
-                    CatalogProgressBar.IsIndeterminate = false;
-                    CatalogProgressBar.Value = 100;
-
-                    MessageBox.Show(
-                        $"WDAC catalog generated successfully!\n\n" +
-                        $"Catalog Path:\n{catalogResult.CatalogPath}\n\n" +
-                        $"Hash: {catalogResult.Hash}",
-                        "Catalog Generation Complete",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-
-                    // Offer to open the catalog folder
-                    var openFolderResult = MessageBox.Show(
-                        "Would you like to open the catalog folder?",
-                        "Open Folder",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question);
-
-                    if (openFolderResult == MessageBoxResult.Yes && !string.IsNullOrEmpty(catalogResult.CatalogPath))
-                    {
-                        try
-                        {
-                            if (File.Exists(catalogResult.CatalogPath))
-                            {
-                                // Open folder and select the file
-                                Process.Start(new ProcessStartInfo
-                                {
-                                    FileName = "explorer.exe",
-                                    Arguments = $"/select,\"{catalogResult.CatalogPath}\"",
-                                    UseShellExecute = true
-                                });
-                            }
-                            else
-                            {
-                                // Just open the folder
-                                var folderPath = Path.GetDirectoryName(catalogResult.CatalogPath);
-                                if (!string.IsNullOrEmpty(folderPath) && Directory.Exists(folderPath))
-                                {
-                                    Process.Start(new ProcessStartInfo
-                                    {
-                                        FileName = "explorer.exe",
-                                        Arguments = $"\"{folderPath}\"",
-                                        UseShellExecute = true
-                                    });
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"Failed to open folder: {ex.Message}");
-                        }
-                    }
-                }
-                else
-                {
-                    CatalogStatusText.Text = "❌ Catalog generation failed";
-                    CatalogStatusText.Foreground = new SolidColorBrush(Colors.Red);
-                    CatalogProgressBar.IsIndeterminate = false;
-
-                    MessageBox.Show(
-                        $"Failed to generate WDAC catalog:\n\n{catalogResult.ErrorMessage}",
-                        "Catalog Generation Failed",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                CatalogStatusText.Text = "❌ Error during catalog generation";
-                CatalogStatusText.Foreground = new SolidColorBrush(Colors.Red);
-                CatalogProgressBar.IsIndeterminate = false;
-
-                MessageBox.Show(
-                    $"An error occurred during catalog generation:\n\n{ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            finally
-            {
-                GenerateCatalogButton.IsEnabled = true;
-                CatalogProgressBar.IsIndeterminate = false;
-            }
-        }
+        
 
         #endregion
 

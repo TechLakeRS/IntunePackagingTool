@@ -14,6 +14,9 @@ namespace IntunePackagingTool.Services
         public bool SuppressRestart { get; set; }
         public bool AllUsersInstall { get; set; }
         public bool VerboseLogging { get; set; }
+        public bool WaitForProcessCompletion { get; set; }  // While loop pause
+        public bool ImportRegFile { get; set; }             // Import .reg files
+        public bool UninstallPreviousByCode { get; set; }   // Uninstall by MSI code
 
         // User Interaction
         public bool CloseRunningApps { get; set; }
@@ -32,12 +35,21 @@ namespace IntunePackagingTool.Services
         public bool SetHKCUAllUsers { get; set; }
         public bool SetCustomRegistry { get; set; }
         public bool CopyConfigFiles { get; set; }
+        public bool RemoveSpecificFiles { get; set; }       // Remove-File for cleanup
+        public bool RemoveEmptyFolders { get; set; }        // Remove empty folders after uninstall
+        public bool ModifyFilePermissions { get; set; }     // ACL modifications
 
         // Shortcuts & Cleanup
         public bool DesktopShortcut { get; set; }
         public bool StartMenuEntry { get; set; }
         public bool RemovePreviousVersions { get; set; }
         public bool CreateInstallMarker { get; set; }
+        public bool ExecuteVBScript { get; set; }           // For legacy apps
+        public bool CreateActiveSetup { get; set; }         // Per-user setup (though not recommended)
+
+        public bool AddToPath { get; set; }                 // Add to PATH environment variable
+        public bool UnregisterDLLs { get; set; }            // Unregister old DLLs
+        public bool ImportDrivers { get; set; }             // PnPutil driver import
 
         // Package Info
         public string PackageType { get; set; } = null!;     // "MSI" or "EXE"
@@ -122,7 +134,7 @@ namespace IntunePackagingTool.Services
                 }
 
                 // Modify the Deploy-Application.ps1 in the Application folder with metadata AND cheatsheet functions
-                await ModifyPSADTScriptAsync(packagePath, appInfo, psadtOptions = null!);
+                await ModifyPSADTScriptAsync(packagePath, appInfo, psadtOptions);
 
                 return packagePath;
             }

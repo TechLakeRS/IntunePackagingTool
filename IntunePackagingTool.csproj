@@ -79,7 +79,6 @@
 		<Folder Include="Resources\" />
 		<Folder Include="Utilities\" />
 		<Folder Include="Dialogs\WizardSteps\" />
-		<Folder Include="Views\" />
 	</ItemGroup>
 	
 	<!-- XAML Settings -->
