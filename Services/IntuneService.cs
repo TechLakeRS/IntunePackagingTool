@@ -981,7 +981,84 @@ namespace IntunePackagingTool.Services
 
             return "Uncategorized";
         }
+        public async Task<InstallationStatistics> GetInstallationStatisticsAsync(string appId)
+        {
+            try
+            {
+                var reportUrl = "https://graph.microsoft.com/beta/deviceManagement/reports/getAppStatusOverviewReport";
 
+                // Call without filter to get all apps
+                var requestBody = new
+                {
+                    filter = ""  // Empty filter gets all apps
+                };
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(requestBody),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await _sharedHttpClient.PostAsync(reportUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine($"Failed to get report: {response.StatusCode}");
+                    return new InstallationStatistics();
+                }
+
+                var reportContent = await response.Content.ReadAsStringAsync();
+                var data = JsonDocument.Parse(reportContent);
+
+                // Find our app in the results
+                if (data.RootElement.TryGetProperty("Values", out var values))
+                {
+                    foreach (var row in values.EnumerateArray())
+                    {
+                        var rowData = row.EnumerateArray().ToList();
+
+                        // ApplicationId is at index 0
+                        if (rowData.Count > 0 && rowData[0].GetString() == appId)
+                        {
+                            // Found our app! Parse the statistics
+                            // Based on the schema from your document:
+                            // [6] InstalledDeviceCount
+                            // [7] InstalledUserCount  
+                            // [8] FailedDeviceCount
+                            // [9] FailedUserCount
+                            // [10] PendingInstallDeviceCount
+                            // [11] PendingInstallUserCount
+                            // [12] NotApplicableDeviceCount
+                            // [13] NotApplicableUserCount
+                            // [14] NotInstalledDeviceCount
+                            // [15] NotInstalledUserCount
+
+                            var stats = new InstallationStatistics
+                            {
+                                SuccessfulInstalls = rowData[6].GetInt32(),  // InstalledDeviceCount
+                                FailedInstalls = rowData[8].GetInt32(),       // FailedDeviceCount
+                                PendingInstalls = rowData[10].GetInt32(),     // PendingInstallDeviceCount
+                                NotInstalled = rowData[14].GetInt32(),        // NotInstalledDeviceCount
+                            };
+
+                            stats.TotalDevices = stats.SuccessfulInstalls + stats.FailedInstalls +
+                                                stats.PendingInstalls + stats.NotInstalled;
+
+                            Debug.WriteLine($"Found stats for {appId}: Success={stats.SuccessfulInstalls}, Failed={stats.FailedInstalls}, Pending={stats.PendingInstalls}, NotInstalled={stats.NotInstalled}");
+
+                            return stats;
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"App {appId} not found in report results");
+                return new InstallationStatistics();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting statistics: {ex.Message}");
+                return new InstallationStatistics();
+            }
+        }
         public async Task<List<DeviceInstallStatus>> GetApplicationInstallStatusAsync(string appId)
         {
             try
@@ -989,7 +1066,6 @@ namespace IntunePackagingTool.Services
                 var allStatuses = new List<DeviceInstallStatus>();
                 var reportUrl = "https://graph.microsoft.com/beta/deviceManagement/reports/retrieveDeviceAppInstallationStatusReport";
 
-                // Correct filter syntax - note the matching quotes and actual appId value
                 var requestBody = new
                 {
                     filter = $"(ApplicationId eq '{appId}')"  // Properly formatted filter
@@ -1005,21 +1081,11 @@ namespace IntunePackagingTool.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     Debug.WriteLine($"Failed to get device report: {response.StatusCode}");
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    Debug.WriteLine($"Error: {errorContent}");
                     return allStatuses;
                 }
 
                 var reportContent = await response.Content.ReadAsStringAsync();
-                Debug.WriteLine($"Report response: {reportContent}");
-
                 var data = JsonDocument.Parse(reportContent);
-
-                // Check if we have data
-                var totalRows = data.RootElement.TryGetProperty("TotalRowCount", out var countElement)
-                    ? countElement.GetInt32() : 0;
-
-                Debug.WriteLine($"Total rows found: {totalRows}");
 
                 if (data.RootElement.TryGetProperty("Values", out var values))
                 {
@@ -1027,21 +1093,20 @@ namespace IntunePackagingTool.Services
                     {
                         var rowData = row.EnumerateArray().ToList();
 
-                        if (rowData.Count >= 18)  // Based on your schema
+                        if (rowData.Count >= 18)
                         {
                             var status = new DeviceInstallStatus
                             {
-                                DeviceId = GetStringValue(rowData[0]),           // DeviceId
-                                DeviceName = GetStringValue(rowData[3]),         // DeviceName
-                                UserPrincipalName = GetStringValue(rowData[4]),  // UserPrincipalName
-                                UserName = GetStringValue(rowData[5]),           // UserName
-                                Platform = GetStringValue(rowData[6]),           // Platform
-                                ErrorCode = rowData[8].ValueKind == JsonValueKind.Number ? rowData[8].GetInt32() : null,  // ErrorCode
-                                InstallState = GetInstallStateString(rowData[9]), // InstallState (int converted to string)
-                                InstallStateDetail = GetStringValue(rowData[16]) ?? GetStringValue(rowData[17]), // AppInstallStateDetails or localized version
+                                DeviceId = GetStringValue(rowData[0]),
+                                DeviceName = GetStringValue(rowData[3]),
+                                UserPrincipalName = GetStringValue(rowData[4]),
+                                UserName = GetStringValue(rowData[5]),
+                                Platform = GetStringValue(rowData[6]),
+                                ErrorCode = rowData[8].ValueKind == JsonValueKind.Number ? rowData[8].GetInt32() : null,
+                                InstallState = GetStringValue(rowData[14]),  // AppInstallState (already as string)
+                                InstallStateDetail = GetStringValue(rowData[16]),
                             };
 
-                            // Parse LastModifiedDateTime (index 11)
                             if (rowData[11].ValueKind == JsonValueKind.String)
                             {
                                 if (DateTime.TryParse(rowData[11].GetString(), out var dt))
@@ -1055,15 +1120,6 @@ namespace IntunePackagingTool.Services
                     }
                 }
 
-                if (totalRows == 0)
-                {
-                    Debug.WriteLine($"No device installation data found for app {appId}");
-                    Debug.WriteLine("This could mean:");
-                    Debug.WriteLine("- The app hasn't been deployed to any devices yet");
-                    Debug.WriteLine("- The app was recently uploaded");
-                    Debug.WriteLine("- No devices have synced after assignment");
-                }
-
                 return allStatuses;
             }
             catch (Exception ex)
@@ -1073,10 +1129,13 @@ namespace IntunePackagingTool.Services
             }
         }
 
+        // Helper method if you don't already have it
         private string GetStringValue(JsonElement element)
         {
             return element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "";
         }
+
+      
 
         private string GetInstallStateString(JsonElement element)
         {
