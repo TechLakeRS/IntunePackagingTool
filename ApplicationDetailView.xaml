@@ -72,6 +72,18 @@
                 Padding="12,10"
                 FontWeight="Medium"
                 Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
+                <!-- Add this after the Open Script Button in the header -->
+                <Button Name="ReportingButton"
+        Content="📊 Reporting" 
+        Click="ReportingButton_Click"
+        Background="#9B59B6" 
+        Foreground="White"
+        BorderThickness="0"
+        Padding="12,10"
+        Margin="8,0,0,0"
+        FontWeight="Medium"
+        ToolTip="View installation statistics and device status"
+        Style="{DynamicResource {x:Static ToolBar.ButtonStyleKey}}"/>
             </StackPanel>
         </Grid>
 

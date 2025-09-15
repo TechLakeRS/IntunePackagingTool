@@ -13,6 +13,9 @@
     <Compile Update="Views\PSADTConfigDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Views\ReportingWindow.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="WDACToolsPage.xaml.cs">
       <SubType>Code</SubType>
     </Compile>

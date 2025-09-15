@@ -28,8 +28,8 @@ namespace IntunePackagingTool.Services
         // Supported file extensions for signing
         private readonly HashSet<string> _signableExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".exe", ".dll", ".ocx", ".cab", ".cat", ".msi", ".msm", ".msp",
-            ".ps1", ".psm1", ".psd1", ".ps1xml", ".vbs", ".js", ".wsf"
+            ".dll", ".ocx", ".cab", ".cat",
+            ".ps1", ".psm1", ".psd1"
         };
 
         public class SigningResult

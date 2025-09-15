@@ -664,7 +664,7 @@ namespace IntunePackagingTool
                 ManufacturerTextBox.Text,
                 AppNameTextBox.Text,
                 VersionTextBox.Text,
-                _detectedPackageType);
+                DetectedPackageType);
 
             // Load existing options if any
             if (_currentPSADTOptions != null)

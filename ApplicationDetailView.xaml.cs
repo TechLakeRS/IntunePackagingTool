@@ -611,6 +611,36 @@ namespace IntunePackagingTool
                 }
             }
         }
+
+        private void ReportingButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentApp == null)
+            {
+                MessageBox.Show("No application selected.", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                StatusText.Text = "Opening installation report...";
+
+                var reportingWindow = new Views.ReportingWindow(_currentApp.Id, _currentApp.DisplayName)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                reportingWindow.ShowDialog();
+
+                StatusText.Text = $"Viewing report for {_currentApp.DisplayName}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening reporting window:\n\n{ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = "Failed to open reporting window";
+            }
+        }
     }
 
 }

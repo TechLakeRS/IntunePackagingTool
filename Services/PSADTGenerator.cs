@@ -378,7 +378,7 @@ namespace IntunePackagingTool.Services
                 }
                 else if (line.Contains("$appScriptDate") && (line.StartsWith("[string]") || line.StartsWith("[String]")))
                 {
-                    lines[i] = $"\t[string]$appScriptDate = '{DateTime.Now:yyyy/MM/dd}'";
+                    lines[i] = $"\t[string]$appScriptDate = '{DateTime.Now:dd/MM/yyyy}'";
                 }
                 else if (line.Contains("$appScriptAuthor") && (line.StartsWith("[string]") || line.StartsWith("[String]")))
                 {

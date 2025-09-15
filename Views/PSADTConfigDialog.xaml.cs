@@ -34,6 +34,7 @@ namespace IntunePackagingTool.Views
             SuppressRestartCheck.IsChecked = options.SuppressRestart;
             AllUsersInstallCheck.IsChecked = options.AllUsersInstall;
             VerboseLoggingCheck.IsChecked = options.VerboseLogging;
+            UserInstallCheck.IsChecked = options.UserInstall;
 
             CloseRunningAppsCheck.IsChecked = options.CloseRunningApps;
             AllowUserDeferralsCheck.IsChecked = options.AllowUserDeferrals;

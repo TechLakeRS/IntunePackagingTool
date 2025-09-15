@@ -982,163 +982,124 @@ namespace IntunePackagingTool.Services
             return "Uncategorized";
         }
 
-        public async Task<List<string>> GetApplicationCategoriesAsync()
+        public async Task<List<DeviceInstallStatus>> GetApplicationInstallStatusAsync(string appId)
         {
             try
             {
-                var token = await GetAccessTokenAsync();
-                var url = "https://graph.microsoft.com/beta/deviceAppManagement/mobileAppCategories";
+                var allStatuses = new List<DeviceInstallStatus>();
+                var reportUrl = "https://graph.microsoft.com/beta/deviceManagement/reports/retrieveDeviceAppInstallationStatusReport";
 
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-                var response = await httpClient.GetAsync(url);
-                if (response.IsSuccessStatusCode)
+                // Correct filter syntax - note the matching quotes and actual appId value
+                var requestBody = new
                 {
-                    var json = await response.Content.ReadAsStringAsync();
-                    using var doc = JsonDocument.Parse(json);
+                    filter = $"(ApplicationId eq '{appId}')"  // Properly formatted filter
+                };
 
-                    var categories = new List<string>();
-                    if (doc.RootElement.TryGetProperty("value", out var value))
+                var content = new StringContent(
+                    JsonSerializer.Serialize(requestBody),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await _sharedHttpClient.PostAsync(reportUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine($"Failed to get device report: {response.StatusCode}");
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"Error: {errorContent}");
+                    return allStatuses;
+                }
+
+                var reportContent = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"Report response: {reportContent}");
+
+                var data = JsonDocument.Parse(reportContent);
+
+                // Check if we have data
+                var totalRows = data.RootElement.TryGetProperty("TotalRowCount", out var countElement)
+                    ? countElement.GetInt32() : 0;
+
+                Debug.WriteLine($"Total rows found: {totalRows}");
+
+                if (data.RootElement.TryGetProperty("Values", out var values))
+                {
+                    foreach (var row in values.EnumerateArray())
                     {
-                        foreach (var cat in value.EnumerateArray())
+                        var rowData = row.EnumerateArray().ToList();
+
+                        if (rowData.Count >= 18)  // Based on your schema
                         {
-                            if (cat.TryGetProperty("displayName", out var name))
+                            var status = new DeviceInstallStatus
                             {
-                                var categoryName = name.GetString();
-                                if (!string.IsNullOrWhiteSpace(categoryName))
-                                    categories.Add(categoryName);
+                                DeviceId = GetStringValue(rowData[0]),           // DeviceId
+                                DeviceName = GetStringValue(rowData[3]),         // DeviceName
+                                UserPrincipalName = GetStringValue(rowData[4]),  // UserPrincipalName
+                                UserName = GetStringValue(rowData[5]),           // UserName
+                                Platform = GetStringValue(rowData[6]),           // Platform
+                                ErrorCode = rowData[8].ValueKind == JsonValueKind.Number ? rowData[8].GetInt32() : null,  // ErrorCode
+                                InstallState = GetInstallStateString(rowData[9]), // InstallState (int converted to string)
+                                InstallStateDetail = GetStringValue(rowData[16]) ?? GetStringValue(rowData[17]), // AppInstallStateDetails or localized version
+                            };
+
+                            // Parse LastModifiedDateTime (index 11)
+                            if (rowData[11].ValueKind == JsonValueKind.String)
+                            {
+                                if (DateTime.TryParse(rowData[11].GetString(), out var dt))
+                                {
+                                    status.LastSyncDateTime = dt;
+                                }
                             }
+
+                            allStatuses.Add(status);
                         }
                     }
-
-                    // Sort alphabetically for easier selection
-                    categories.Sort();
-                    return categories;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error fetching categories: {ex.Message}");
-            }
-
-            // Return empty list if fetch fails (will fall back to hardcoded)
-            return new List<string>();
-        }
-
-        public async Task<string> UploadApplicationAsync(ApplicationInfo appInfo, List<DetectionRule>? detectionRules = null)
-        {
-            try
-            {
-                var token = await GetAccessTokenAsync();
-                await Task.Delay(1000); // Simulate upload delay
-
-                MessageBox.Show(
-                    $"Win32 app upload via API requires complex file handling.\n\n" +
-                    $"Package: {appInfo.Manufacturer}_{appInfo.Name}_{appInfo.Version}\n\n" +
-                    $"Package is ready at the network location.\n",
-                    "Upload Status", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                string appId = "generated-app-id"; // Get this from the actual upload response
-                return appId;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to upload application to Intune: {ex.Message}", ex);
-            }
-        }
-
-        public async Task<bool> UpdateApplicationAsync(
-       string appId,
-       string displayName,
-       string description,
-       string category,
-       List<DetectionRule> detectionRules,
-       string? packagePath = null,
-       string? iconPath = null)
-        {
-            try
-            {
-                var token = await GetAccessTokenAsync();
-                var updateUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}";
-
-                // Build update body
-                var updateBody = new Dictionary<string, object>
-                {
-                    ["@odata.type"] = "#microsoft.graph.win32LobApp",
-                    ["displayName"] = displayName,
-                    ["description"] = description,
-                    ["categories"] = new[] { category }
-                };
-
-                // Add detection rules if provided
-                if (detectionRules?.Count > 0)
-                {
-                    var formattedRules = new List<object>();
-
-                    foreach (var rule in detectionRules)
-                    {
-                        object? formattedRule = rule.Type switch
-                        {
-                            DetectionRuleType.File => new
-                            {
-                                odataType = "#microsoft.graph.win32LobAppFileSystemDetection",
-                                path = rule.Path,
-                                fileOrFolderName = rule.FileOrFolderName,
-                                check32BitOn64System = false,
-                                detectionType = rule.CheckVersion ? "version" : "exists"
-                            },
-                            DetectionRuleType.Registry => new
-                            {
-                                odataType = "#microsoft.graph.win32LobAppRegistryDetection",
-                                check32BitOn64System = false,
-                                keyPath = rule.Path,
-                                valueName = rule.FileOrFolderName,
-                                detectionType = string.IsNullOrEmpty(rule.FileOrFolderName) ? "exists" : "string"
-                            },
-                            DetectionRuleType.MSI => new
-                            {
-                                odataType = "#microsoft.graph.win32LobAppProductCodeDetection",
-                                productCode = rule.Path,
-                                productVersionOperator = rule.Operator,
-                                productVersion = rule.FileOrFolderName
-                            },
-                            _ => null
-                        };
-
-                        if (formattedRule != null)
-                        {
-                            formattedRules.Add(formattedRule);
-                        }
-                    }
-
-                    updateBody["detectionRules"] = formattedRules;
                 }
 
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-                var json = JsonSerializer.Serialize(updateBody);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var patchMethod = new HttpMethod("PATCH");
-                var request = new HttpRequestMessage(patchMethod, updateUrl)
+                if (totalRows == 0)
                 {
-                    Content = content
-                };
+                    Debug.WriteLine($"No device installation data found for app {appId}");
+                    Debug.WriteLine("This could mean:");
+                    Debug.WriteLine("- The app hasn't been deployed to any devices yet");
+                    Debug.WriteLine("- The app was recently uploaded");
+                    Debug.WriteLine("- No devices have synced after assignment");
+                }
 
-                var response = await httpClient.SendAsync(request);
-
-                return response.IsSuccessStatusCode;
+                return allStatuses;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error updating app: {ex.Message}");
-                return false;
+                Debug.WriteLine($"Error fetching device status: {ex.Message}");
+                return new List<DeviceInstallStatus>();
             }
         }
+
+        private string GetStringValue(JsonElement element)
+        {
+            return element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "";
+        }
+
+        private string GetInstallStateString(JsonElement element)
+        {
+            if (element.ValueKind != JsonValueKind.Number)
+                return "Unknown";
+
+            var stateValue = element.GetInt32();
+
+            // Map int values to string states
+            return stateValue switch
+            {
+                0 => "NotApplicable",
+                1 => "Installed",
+                2 => "Failed",
+                3 => "Pending",
+                4 => "NotInstalled",
+                5 => "UninstallFailed",
+                _ => $"Unknown ({stateValue})"
+            };
+        }
+
+
+
 
         // Dispose method to clean up HttpClient
         public void Dispose()
