@@ -32,16 +32,16 @@ namespace IntunePackagingTool.Services
             {
                 Authentication = new AppSettings.AuthenticationSettings
                 {
-                    ClientId = "b47987a1-70b4-415a-9a4e-9775473e382b",
-                    TenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7",
-                    CertificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F",
+                    ClientId = "",
+                    TenantId = "",
+                    CertificateThumbprint = "",
                     Method = AppSettings.AuthMethod.Certificate
                 },
                 Paths = new AppSettings.PathSettings
                 {
-                    PSADTTemplatePath = @"\\nbb.local\sys\SCCMData\TOOLS\IntunePackagingTool\20250811\Application",
-                    IntuneWinAppUtilPath = @"\\nbb.local\sys\SCCMData\TOOLS\IntunePackagingTool\IntuneWinAppUtil.exe",
-                    OutputDirectory = @"\\nbb.local\sys\SCCMData\IntuneApplications",
+                    PSADTTemplatePath = @"",
+                    IntuneWinAppUtilPath = @",
+                    OutputDirectory = @"",
                     TempDirectory = @"C:\Temp\IntunePackaging",
                     UsePSADT = true,
                     AutoCleanupTemp = true

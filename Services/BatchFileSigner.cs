@@ -15,9 +15,7 @@ namespace IntunePackagingTool.Services
         private readonly string _timestampServer;
         private readonly string _signToolPath;
 
-        public BatchFileSigner(string certificateName = "NBB Digital Workplace",
-                              string certificateThumbprint = "B74452FD21BE6AD24CA9D61BCE156FD75E774716",
-                              string timestampServer = "http://timestamp.digicert.com")
+        public BatchFileSigner
         {
             _certificateName = certificateName;
             _certificateThumbprint = certificateThumbprint?.Replace(" ", "").ToUpper() ?? "";
