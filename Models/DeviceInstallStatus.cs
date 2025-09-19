@@ -1,4 +1,4 @@
-﻿using System;
+﻿using IntunePackagingTool.Services;
 
 namespace IntunePackagingTool.Models
 {
@@ -12,33 +12,51 @@ namespace IntunePackagingTool.Models
         public string InstallState { get; set; } = "";
         public string InstallStateDetail { get; set; } = "";
         public int? ErrorCode { get; set; }
-        public string? HexErrorCode { get; set; } = "";  // New - hex version of error code
-        public string? AppVersion { get; set; } = "";     // New - version of app installed
+        public string? HexErrorCode { get; set; } = "";
+        public string? AppVersion { get; set; } = "";
         public DateTime? LastSyncDateTime { get; set; }
 
-        // These aren't in the API response but keeping them won't hurt
-        public string Id { get; set; } = "";  // Can map DeviceId to this
-        public string OSDescription { get; set; } = "";  // Not available from this endpoint
-        public string OSVersion { get; set; } = "";      // Not available from this endpoint
-
-        // Computed properties - these are perfect
+        // Enhanced computed properties
         public string StatusIcon => InstallState?.ToLower() switch
         {
-            "installed" => "✅",
+            "installed" => ErrorCodeMapper.IsSuccessCode(ErrorCode) ? "✅" : "⚠️",
             "failed" => "❌",
             "pending" => "⏳",
             "notinstalled" => "⚫",
-            "notapplicable" => "➖",  // Added this state
+            "notapplicable" => "➖",
             _ => "❓"
         };
 
         public string FormattedLastSync => LastSyncDateTime?.ToString("MMM dd, yyyy HH:mm") ?? "Never";
 
-        // Add error description if you want
-       
-    }
+        public string ErrorCodeDisplay
+        {
+            get
+            {
+                if (!ErrorCode.HasValue || ErrorCode == 0)
+                    return "";
 
-    public class InstallationStatistics
+                if (!string.IsNullOrEmpty(HexErrorCode))
+                    return HexErrorCode;
+
+                return $"0x{ErrorCode.Value:X8}";
+            }
+        }
+
+        // Use the mapper for detailed description
+        public string DetailedStatus => ErrorCodeMapper.GetErrorDescription(ErrorCode);
+
+        // Short status for grid display
+        public string StatusSummary => string.IsNullOrEmpty(InstallStateDetail)
+            ? ErrorCodeMapper.GetShortErrorDescription(ErrorCode)
+            : InstallStateDetail;
+
+        // Recommended action
+        public string RecommendedAction => ErrorCodeMapper.GetRecommendedAction(ErrorCode);
+    }
+}
+
+public class InstallationStatistics
     {
         public int TotalDevices { get; set; }
         public int SuccessfulInstalls { get; set; }
@@ -55,4 +73,3 @@ namespace IntunePackagingTool.Models
             ? Math.Round((double)FailedInstalls / TotalDevices * 100, 1)
             : 0;
     }
-}

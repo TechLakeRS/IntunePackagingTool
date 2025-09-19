@@ -34,7 +34,7 @@ namespace IntunePackagingTool
             InitializeComponent();
             _uploadService = new IntuneUploadService(_intuneService);
 
-            // ✅ PERFORMANCE: Only initialize first step immediately
+            
             LoadStep(0);
         }
 
@@ -391,7 +391,6 @@ namespace IntunePackagingTool
         }
 
         // This method will be called from DetectionRulesStep when user opens detection dialogs
-
 
 
 

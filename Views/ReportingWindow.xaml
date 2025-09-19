@@ -231,10 +231,38 @@
                                             Width="*"
                                             IsReadOnly="True"/>
 
-                        <DataGridTextColumn Header="Error Code" 
-                                            Binding="{Binding ErrorCode}" 
-                                            Width="100"
-                                            IsReadOnly="True"/>
+                        <DataGridTemplateColumn Header="Status Details" Width="250" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DetailedStatus}" 
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding InstallState}" Value="Failed">
+                                                        <Setter Property="Foreground" Value="#E74C3C"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding InstallState}" Value="Installed">
+                                                        <Setter Property="Foreground" Value="#27AE60"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                        <TextBlock.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel MaxWidth="400">
+                                                    <TextBlock FontWeight="Bold" Text="{Binding ErrorCodeDisplay}"/>
+                                                    <TextBlock Text="{Binding DetailedStatus}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="Recommended Action:" FontWeight="Bold" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="{Binding RecommendedAction}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
                         <DataGridTextColumn Header="Last Sync" 
                                             Binding="{Binding FormattedLastSync}" 

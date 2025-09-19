@@ -1,0 +1,305 @@
+﻿<Window x:Class="IntunePackagingTool.RemoteTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Remote Test Deployment" 
+        Height="600" 
+        Width="800"
+        WindowStartupLocation="CenterOwner"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <!-- Modern Button Style -->
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Background" Value="#0078D4"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="5"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#106EBE"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="Foreground" Value="#666666"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Status Indicator Style -->
+        <Style x:Key="StatusIndicator" TargetType="Ellipse">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#0078D4" Padding="20">
+            <StackPanel>
+                <TextBlock Text="Remote Test Deployment" 
+                          Foreground="White" 
+                          FontSize="24" 
+                          FontWeight="Bold"/>
+                <TextBlock Text="Test your package on a remote machine using PsExec" 
+                          Foreground="#E0E0E0" 
+                          FontSize="12" 
+                          Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Input Section -->
+        <Border Grid.Row="1" Background="White" Margin="20,20,20,10" 
+                CornerRadius="8" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect Opacity="0.1" ShadowDepth="2" BlurRadius="5"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Computer Name Input -->
+                <Label Grid.Row="0" Grid.Column="0" 
+                       Content="Computer Name:" 
+                       VerticalAlignment="Center" 
+                       FontWeight="SemiBold"/>
+                <TextBox x:Name="txtComputerName" 
+                         Grid.Row="0" Grid.Column="1" 
+                         Height="32" 
+                         VerticalContentAlignment="Center"
+                         Padding="8,0"
+                         FontSize="14"
+                         Text="PC0027639">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="BorderBrush" Value="#DDDDDD"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsFocused" Value="True">
+                                    <Setter Property="BorderBrush" Value="#0078D4"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+                <Button x:Name="btnCheckOnline" 
+                        Grid.Row="0" Grid.Column="2" 
+                        Content="Check Status" 
+                        Margin="10,0,0,0"
+                        Height="32"
+                        Style="{StaticResource ModernButton}"
+                        Click="btnCheckOnline_Click"/>
+
+                <!-- Status Display -->
+                <Label Grid.Row="1" Grid.Column="0" 
+                       Content="Status:" 
+                       VerticalAlignment="Center" 
+                       FontWeight="SemiBold"
+                       Margin="0,10,0,0"/>
+                <StackPanel Grid.Row="1" Grid.Column="1" 
+                           Orientation="Horizontal" 
+                           VerticalAlignment="Center"
+                           Margin="0,10,0,0">
+                    <Ellipse x:Name="statusIndicator" 
+                            Style="{StaticResource StatusIndicator}"
+                            Fill="Gray"/>
+                    <TextBlock x:Name="txtStatus" 
+                              Text="Not checked" 
+                              VerticalAlignment="Center"
+                              FontSize="14"/>
+                </StackPanel>
+
+                <!-- Package Path -->
+                <Label Grid.Row="2" Grid.Column="0" 
+                       Content="Package Path:" 
+                       VerticalAlignment="Center" 
+                       FontWeight="SemiBold"
+                       Margin="0,10,0,0"/>
+                <TextBox x:Name="txtPackagePath" 
+                         Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                         Height="32" 
+                         VerticalContentAlignment="Center"
+                         Padding="8,0"
+                         FontSize="12"
+                         Margin="0,10,0,0"
+                         IsReadOnly="True"
+                         Background="#F9F9F9"
+                         Foreground="#666666"/>
+
+                <!-- Deployment Options -->
+                <Label Grid.Row="3" Grid.Column="0" 
+                       Content="Deployment Type:" 
+                       VerticalAlignment="Center" 
+                       FontWeight="SemiBold"
+                       Margin="0,10,0,0"/>
+                <StackPanel Grid.Row="3" Grid.Column="1" 
+                           Orientation="Horizontal"
+                           Margin="0,10,0,0">
+                    <RadioButton x:Name="rbInstall" 
+                                Content="Install" 
+                                IsChecked="True" 
+                                Margin="0,0,20,0"
+                                VerticalAlignment="Center"
+                                FontSize="14"/>
+                    <RadioButton x:Name="rbUninstall" 
+                                Content="Uninstall" 
+                                Margin="0,0,20,0"
+                                VerticalAlignment="Center"
+                                FontSize="14"/>
+                    <RadioButton x:Name="rbRepair" 
+                                Content="Repair"
+                                VerticalAlignment="Center"
+                                FontSize="14"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Progress/Output Section -->
+        <Border Grid.Row="2" Background="White" Margin="20,10,20,10" 
+                CornerRadius="8" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect Opacity="0.1" ShadowDepth="2" BlurRadius="5"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Deployment Output" 
+                          FontWeight="SemiBold" 
+                          FontSize="16"
+                          Margin="0,0,0,10"/>
+
+                <!-- Progress Bar -->
+                <ProgressBar x:Name="progressBar" 
+                            Grid.Row="1"
+                            Height="8" 
+                            Margin="0,0,0,10"
+                            Visibility="Collapsed">
+                    <ProgressBar.Style>
+                        <Style TargetType="ProgressBar">
+                            <Setter Property="Foreground" Value="#0078D4"/>
+                            <Setter Property="Background" Value="#E0E0E0"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ProgressBar">
+                                        <Grid>
+                                            <Border Background="{TemplateBinding Background}" 
+                                                   CornerRadius="4"/>
+                                            <Border Background="{TemplateBinding Foreground}" 
+                                                   CornerRadius="4"
+                                                   HorizontalAlignment="Left"
+                                                   Width="{Binding ActualWidth, 
+                                                          RelativeSource={RelativeSource TemplatedParent}}">
+                                                <Border.RenderTransform>
+                                                    <ScaleTransform ScaleX="{Binding Value, 
+                                                                   RelativeSource={RelativeSource TemplatedParent}}" />
+                                                </Border.RenderTransform>
+                                            </Border>
+                                        </Grid>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ProgressBar.Style>
+                </ProgressBar>
+
+                <!-- Output TextBox -->
+                <Border Grid.Row="2" BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="4">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBox x:Name="txtOutput" 
+                                TextWrapping="Wrap" 
+                                IsReadOnly="True"
+                                Background="#1E1E1E"
+                                Foreground="#D4D4D4"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Padding="10"
+                                BorderThickness="0"
+                                Text="Ready to deploy..."/>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Action Buttons -->
+        <Border Grid.Row="3" Background="#F5F5F5" Padding="20,10">
+            <Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <CheckBox x:Name="chkCleanup" 
+                             Content="Clean up after deployment" 
+                             IsChecked="True"
+                             VerticalAlignment="Center"
+                             FontSize="14"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="btnDeploy" 
+                           Content="🚀 Deploy" 
+                           Width="140"
+                           Height="40"
+                           Style="{StaticResource ModernButton}"
+                           IsEnabled="False"
+                           Click="btnDeploy_Click"
+                           Margin="0,0,10,0"/>
+
+                    <Button x:Name="btnClose" 
+                           Content="Close" 
+                           Width="100"
+                           Height="40"
+                           Click="btnClose_Click">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                <Setter Property="Background" Value="#666666"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#555555"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

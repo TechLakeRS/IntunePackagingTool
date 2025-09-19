@@ -194,10 +194,12 @@ namespace IntunePackagingTool.Views
                     {
                         yield return (T)child;
                     }
-
-                    foreach (T childOfChild in FindVisualChildren<T>(child))
+                    if (child != null)  // Add null check here
                     {
-                        yield return childOfChild;
+                        foreach (T childOfChild in FindVisualChildren<T>(child))
+                        {
+                            yield return childOfChild;
+                        }
                     }
                 }
             }

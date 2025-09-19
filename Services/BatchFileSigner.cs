@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
 namespace IntunePackagingTool.Services
@@ -11,23 +10,25 @@ namespace IntunePackagingTool.Services
     public class BatchFileSigner
     {
         private readonly string _certificateName;
+        private readonly string _certificateSubject;
         private readonly string _certificateThumbprint;
         private readonly string _timestampServer;
-        private readonly string _signToolPath;
 
-        public BatchFileSigner
+        public BatchFileSigner(string certificateName = "NBB Digital Workplace",
+                              string certificateThumbprint = "B74452FD21BE6AD24CA9D61BCE156FD75E774716",
+                              string timestampServer = "http://timestamp.digicert.com")
         {
             _certificateName = certificateName;
+            _certificateSubject = "CN=NBB Digital Workplace, OU=National Bank of Belgium (BE), O=EUROPEAN SYSTEM OF CENTRAL BANKS, C=BE";
             _certificateThumbprint = certificateThumbprint?.Replace(" ", "").ToUpper() ?? "";
             _timestampServer = timestampServer;
-            _signToolPath = FindSignToolPath();
         }
 
         // Supported file extensions for signing
         private readonly HashSet<string> _signableExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".dll", ".ocx", ".cab", ".cat",
-            ".ps1", ".psm1", ".psd1"
+            ".dll", ".exe", ".ocx", ".cab", ".cat",
+            ".ps1", ".psm1", ".psd1", ".ps1xml"
         };
 
         public class SigningResult
@@ -45,7 +46,6 @@ namespace IntunePackagingTool.Services
             public List<SigningResult> Results { get; set; } = new List<SigningResult>();
         }
 
-       
         public async Task<SigningProgress> SignApplicationFolderAsync(string packagePath,
                                                                      IProgress<SigningProgress>? progress = null)
         {
@@ -63,7 +63,7 @@ namespace IntunePackagingTool.Services
                                                             IProgress<SigningProgress>? progress = null,
                                                             bool recursive = true)
         {
-            var signableFiles = GetUnsignedFiles(rootDirectory, recursive);
+            var signableFiles = GetSignableFiles(rootDirectory, recursive);
             var signingProgress = new SigningProgress { TotalFiles = signableFiles.Count };
 
             foreach (var file in signableFiles)
@@ -87,27 +87,12 @@ namespace IntunePackagingTool.Services
 
             try
             {
-                // Skip if already signed
-                if (IsAlreadySigned(filePath))
-                {
-                    result.Success = true;
-                    result.ErrorMessage = "Already signed";
-                    return result;
-                }
-
-                if (string.IsNullOrEmpty(_signToolPath))
-                {
-                    result.Success = false;
-                    result.ErrorMessage = "SignTool.exe not found";
-                    return result;
-                }
-
-                var success = await SignWithSignToolAsync(filePath);
+                var success = await SignWithPowerShellAsync(filePath);
                 result.Success = success;
 
                 if (!success)
                 {
-                    result.ErrorMessage = "SignTool failed - check certificate and file permissions";
+                    result.ErrorMessage = "PowerShell signing failed - check certificate and file permissions";
                 }
             }
             catch (Exception ex)
@@ -119,48 +104,158 @@ namespace IntunePackagingTool.Services
             return result;
         }
 
-        private List<string> GetUnsignedFiles(string rootDirectory, bool recursive)
+        private List<string> GetSignableFiles(string rootDirectory, bool recursive)
         {
             var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
 
             return Directory.GetFiles(rootDirectory, "*.*", searchOption)
                 .Where(file => _signableExtensions.Contains(Path.GetExtension(file)))
-                .Where(file => !IsAlreadySigned(file))
                 .OrderBy(file => file)
                 .ToList();
         }
 
-        private bool IsAlreadySigned(string filePath)
+        private async Task<bool> SignWithPowerShellAsync(string filePath)
         {
-            try
+            return await Task.Run(() =>
             {
-                var extension = Path.GetExtension(filePath).ToLowerInvariant();
+                try
+                {
+                    // Escape single quotes in file path for PowerShell
+                    var escapedFilePath = filePath.Replace("'", "''");
 
-                if (extension == ".ps1" || extension == ".psm1" || extension == ".psd1")
-                {
-                    // For PowerShell files, use PowerShell to check signature
-                    return CheckPowerShellSignatureWithProcess(filePath);
+                    // Build PowerShell command using Set-AuthenticodeSignature
+                    var powerShellCommand = BuildPowerShellSigningCommand(escapedFilePath);
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{powerShellCommand}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
+
+                    using var process = Process.Start(psi);
+                    if (process != null)
+                    {
+                        process.WaitForExit();
+
+                        if (process.ExitCode != 0)
+                        {
+                            var error = process.StandardError.ReadToEnd();
+                            Debug.WriteLine($"Signing failed for {filePath}: {error}");
+                            return false;
+                        }
+
+                        return true;
+                    }
+
+                    return false;
                 }
-                else
+                catch (Exception ex)
                 {
-                    // For binary files, use .NET X509Certificate
-                    return CheckAuthenticodeSignature(filePath);
+                    Debug.WriteLine($"Exception during signing {filePath}: {ex.Message}");
+                    return false;
                 }
-            }
-            catch
-            {
-                return false; // Assume not signed if check fails
-            }
+            });
         }
 
-        private bool CheckPowerShellSignatureWithProcess(string filePath)
+        private string BuildPowerShellSigningCommand(string escapedFilePath)
+        {
+            // Try multiple methods to find the certificate
+            var commands = new List<string>();
+
+            // Method 1: Try LocalMachine\TrustedPublisher with full subject match
+            commands.Add($@"
+                $cert = Get-ChildItem Cert:\LocalMachine\TrustedPublisher -CodeSigningCert | 
+                    Where-Object {{$_.Subject -eq '{_certificateSubject}'}} | 
+                    Select-Object -First 1");
+
+            // Method 2: Try LocalMachine\My (Personal) with thumbprint
+            if (!string.IsNullOrEmpty(_certificateThumbprint))
+            {
+                commands.Add($@"
+                if (-not $cert) {{
+                    $cert = Get-ChildItem Cert:\LocalMachine\My | 
+                        Where-Object {{$_.Thumbprint -eq '{_certificateThumbprint}'}} | 
+                        Select-Object -First 1
+                }}");
+            }
+
+            // Method 3: Try CurrentUser\My with thumbprint
+            if (!string.IsNullOrEmpty(_certificateThumbprint))
+            {
+                commands.Add($@"
+                if (-not $cert) {{
+                    $cert = Get-ChildItem Cert:\CurrentUser\My | 
+                        Where-Object {{$_.Thumbprint -eq '{_certificateThumbprint}'}} | 
+                        Select-Object -First 1
+                }}");
+            }
+
+            // Method 4: Try LocalMachine\My with subject name contains
+            commands.Add($@"
+                if (-not $cert) {{
+                    $cert = Get-ChildItem Cert:\LocalMachine\My -CodeSigningCert | 
+                        Where-Object {{$_.Subject -like '*{_certificateName}*'}} | 
+                        Select-Object -First 1
+                }}");
+
+            // Method 5: Try CurrentUser\My with subject name contains
+            commands.Add($@"
+                if (-not $cert) {{
+                    $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | 
+                        Where-Object {{$_.Subject -like '*{_certificateName}*'}} | 
+                        Select-Object -First 1
+                }}");
+
+            // Build the final command
+            var fullCommand = string.Join(Environment.NewLine, commands) + $@"
+                if ($cert) {{
+                    Set-AuthenticodeSignature -Certificate $cert -TimestampServer '{_timestampServer}' -HashAlgorithm SHA256 -FilePath '{escapedFilePath}' | Out-Null
+                    exit 0
+                }} else {{
+                    Write-Error 'Certificate not found'
+                    exit 1
+                }}";
+
+            return fullCommand;
+        }
+
+        public bool ValidateCertificateAvailability()
         {
             try
             {
+                // Check using PowerShell to see if we can find the certificate
+                var checkCommand = $@"
+                    $found = $false
+                    
+                    # Check TrustedPublisher
+                    $cert = Get-ChildItem Cert:\LocalMachine\TrustedPublisher -CodeSigningCert | 
+                        Where-Object {{$_.Subject -eq '{_certificateSubject}'}}
+                    if ($cert) {{ $found = $true }}
+                    
+                    # Check LocalMachine\My
+                    if (-not $found) {{
+                        $cert = Get-ChildItem Cert:\LocalMachine\My | 
+                            Where-Object {{$_.Thumbprint -eq '{_certificateThumbprint}' -or $_.Subject -like '*{_certificateName}*'}}
+                        if ($cert) {{ $found = $true }}
+                    }}
+                    
+                    # Check CurrentUser\My
+                    if (-not $found) {{
+                        $cert = Get-ChildItem Cert:\CurrentUser\My | 
+                            Where-Object {{$_.Thumbprint -eq '{_certificateThumbprint}' -or $_.Subject -like '*{_certificateName}*'}}
+                        if ($cert) {{ $found = $true }}
+                    }}
+                    
+                    Write-Output $found";
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
-                    Arguments = $"-Command \"(Get-AuthenticodeSignature -FilePath '{filePath}').Status -eq 'Valid'\"",
+                    Arguments = $"-NoProfile -Command \"{checkCommand}\"",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -173,146 +268,6 @@ namespace IntunePackagingTool.Services
                     process.WaitForExit();
                     var output = process.StandardOutput.ReadToEnd().Trim();
                     return output.Equals("True", StringComparison.OrdinalIgnoreCase);
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool CheckAuthenticodeSignature(string filePath)
-        {
-            try
-            {
-                var cert = X509CertificateLoader.LoadCertificateFromFile(filePath);
-                return cert != null;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private string GetHashAlgorithm(string filePath)
-        {
-            var extension = Path.GetExtension(filePath).ToLowerInvariant();
-
-   
-            if (extension == ".ps1" || extension == ".psm1" || extension == ".psd1" || extension == ".ps1xml")
-            {
-                return "sha256";
-            }
-           
-            return "sha256";
-        }
-
-        private async Task<bool> SignWithSignToolAsync(string filePath)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    var hashAlgorithm = GetHashAlgorithm(filePath);
-                    var fileName = Path.GetFileName(filePath);
-
-                   
-                    var signingAttempts = new List<string>();
-
-                    // Method 1: Use thumbprint with LocalMachine\My store
-                    if (!string.IsNullOrEmpty(_certificateThumbprint))
-                    {
-                        signingAttempts.Add($"sign /s My /sm /sha1 {_certificateThumbprint} /t {_timestampServer} /fd {hashAlgorithm} /v \"{filePath}\"");
-                    }
-
-                    // Method 2: Use thumbprint with CurrentUser\My store  
-                    if (!string.IsNullOrEmpty(_certificateThumbprint))
-                    {
-                        signingAttempts.Add($"sign /s My /sha1 {_certificateThumbprint} /t {_timestampServer} /fd {hashAlgorithm} /v \"{filePath}\"");
-                    }
-
-                    // Method 3: Use subject name with LocalMachine\My store
-                    signingAttempts.Add($"sign /s My /sm /n \"{_certificateName}\" /t {_timestampServer} /fd {hashAlgorithm} /v \"{filePath}\"");
-
-                    // Method 4: Use subject name with CurrentUser\My store
-                    signingAttempts.Add($"sign /s My /n \"{_certificateName}\" /t {_timestampServer} /fd {hashAlgorithm} /v \"{filePath}\"");
-
-                    foreach (var arguments in signingAttempts)
-                    {
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = _signToolPath,
-                            Arguments = arguments,
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        };
-
-                        using var process = Process.Start(psi);
-                        if (process != null)
-                        {
-                            process.WaitForExit();
-
-                            if (process.ExitCode == 0)
-                            {
-                                return true;
-                            }
-                        }
-                    }
-
-                    return false;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            });
-        }
-
-        private string FindSignToolPath()
-        {
-            var possiblePaths = new[]
-            {
-                @"C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
-               
-            };
-
-            return possiblePaths.FirstOrDefault(File.Exists) ?? "";
-        }
-
-        public bool ValidateCertificateAvailability()
-        {
-            try
-            {
-                var storesToCheck = new[]
-                {
-                    new { Store = StoreName.My, Location = StoreLocation.LocalMachine },
-                    new { Store = StoreName.My, Location = StoreLocation.CurrentUser }
-                };
-
-                foreach (var storeInfo in storesToCheck)
-                {
-                    using var store = new X509Store(storeInfo.Store, storeInfo.Location);
-                    store.Open(OpenFlags.ReadOnly);
-
-                   
-                    if (!string.IsNullOrEmpty(_certificateThumbprint))
-                    {
-                        var certsByThumbprint = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
-                        if (certsByThumbprint.Count > 0 && certsByThumbprint[0].HasPrivateKey)
-                        {
-                            return true;
-                        }
-                    }
-
-                    
-                    var certsBySubject = store.Certificates.Find(X509FindType.FindBySubjectName, _certificateName, false);
-                    if (certsBySubject.Count > 0 && certsBySubject[0].HasPrivateKey)
-                    {
-                        return true;
-                    }
                 }
 
                 return false;
@@ -329,118 +284,89 @@ namespace IntunePackagingTool.Services
 
             try
             {
-                issues.Add($"🔍 CERTIFICATE DIAGNOSIS");
+                issues.Add($"🔍 CERTIFICATE DIAGNOSIS (PowerShell Method)");
                 issues.Add($"Searching for: Subject='{_certificateName}', Thumbprint='{_certificateThumbprint}'");
                 issues.Add("");
 
-                var storesToCheck = new[]
+                // Use PowerShell to get detailed certificate information
+                var diagnosticCommand = $@"
+                    Write-Output '📁 Certificate Store Analysis:'
+                    Write-Output ''
+                    
+                    # Check LocalMachine\TrustedPublisher
+                    Write-Output '🔐 LocalMachine\TrustedPublisher:'
+                    $certs = Get-ChildItem Cert:\LocalMachine\TrustedPublisher -CodeSigningCert | 
+                        Where-Object {{$_.Subject -eq '{_certificateSubject}'}}
+                    if ($certs) {{
+                        foreach ($cert in $certs) {{
+                            Write-Output ""  ✅ FOUND: $($cert.Subject)""
+                            Write-Output ""     Thumbprint: $($cert.Thumbprint)""
+                            Write-Output ""     Has Private Key: $($cert.HasPrivateKey)""
+                            Write-Output ""     Valid: $($cert.NotBefore) to $($cert.NotAfter)""
+                        }}
+                    }} else {{
+                        Write-Output '  ❌ Certificate not found in TrustedPublisher'
+                    }}
+                    Write-Output ''
+                    
+                    # Check LocalMachine\My
+                    Write-Output '🔐 LocalMachine\My (Personal):'
+                    $certs = Get-ChildItem Cert:\LocalMachine\My | 
+                        Where-Object {{$_.Thumbprint -eq '{_certificateThumbprint}' -or $_.Subject -like '*{_certificateName}*'}}
+                    if ($certs) {{
+                        foreach ($cert in $certs) {{
+                            Write-Output ""  ✅ FOUND: $($cert.Subject)""
+                            Write-Output ""     Thumbprint: $($cert.Thumbprint)""
+                            Write-Output ""     Has Private Key: $($cert.HasPrivateKey)""
+                            if ($cert.HasPrivateKey) {{
+                                Write-Output ""     ⭐ PERFECT FOR SIGNING!""
+                            }}
+                        }}
+                    }} else {{
+                        Write-Output '  ❌ Certificate not found in Personal store'
+                    }}
+                    Write-Output ''
+                    
+                    # Check CurrentUser\My
+                    Write-Output '🔐 CurrentUser\My (Personal):'
+                    $certs = Get-ChildItem Cert:\CurrentUser\My | 
+                        Where-Object {{$_.Thumbprint -eq '{_certificateThumbprint}' -or $_.Subject -like '*{_certificateName}*'}}
+                    if ($certs) {{
+                        foreach ($cert in $certs) {{
+                            Write-Output ""  ✅ FOUND: $($cert.Subject)""
+                            Write-Output ""     Thumbprint: $($cert.Thumbprint)""
+                            Write-Output ""     Has Private Key: $($cert.HasPrivateKey)""
+                        }}
+                    }} else {{
+                        Write-Output '  ❌ Certificate not found in CurrentUser Personal store'
+                    }}";
+
+                var psi = new ProcessStartInfo
                 {
-                    new { Store = StoreName.My, Location = StoreLocation.LocalMachine, Name = "LocalMachine\\My (Personal)" },
-                    new { Store = StoreName.My, Location = StoreLocation.CurrentUser, Name = "CurrentUser\\My (Personal)" },
-                    new { Store = StoreName.TrustedPublisher, Location = StoreLocation.LocalMachine, Name = "LocalMachine\\TrustedPublisher" },
-                    new { Store = StoreName.TrustedPublisher, Location = StoreLocation.CurrentUser, Name = "CurrentUser\\TrustedPublisher" },
-                    new { Store = StoreName.Root, Location = StoreLocation.LocalMachine, Name = "LocalMachine\\Root" }
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -Command \"{diagnosticCommand}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
                 };
 
-                bool foundInTrustedPublisher = false;
-                bool foundInPersonalWithPrivateKey = false;
-
-                foreach (var storeInfo in storesToCheck)
+                using var process = Process.Start(psi);
+                if (process != null)
                 {
-                    using var store = new X509Store(storeInfo.Store, storeInfo.Location);
-                    store.Open(OpenFlags.ReadOnly);
-
-                    issues.Add($"📁 {storeInfo.Name}: {store.Certificates.Count} certificates");
-
-                    // Check by thumbprint
-                    if (!string.IsNullOrEmpty(_certificateThumbprint))
-                    {
-                        var certsByThumbprint = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
-                        foreach (X509Certificate2 cert in certsByThumbprint)
-                        {
-                            var hasPrivateKey = cert.HasPrivateKey ? "✅ Has Private Key" : "❌ No Private Key";
-                            issues.Add($"  🎯 FOUND BY THUMBPRINT: {cert.Subject}");
-                            issues.Add($"     {hasPrivateKey}");
-                            issues.Add($"     Valid: {cert.NotBefore:yyyy-MM-dd} to {cert.NotAfter:yyyy-MM-dd}");
-
-                            if (storeInfo.Store == StoreName.TrustedPublisher)
-                            {
-                                foundInTrustedPublisher = true;
-                                issues.Add($"     ⚠️  Found in TrustedPublisher - need to copy to Personal store");
-                            }
-
-                            if (cert.HasPrivateKey && storeInfo.Store == StoreName.My)
-                            {
-                                foundInPersonalWithPrivateKey = true;
-                                issues.Add($"     ⭐ PERFECT FOR SIGNING!");
-                            }
-                            else if (!cert.HasPrivateKey)
-                            {
-                                issues.Add($"     ⚠️  Can't sign - no private key");
-                            }
-                        }
-                    }
-
-                    // Check by subject name
-                    var certsBySubject = store.Certificates.Find(X509FindType.FindBySubjectName, _certificateName, false);
-                    foreach (X509Certificate2 cert in certsBySubject)
-                    {
-                        var hasPrivateKey = cert.HasPrivateKey ? "✅ Has Private Key" : "❌ No Private Key";
-                        issues.Add($"  📋 FOUND BY SUBJECT: {cert.Subject}");
-                        issues.Add($"     Thumbprint: {cert.Thumbprint}");
-                        issues.Add($"     {hasPrivateKey}");
-
-                        if (storeInfo.Store == StoreName.TrustedPublisher)
-                        {
-                            foundInTrustedPublisher = true;
-                        }
-
-                        if (cert.HasPrivateKey && storeInfo.Store == StoreName.My)
-                        {
-                            foundInPersonalWithPrivateKey = true;
-                            issues.Add($"     ⭐ PERFECT FOR SIGNING!");
-                        }
-                    }
-
-                    issues.Add("");
-                }
-
-                issues.Add("🔧 DIAGNOSIS & SOLUTION:");
-
-                if (foundInTrustedPublisher && !foundInPersonalWithPrivateKey)
-                {
-                    issues.Add("❌ PROBLEM: Certificate found in TrustedPublisher but NOT in Personal store with private key");
-                    issues.Add("");
-                    issues.Add("✅ SOLUTION - You need to import the certificate with private key:");
-                    issues.Add("1. Find your original .pfx/.p12 certificate file");
-                    issues.Add("2. Run 'certmgr.msc' as Administrator");
-                    issues.Add("3. Navigate to Personal > Certificates");
-                    issues.Add("4. Right-click > All Tasks > Import...");
-                    issues.Add("5. Select your .pfx file");
-                    issues.Add("6. Enter the password");
-                    issues.Add("7. Check 'Mark this key as exportable'");
-                    issues.Add("8. Choose 'Personal' store (not Trusted Publishers)");
-                    issues.Add("");
-                    issues.Add("OR use PowerShell:");
-                    issues.Add($"Import-PfxCertificate -FilePath 'C:\\path\\to\\your.pfx' -CertStoreLocation Cert:\\LocalMachine\\My");
-                }
-                else if (!foundInTrustedPublisher && !foundInPersonalWithPrivateKey)
-                {
-                    issues.Add("❌ PROBLEM: Certificate not found in any store");
-                    issues.Add("✅ SOLUTION: Import your certificate with private key to Personal store");
-                }
-                else if (foundInPersonalWithPrivateKey)
-                {
-                    issues.Add("✅ Certificate is correctly installed for signing!");
+                    process.WaitForExit();
+                    var output = process.StandardOutput.ReadToEnd();
+                    issues.Add(output);
                 }
 
                 issues.Add("");
-                issues.Add("📝 NOTES:");
-                issues.Add("• TrustedPublisher = Public keys only (for verification)");
-                issues.Add("• Personal (My) = Private keys (for signing)");
-                issues.Add("• SignTool requires certificates in Personal store");
-                issues.Add("• All files use SHA256 hash algorithm (modern standard)");
-                issues.Add("• PowerShell scripts require SHA256 (as requested)");
+                issues.Add("🔧 NOTES:");
+                issues.Add("• PowerShell Set-AuthenticodeSignature can use certificates from:");
+                issues.Add("  - LocalMachine\\TrustedPublisher (as specified in your command)");
+                issues.Add("  - LocalMachine\\My (Personal)");
+                issues.Add("  - CurrentUser\\My (Personal)");
+                issues.Add("• SHA256 hash algorithm is used for all signatures");
+                issues.Add("• Timestamp server: " + _timestampServer);
 
             }
             catch (Exception ex)

@@ -495,7 +495,7 @@ namespace IntunePackagingTool.Services
             var createAppPayload = new Dictionary<string, object>
             {
                 ["@odata.type"] = "#microsoft.graph.win32LobApp",
-                ["displayName"] = $"{appInfo.Manufacturer} {appInfo.Name}",
+                ["displayName"] = $"{appInfo.Manufacturer} {appInfo.Name} {appInfo.Version}",
                 ["description"] = description,
                 ["publisher"] = appInfo.Manufacturer,
                 ["displayVersion"] = appInfo.Version,

@@ -163,6 +163,7 @@ namespace IntunePackagingTool.Models
 
     public class AssignedGroup
     {
+        public string GroupId { get; set; }
         public string GroupName { get; set; } = "";
         public string AssignmentType { get; set; } = "";
     }

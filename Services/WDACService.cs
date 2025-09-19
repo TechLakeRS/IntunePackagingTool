@@ -13,14 +13,14 @@ namespace IntunePackagingTool.Services
     {
         
         private readonly string _vmScriptPath;
-        private readonly string _catalogOutputPath;
-        private readonly bool _useSimpleScript;
+      // private readonly string _catalogOutputPath;
+        //private readonly bool _useSimpleScript;
 
-        public WDACService()
+       public WDACService()
         {
            
             _vmScriptPath = @"\\nbb.local\sys\SCCMData\SCRIPTS\Intune\CreateSecurityCatalog\Create_CatVM.ps1";
-            _catalogOutputPath = @"\\nbb.local\sys\SCCMData\SCRIPTS\Intune\CreateSecurityCatalog\CatTS";
+          //  _catalogOutputPath = @"\\nbb.local\sys\SCCMData\SCRIPTS\Intune\CreateSecurityCatalog\CatTS";
 
            
         }
@@ -183,8 +183,6 @@ namespace IntunePackagingTool.Services
 
             return result;
         }
-
-       
 
         private string BuildVMScriptArguments(CatalogTask task)
         {

@@ -47,14 +47,18 @@ namespace IntunePackagingTool
 
         // Package Management
         private string _currentPackagePath = "";
-        private string _generatedCatalogPath = "";
-        private bool _catalogGenerated = false;
+       // private string _generatedCatalogPath = "";
+        //private bool _catalogGenerated = false;
         private PSADTOptions? _currentPSADTOptions = null;
         private string _detectedPackageType = "";
 
         #endregion
 
         #region Properties
+        public IntuneService GetIntuneService()
+        {
+            return _intuneService;
+        }
 
         private int MaxPage
         {
@@ -1052,12 +1056,7 @@ namespace IntunePackagingTool
             }
         }
 
-        private void ShowSettingsPage()
-        {
-            CreateApplicationPage.Visibility = Visibility.Collapsed;
-            LoadConfigurationDisplay();
-            SettingsPage.Visibility = Visibility.Visible;
-        }
+        
 
         #endregion
 

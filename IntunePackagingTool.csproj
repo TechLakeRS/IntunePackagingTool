@@ -20,7 +20,7 @@
 		<AssemblyTitle>IntunePackagingTool</AssemblyTitle>
 		<Company>NBB</Company>
 		<Copyright>Copyright © NBB 2025</Copyright>
-		<Description>Application packaging and deployment tool for Microsoft Intune</Description>
+		<Description>Application packaging and deployment tool for Microsoft Intune created by Riyadh Sarker</Description>
 		
 		<!-- Application Settings -->
 		
@@ -83,7 +83,7 @@
 	
 	<!-- XAML Settings -->
 	<ItemGroup>
-		<Page Update="ApplicationDetailView.xaml">
+		<Page Update="Dialogs\ApplicationDetailView.xaml">
 			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</Page>
 	</ItemGroup>

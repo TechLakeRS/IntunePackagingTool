@@ -3,6 +3,8 @@ using IntunePackagingTool.Models;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Net.Http.Json;
+
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
@@ -24,13 +26,11 @@ namespace IntunePackagingTool.Services
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
         private bool _disposed = false;
-     
+      
 
         public string ClientId => _clientId;
         public string TenantId => _tenantId;
         public string CertificateThumbprint => _certificateThumbprint;
-
-
 
 
         public async Task<string> GetAccessTokenAsync()
@@ -400,8 +400,7 @@ namespace IntunePackagingTool.Services
                 throw new Exception($"Failed to get application details from Intune: {ex.Message}", ex);
             }
         }
-
-        // Extract app parsing logic into a separate method
+        
         private IntuneApplication ParseIntuneApplication(JsonElement app)
         {
             var id = app.GetProperty("id").GetString() ?? "";
@@ -437,8 +436,7 @@ namespace IntunePackagingTool.Services
                 LastModified = DateTime.Now
             };
         }
-
-        // Cache invalidation method for ApplicationDetailView
+        
         public void InvalidateApplicationCache(string appId)
         {
             _cache.Clear($"app_detail_{appId}");
@@ -447,7 +445,6 @@ namespace IntunePackagingTool.Services
             _cache.ClearPattern("apps_list");
             _cache.ClearPattern("apps_paged");
         }
-
 
         private static long GetSafeLong(JsonElement element, string propertyName)
         {
@@ -706,7 +703,7 @@ namespace IntunePackagingTool.Services
 
 
                 // First check if group exists
-                var checkUrl = $"https://graph.microsoft.com/v1.0/groups?$filter=displayName eq '{Uri.EscapeDataString(displayName)}'";
+                var checkUrl = $"https://graph.microsoft.com/beta/groups?$filter=displayName eq '{Uri.EscapeDataString(displayName)}'";
                 var checkResponse = await _sharedHttpClient.GetAsync(checkUrl);
 
                 if (checkResponse.IsSuccessStatusCode)
@@ -738,7 +735,7 @@ namespace IntunePackagingTool.Services
                     securityEnabled = true
                 };
 
-                var createUrl = "https://graph.microsoft.com/v1.0/groups";
+                var createUrl = "https://graph.microsoft.com/beta/groups";
                 var content = new StringContent(JsonSerializer.Serialize(groupPayload),
                     System.Text.Encoding.UTF8, "application/json");
 
@@ -837,6 +834,313 @@ namespace IntunePackagingTool.Services
         }
 
 
+        public async Task<GroupDevice> FindDeviceByNameAsync(string deviceName)
+        {
+            try
+            {
+                var requestUrl = $"https://graph.microsoft.com/beta/deviceManagement/managedDevices?$filter=deviceName eq '{Uri.EscapeDataString(deviceName)}'";
+
+                var response = await _sharedHttpClient.GetAsync(requestUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseText = await response.Content.ReadAsStringAsync();
+                    var jsonDoc = JsonDocument.Parse(responseText);
+
+                    if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray) &&
+                        valueArray.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var deviceElement in valueArray.EnumerateArray())
+                        {
+                            var device = new GroupDevice
+                            {
+                                Id = GetStringValue(deviceElement, "id"),
+                                DeviceName = GetStringValue(deviceElement, "deviceName"),
+                                UserPrincipalName = GetStringValue(deviceElement, "userPrincipalName"),
+                                OperatingSystem = GetStringValue(deviceElement, "operatingSystem"),
+                                IsCompliant = deviceElement.TryGetProperty("complianceState", out var complianceProp)
+                                    && complianceProp.GetString() == "compliant",
+                                LastSyncDateTime = GetSafeDateTime(deviceElement, "lastSyncDateTime")
+                            };
+
+                            return device;
+                        }
+                    }
+                }
+
+               
+                var allDevices = await GetAllManagedDevicesAsync();
+                return allDevices.FirstOrDefault(d =>
+                    d.DeviceName.Equals(deviceName, StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error finding device by name: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<bool> IsDeviceInGroupAsync(string deviceId, string groupId)
+        {
+            try
+            {
+                await GetAccessTokenAsync();
+
+                var requestUrl = $"https://graph.microsoft.com/beta/groups/{groupId}/members/{deviceId}";
+
+                var response = await _sharedHttpClient.GetAsync(requestUrl);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking device membership: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task AddDeviceToGroupAsync(string deviceId, string groupId)
+        {
+            try
+            {
+                await GetAccessTokenAsync();
+
+                var requestUrl = $"https://graph.microsoft.com/beta/groups/{groupId}/members/$ref";
+
+                var payload = new
+                {
+                    @odata = new { id = $"https://graph.microsoft.com/beta/directoryObjects/{deviceId}" }
+                };
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(new { @odata = new { id = $"https://graph.microsoft.com/beta/directoryObjects/{deviceId}" } }),
+                    Encoding.UTF8,
+                    "application/json"
+                );
+
+                var response = await _sharedHttpClient.PostAsync(requestUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"Failed to add device to group: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error adding device to group: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task RemoveDeviceFromGroupAsync(string groupId, string deviceId)
+        {
+            try
+            {
+                await GetAccessTokenAsync();
+
+                var requestUrl = $"https://graph.microsoft.com/beta/groups/{groupId}/members/{deviceId}/$ref";
+
+                var response = await _sharedHttpClient.DeleteAsync(requestUrl);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"Failed to remove device from group: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error removing device from group: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task RemoveDevicesFromGroupAsync(string groupId, List<string> deviceIds)
+        {
+            var tasks = new List<Task>();
+            const int batchSize = 5;
+
+            for (int i = 0; i < deviceIds.Count; i += batchSize)
+            {
+                var batch = deviceIds.Skip(i).Take(batchSize);
+
+                foreach (var deviceId in batch)
+                {
+                    tasks.Add(RemoveDeviceFromGroupAsync(groupId, deviceId));
+                }
+
+                await Task.WhenAll(tasks);
+                tasks.Clear();
+
+                if (i + batchSize < deviceIds.Count)
+                {
+                    await Task.Delay(500);
+                }
+            }
+        }
+
+        public async Task<List<GroupDevice>> GetGroupMembersAsync(string groupId)
+        {
+            try
+            {
+                await GetAccessTokenAsync();
+                var members = new List<GroupDevice>();
+
+                Debug.WriteLine($"Fetching members for group: {groupId}");
+
+                var requestUrl = $"https://graph.microsoft.com/v1.0/groups/{groupId}/members";
+
+                while (!string.IsNullOrEmpty(requestUrl))
+                {
+                    var response = await _sharedHttpClient.GetAsync(requestUrl);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseText = await response.Content.ReadAsStringAsync();
+                        Debug.WriteLine($"Members response: {responseText.Substring(0, Math.Min(500, responseText.Length))}");
+
+                        var jsonDoc = JsonDocument.Parse(responseText);
+
+                        if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                        {
+                            foreach (var member in valueArray.EnumerateArray())
+                            {
+                                var memberType = GetStringValue(member, "@odata.type");
+
+                                if (memberType == "#microsoft.graph.device")
+                                {
+                                    // Just parse the device information we have!
+                                    var device = new GroupDevice
+                                    {
+                                        Id = GetStringValue(member, "id"),
+                                        DeviceName = GetStringValue(member, "displayName"),
+                                        // The deviceId field is the Azure AD device ID
+                                        AzureDeviceId = GetStringValue(member, "deviceId"),
+                                        OperatingSystem = GetStringValue(member, "operatingSystem"),
+                                        // Parse the trust type which indicates domain join status
+                                        TrustType = GetStringValue(member, "trustType"),
+                                        DeviceCategory = GetStringValue(member, "deviceCategory"),
+                                        DeviceOwnership = GetStringValue(member, "deviceOwnership"),
+                                        IsCompliant = member.TryGetProperty("isCompliant", out var compliantProp)
+                                            && compliantProp.GetBoolean(),
+                                        LastSyncDateTime = GetSafeDateTime(member, "approximateLastSignInDateTime"),
+                                        CreatedDateTime = GetSafeDateTime(member, "createdDateTime"),
+                                        AccountEnabled = member.TryGetProperty("accountEnabled", out var enabledProp)
+                                            && enabledProp.GetBoolean()
+                                    };
+
+                                    // Try to get OS version from deviceVersion if available
+                                    if (member.TryGetProperty("deviceVersion", out var versionProp))
+                                    {
+                                        device.OSVersion = versionProp.ValueKind == JsonValueKind.Number
+                                            ? versionProp.GetInt32().ToString()
+                                            : GetStringValue(member, "deviceVersion");
+                                    }
+
+                                    // Get profile type
+                                    device.ProfileType = GetStringValue(member, "profileType");
+
+                                    Debug.WriteLine($"Added device: {device.DeviceName} (ID: {device.Id})");
+                                    members.Add(device);
+                                }
+                            }
+                        }
+
+                        // Check for next page
+                        if (jsonDoc.RootElement.TryGetProperty("@odata.nextLink", out var nextLinkProp))
+                        {
+                            requestUrl = nextLinkProp.GetString();
+                        }
+                        else
+                        {
+                            requestUrl = null;
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception($"Failed to get group members: {response.StatusCode}");
+                    }
+                }
+
+                Debug.WriteLine($"Total devices found: {members.Count}");
+                return members;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting group members: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<List<GroupDevice>> GetAllManagedDevicesAsync()
+        {
+            try
+            {
+                await GetAccessTokenAsync();
+
+                var devices = new List<GroupDevice>();
+                var requestUrl = "https://graph.microsoft.com/beta/deviceManagement/managedDevices";
+
+                while (!string.IsNullOrEmpty(requestUrl))
+                {
+                    var response = await _sharedHttpClient.GetAsync(requestUrl);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseText = await response.Content.ReadAsStringAsync();
+                        var jsonDoc = JsonDocument.Parse(responseText);
+
+                        if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                        {
+                            foreach (var deviceElement in valueArray.EnumerateArray())
+                            {
+                                var device = new GroupDevice
+                                {
+                                    Id = GetStringValue(deviceElement, "id"),
+                                    DeviceName = GetStringValue(deviceElement, "deviceName"),
+                                    UserPrincipalName = GetStringValue(deviceElement, "userPrincipalName"),
+                                    OperatingSystem = GetStringValue(deviceElement, "operatingSystem"),
+                                    IsCompliant = deviceElement.TryGetProperty("complianceState", out var complianceProp)
+                                        && complianceProp.GetString() == "compliant",
+                                    LastSyncDateTime = GetSafeDateTime(deviceElement, "lastSyncDateTime")
+                                };
+
+                                devices.Add(device);
+                            }
+                        }
+
+                        if (jsonDoc.RootElement.TryGetProperty("@odata.nextLink", out var nextLinkProp))
+                        {
+                            requestUrl = nextLinkProp.GetString();
+                        }
+                        else
+                        {
+                            requestUrl = null;
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception($"Failed to get managed devices: {response.StatusCode}");
+                    }
+                }
+
+                return devices;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting all managed devices: {ex.Message}");
+                throw;
+            }
+        }
+
+        private string GetStringValue(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String)
+            {
+                return prop.GetString() ?? "";
+            }
+            return "";
+        }
         private async Task<List<AssignedGroup>> GetAssignedGroupsAsync(string appId)
         {
             var groups = new List<AssignedGroup>();
@@ -857,6 +1161,7 @@ namespace IntunePackagingTool.Services
                         {
                             var intent = assignment.TryGetProperty("intent", out var intentProp) ? intentProp.GetString() : "Unknown";
                             var groupName = "Unknown Group";
+                            var groupId = "";  // Add this
 
                             if (assignment.TryGetProperty("target", out var targetObj))
                             {
@@ -867,8 +1172,8 @@ namespace IntunePackagingTool.Services
                                     case "#microsoft.graph.groupAssignmentTarget":
                                         if (targetObj.TryGetProperty("groupId", out var groupIdProp))
                                         {
-                                            var groupId = groupIdProp.GetString();
-                                            if (groupId != null)
+                                            groupId = groupIdProp.GetString();  // Capture the GroupId
+                                            if (!string.IsNullOrEmpty(groupId))
                                             {
                                                 groupName = await GetGroupNameAsync(groupId) ?? $"Group ID: {groupId}";
                                             }
@@ -895,6 +1200,7 @@ namespace IntunePackagingTool.Services
 
                             groups.Add(new AssignedGroup
                             {
+                                GroupId = groupId,  // Add this line
                                 GroupName = groupName,
                                 AssignmentType = intent ?? "Unknown",
                             });
@@ -906,6 +1212,7 @@ namespace IntunePackagingTool.Services
                 {
                     groups.Add(new AssignedGroup
                     {
+                        GroupId = "",  // Add this
                         GroupName = "No Assignments",
                         AssignmentType = "Not assigned to any groups"
                     });
@@ -914,7 +1221,12 @@ namespace IntunePackagingTool.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error getting assigned groups: {ex.Message}");
-                groups.Add(new AssignedGroup { GroupName = "Error Loading Groups", AssignmentType = "Could not load assignments" });
+                groups.Add(new AssignedGroup
+                {
+                    GroupId = "",  // Add this
+                    GroupName = "Error Loading Groups",
+                    AssignmentType = "Could not load assignments"
+                });
             }
 
             return groups;
@@ -985,10 +1297,9 @@ namespace IntunePackagingTool.Services
             {
                 var reportUrl = "https://graph.microsoft.com/beta/deviceManagement/reports/getAppStatusOverviewReport";
 
-                // Call without filter to get all apps
                 var requestBody = new
                 {
-                    filter = ""  // Empty filter gets all apps
+                    filter = $"(ApplicationId eq '{appId}')"
                 };
 
                 var content = new StringContent(
@@ -1005,50 +1316,54 @@ namespace IntunePackagingTool.Services
                 }
 
                 var reportContent = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"Statistics Response: {reportContent}");
+
                 var data = JsonDocument.Parse(reportContent);
 
-                // Find our app in the results
                 if (data.RootElement.TryGetProperty("Values", out var values))
                 {
                     foreach (var row in values.EnumerateArray())
                     {
                         var rowData = row.EnumerateArray().ToList();
 
-                        // ApplicationId is at index 0
-                        if (rowData.Count > 0 && rowData[0].GetString() == appId)
-                        {
-                            // Found our app! Parse the statistics
-                            // Based on the schema from your document:
-                            // [6] InstalledDeviceCount
-                            // [7] InstalledUserCount  
-                            // [8] FailedDeviceCount
-                            // [9] FailedUserCount
-                            // [10] PendingInstallDeviceCount
-                            // [11] PendingInstallUserCount
-                            // [12] NotApplicableDeviceCount
-                            // [13] NotApplicableUserCount
-                            // [14] NotInstalledDeviceCount
-                            // [15] NotInstalledUserCount
+                        // Based on the actual schema from your response:
+                        // [0] ApplicationId
+                        // [1] FailedDeviceCount
+                        // [2] PendingInstallDeviceCount  
+                        // [3] InstalledDeviceCount
+                        // [4] NotInstalledDeviceCount
+                        // [5] NotApplicableDeviceCount
 
+                        if (rowData.Count >= 6)
+                        {
                             var stats = new InstallationStatistics
                             {
-                                SuccessfulInstalls = rowData[6].GetInt32(),  // InstalledDeviceCount
-                                FailedInstalls = rowData[8].GetInt32(),       // FailedDeviceCount
-                                PendingInstalls = rowData[10].GetInt32(),     // PendingInstallDeviceCount
-                                NotInstalled = rowData[14].GetInt32(),        // NotInstalledDeviceCount
+                                FailedInstalls = GetSafeInt(rowData[1]),      // FailedDeviceCount
+                                PendingInstalls = GetSafeInt(rowData[2]),     // PendingInstallDeviceCount
+                                SuccessfulInstalls = GetSafeInt(rowData[3]),  // InstalledDeviceCount
+                                NotInstalled = GetSafeInt(rowData[4]),        // NotInstalledDeviceCount
                             };
 
-                            stats.TotalDevices = stats.SuccessfulInstalls + stats.FailedInstalls +
-                                                stats.PendingInstalls + stats.NotInstalled;
+                            var notApplicable = GetSafeInt(rowData[5]);       // NotApplicableDeviceCount
 
-                            Debug.WriteLine($"Found stats for {appId}: Success={stats.SuccessfulInstalls}, Failed={stats.FailedInstalls}, Pending={stats.PendingInstalls}, NotInstalled={stats.NotInstalled}");
+                            // Calculate total devices
+                            stats.TotalDevices = stats.SuccessfulInstalls + stats.FailedInstalls +
+                                                stats.PendingInstalls + stats.NotInstalled + notApplicable;
+
+                            Debug.WriteLine($"Found stats for {appId}:");
+                            Debug.WriteLine($"  Installed: {stats.SuccessfulInstalls}");
+                            Debug.WriteLine($"  Failed: {stats.FailedInstalls}");
+                            Debug.WriteLine($"  Pending: {stats.PendingInstalls}");
+                            Debug.WriteLine($"  NotInstalled: {stats.NotInstalled}");
+                            Debug.WriteLine($"  NotApplicable: {notApplicable}");
+                            Debug.WriteLine($"  Total: {stats.TotalDevices}");
 
                             return stats;
                         }
                     }
                 }
 
-                Debug.WriteLine($"App {appId} not found in report results");
+                Debug.WriteLine($"No statistics found for app {appId}");
                 return new InstallationStatistics();
             }
             catch (Exception ex)
@@ -1056,6 +1371,22 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"Error getting statistics: {ex.Message}");
                 return new InstallationStatistics();
             }
+        }
+
+
+        
+        private static int GetSafeInt(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Number)
+            {
+                return element.GetInt32();
+            }
+            else if (element.ValueKind == JsonValueKind.String)
+            {
+                if (int.TryParse(element.GetString(), out var value))
+                    return value;
+            }
+            return 0;
         }
         public async Task<List<DeviceInstallStatus>> GetApplicationInstallStatusAsync(string appId)
         {
@@ -1101,9 +1432,15 @@ namespace IntunePackagingTool.Services
                                 UserName = GetStringValue(rowData[5]),
                                 Platform = GetStringValue(rowData[6]),
                                 ErrorCode = rowData[8].ValueKind == JsonValueKind.Number ? rowData[8].GetInt32() : null,
-                                InstallState = GetStringValue(rowData[14]),  // AppInstallState (already as string)
+                                InstallState = GetInstallStateString(rowData[15]),  // ✅ FIXED: Use GetInstallStateString
                                 InstallStateDetail = GetStringValue(rowData[16]),
                             };
+
+                            // Add hex error code if there's an error
+                            if (status.ErrorCode.HasValue && status.ErrorCode != 0)
+                            {
+                                status.HexErrorCode = $"0x{status.ErrorCode.Value:X8}";
+                            }
 
                             if (rowData[11].ValueKind == JsonValueKind.String)
                             {
@@ -1118,7 +1455,17 @@ namespace IntunePackagingTool.Services
                     }
                 }
 
-                return allStatuses;
+                var deduplicatedStatuses = allStatuses
+              .GroupBy(s => s.DeviceName)
+              .Select(group => group
+                  .OrderByDescending(s => s.LastSyncDateTime)  // Most recent first
+                  .ThenBy(s => string.IsNullOrEmpty(s.UserPrincipalName) ? 0 : 1)  // Prefer user records over system
+                  .First())
+              .ToList();
+
+                Debug.WriteLine($"Deduplicated from {allStatuses.Count} to {deduplicatedStatuses.Count} records");
+
+                return deduplicatedStatuses;
             }
             catch (Exception ex)
             {
@@ -1127,35 +1474,50 @@ namespace IntunePackagingTool.Services
             }
         }
 
-        // Helper method if you don't already have it
         private string GetStringValue(JsonElement element)
         {
             return element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "";
         }
 
-      
-
         private string GetInstallStateString(JsonElement element)
         {
-            if (element.ValueKind != JsonValueKind.Number)
-                return "Unknown";
-
-            var stateValue = element.GetInt32();
-
-            // Map int values to string states
-            return stateValue switch
+            
+            if (element.ValueKind == JsonValueKind.String)
             {
-                0 => "NotApplicable",
-                1 => "Installed",
-                2 => "Failed",
-                3 => "Pending",
-                4 => "NotInstalled",
-                5 => "UninstallFailed",
-                _ => $"Unknown ({stateValue})"
-            };
+                var stringValue = element.GetString()?.ToLower() ?? "";
+
+               
+                return stringValue switch
+                {
+                    "installed" => "Installed",
+                    "failed" => "Failed",
+                    "pending" => "Pending",
+                    "notinstalled" => "NotInstalled",
+                    "notapplicable" => "NotApplicable",
+                    "uninstallfailed" => "UninstallFailed",
+                    _ => stringValue // Return as-is if not recognized
+                };
+            }
+
+            
+            if (element.ValueKind == JsonValueKind.Number)
+            {
+                var stateValue = element.GetInt32();
+                return stateValue switch
+                {
+                    0 => "NotApplicable",
+                    1 => "Installed",
+                    2 => "Failed",
+                    3 => "Pending",
+                    4 => "NotInstalled",
+                    5 => "UninstallFailed",
+                    _ => $"Unknown ({stateValue})"
+                };
+            }
+
+            // Handle null or other types
+            return "Unknown";
         }
-
-
 
 
         // Dispose method to clean up HttpClient
@@ -1187,6 +1549,7 @@ namespace IntunePackagingTool.Services
         }
     }
 
+ 
     public class GraphResponse<T>
     {
         [JsonPropertyName("@odata.context")]

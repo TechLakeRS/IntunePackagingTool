@@ -1083,11 +1083,6 @@ namespace IntunePackagingTool.Services
             return sb.ToString();
         }
 
-        public string GetScriptPath(string manufacturer, string appName, string version)
-        {
-            var cleanManufacturer = manufacturer.Replace(" ", "_");
-            var cleanAppName = appName.Replace(" ", "_");
-            return Path.Combine(_baseOutputPath, $"{cleanManufacturer}_{cleanAppName}", version, "Application", "Deploy-Application.ps1");
-        }
+      
     }
 }

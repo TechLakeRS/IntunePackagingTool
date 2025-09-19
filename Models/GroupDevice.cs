@@ -1,0 +1,29 @@
+﻿using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace IntunePackagingTool.Models
+{
+    public class GroupDevice 
+    {
+            public string Id { get; set; }
+            public string DeviceName { get; set; }
+            public string AzureDeviceId { get; set; }  // The Azure AD device ID
+            public string UserPrincipalName { get; set; }
+            public string OperatingSystem { get; set; }
+            public string OSVersion { get; set; }
+            public string DeviceCategory { get; set; }  // e.g., "Workstation"
+            public string DeviceOwnership { get; set; }  // e.g., "Company"
+            public string TrustType { get; set; }  // e.g., "AzureAd", "ServerAd", "Workplace"
+            public string ProfileType { get; set; }
+            public bool IsCompliant { get; set; }
+            public bool AccountEnabled { get; set; }
+            public DateTime LastSyncDateTime { get; set; }
+            public DateTime CreatedDateTime { get; set; }
+
+            // Display helpers
+            public string ComplianceStatus => IsCompliant ? "Compliant" : "Non-Compliant";
+            public string EnabledStatus => AccountEnabled ? "Enabled" : "Disabled";
+      
+    }
+}
