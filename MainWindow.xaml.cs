@@ -38,6 +38,7 @@ namespace IntunePackagingTool
         private SettingsService? _settingsService;
         private BatchFileSigner? _batchSigner;
         private WDACToolsPage? _wdacToolsPage;
+        private WingetCatalogView _wingetCatalogView;
 
 
         // Pagination
@@ -141,6 +142,7 @@ namespace IntunePackagingTool
             LoadCategoriesDropdown();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
             _wdacToolsPage = new WDACToolsPage();
+            _wingetCatalogView = new WingetCatalogView();
             this.DataContext = this;
 
         }
@@ -246,6 +248,23 @@ namespace IntunePackagingTool
                     PageTitle.Text = "WDAC Security Tools";
                     PageSubtitle.Text = "Generate and manage Windows Defender Application Control catalogs";
                     break;
+                case "WingetCatalog":
+                    // Ensure the UserControl is added to the main content area if not already
+                    if (_wingetCatalogView == null)
+                    {
+                        _wingetCatalogView = new WingetCatalogView();
+                    }
+
+                    // Add to MainContentGrid if not already a child
+                    if (!MainContentGrid.Children.Contains(_wingetCatalogView))
+                    {
+                        MainContentGrid.Children.Add(_wingetCatalogView);
+                    }
+
+                    _wingetCatalogView.Visibility = Visibility.Visible;
+                    PageTitle.Text = "Winget Catalog";
+                    PageSubtitle.Text = "Browse and deploy applications from Windows Package Manager";
+                    break;
             }
         }
 
@@ -255,6 +274,7 @@ namespace IntunePackagingTool
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
             WDACToolsNavButton.Style = (Style)FindResource("SidebarNavButton");
+            WingetCatalogNavButton.Style = (Style)FindResource("SidebarNavButton");
 
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
@@ -264,6 +284,7 @@ namespace IntunePackagingTool
             CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
+            WingetCatalogNavButton.Style = (Style)FindResource("SidebarNavButton");
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
 
@@ -271,6 +292,12 @@ namespace IntunePackagingTool
         {
             ShowPage("WDACTools");
             UpdateNavigation(WDACToolsNavButton);
+        }
+
+        private void WingetCatalogNavButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowPage("WingetCatalog");
+            UpdateNavigation(WingetCatalogNavButton);
         }
 
         #endregion
@@ -395,7 +422,6 @@ namespace IntunePackagingTool
             if (ApplicationsList.SelectedItem != null)
             {
                 var selectedApp = ApplicationsList.SelectedItem as IntuneApplication;
-
                 if (selectedApp != null)
                 {
                     try
@@ -403,32 +429,44 @@ namespace IntunePackagingTool
                         StatusText.Text = $"Loading details for {selectedApp.DisplayName} from Microsoft Intune...";
                         ProgressBar.Visibility = Visibility.Visible;
                         ProgressBar.IsIndeterminate = true;
+
                         if (_intuneService == null)
                         {
                             MessageBox.Show("Intune service is not initialized", "Error",
                                 MessageBoxButton.OK, MessageBoxImage.Error);
                             return;
                         }
-                        var appDetail = await _intuneService.GetApplicationDetailAsync(selectedApp.Id);
-                        ProgressBar.Visibility = Visibility.Collapsed;
 
-                        if (appDetail != null)
+                        // Get data on background thread
+                        var appDetail = await _intuneService.GetApplicationDetailAsync(selectedApp.Id)
+                            .ConfigureAwait(false);
+
+                        // ALL UI updates must go through Dispatcher after ConfigureAwait(false)
+                        await Dispatcher.InvokeAsync(() =>
                         {
-                            ApplicationsListPanel.Visibility = Visibility.Collapsed;
-                            ApplicationDetailView.Visibility = Visibility.Visible;
-                            ApplicationDetailView.LoadApplicationDetail(appDetail);
+                            ProgressBar.Visibility = Visibility.Collapsed;
 
-                            PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
-                            PageSubtitle.Text = "Live data from Microsoft Intune";
-                            StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
-                        }
+                            if (appDetail != null)
+                            {
+                                ApplicationsListPanel.Visibility = Visibility.Collapsed;
+                                ApplicationDetailView.Visibility = Visibility.Visible;
+                                ApplicationDetailView.LoadApplicationDetail(appDetail);
+                                PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
+                                PageSubtitle.Text = "Live data from Microsoft Intune";
+                                StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
+                            }
+                        });
                     }
                     catch (Exception ex)
                     {
-                        ProgressBar.Visibility = Visibility.Collapsed;
-                        StatusText.Text = "Error loading application details";
-                        MessageBox.Show($"Error loading application details from Intune:\n\n{ex.Message}",
-                            "Intune API Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        // Even error handling needs Dispatcher after ConfigureAwait(false)
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            ProgressBar.Visibility = Visibility.Collapsed;
+                            StatusText.Text = "Error loading application details";
+                            MessageBox.Show($"Error loading application details from Intune:\n\n{ex.Message}",
+                                "Intune API Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        });
                     }
                 }
             }
@@ -559,33 +597,62 @@ namespace IntunePackagingTool
         {
             try
             {
+                // Disable button to prevent double-click
+                GenerateButton.IsEnabled = false;
                 ProgressBar.Visibility = Visibility.Visible;
                 StatusText.Text = "Generating package...";
 
-                if (!ValidatePackageInputs()) return;
+                // Validate inputs on UI thread (needs to read UI controls)
+                if (!ValidatePackageInputs())
+                {
+                    return;
+                }
 
+                // Collect data from UI controls while on UI thread
                 var appInfo = CreateApplicationInfo();
                 var psadtOptions = CollectPSADTOptions();
 
                 // Store the options for later use
                 _currentPSADTOptions = psadtOptions;
 
+                // Run package creation on background thread
                 var generator = new PSADTGenerator();
-                string packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions);
+                string packagePath = null;
+
+                await Task.Run(async () =>
+                {
+                    packagePath = await generator.CreatePackageAsync(appInfo, psadtOptions)
+                        .ConfigureAwait(false);
+                }).ConfigureAwait(false);
+
+                // Store the result
                 _currentPackagePath = packagePath;
 
-                
-                ShowPackageSuccess(appInfo, psadtOptions);
+                // Update UI on UI thread
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    ShowPackageSuccess(appInfo, psadtOptions);
+                    StatusText.Text = $"Package created successfully • {DateTime.Now:HH:mm:ss}";
+                });
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error generating package: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-                StatusText.Text = "Package generation failed";
+                // Handle errors on UI thread
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show($"Error generating package: {ex.Message}", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    StatusText.Text = "Package generation failed";
+                });
             }
             finally
             {
-                ProgressBar.Visibility = Visibility.Collapsed;
+                // Ensure UI cleanup happens on UI thread
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    GenerateButton.IsEnabled = true;
+                    ProgressBar.Visibility = Visibility.Collapsed;
+                });
             }
         }
 
@@ -1026,8 +1093,6 @@ namespace IntunePackagingTool
         }
 
 
-        
-
         #endregion
 
         #region Settings Management
@@ -1082,40 +1147,12 @@ namespace IntunePackagingTool
             }
         }
 
-       
-
-        
-
-        private void DiagnoseIntuneService()
-        {
-            try
-            {
-                if (_intuneService == null)
-                {
-                    MessageBox.Show("IntuneService is null after initialization attempt", "Debug Info");
-                    return;
-                }
-
-                var tenantId = _intuneService.TenantId;
-                var clientId = _intuneService.ClientId;
-
-                MessageBox.Show($"IntuneService initialized successfully\nTenant: {tenantId}\nClient: {clientId}", "Debug Info");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"IntuneService diagnostic failed: {ex.Message}", "Debug Info");
-            }
-        }
 
         #endregion
 
         #region Cleanup
 
-        protected override void OnClosed(EventArgs e)
-        {
-            base.OnClosed(e);
-            _intuneService?.Dispose();
-        }
+       
 
         #endregion
     }

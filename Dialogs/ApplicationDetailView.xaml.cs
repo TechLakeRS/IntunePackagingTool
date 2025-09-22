@@ -115,30 +115,46 @@ namespace IntunePackagingTool
             SourcePathText.Text = "Searching for network path...";
             ActionButtonsPanel.Visibility = Visibility.Collapsed;
 
-            await Task.Run(() =>
+            // Fire and forget - don't await this
+            _ = Task.Run(async () =>
             {
-                var networkPath = NetworkShareHelper.FindApplicationPath(app.DisplayName, app.Version);
-
-                Dispatcher.Invoke(() =>
+                try
                 {
-                    if (!string.IsNullOrEmpty(networkPath))
+                    var networkPath = NetworkShareHelper.FindApplicationPath(app.DisplayName, app.Version);
+
+                    await Dispatcher.InvokeAsync(() =>
                     {
-                        _currentApp.NetworkSharePath = networkPath;
-                        SourcePathText.Text = networkPath;
-                        ActionButtonsPanel.Visibility = Visibility.Visible;
-                        StatusText.Text = $"Loaded comprehensive details for {app.DisplayName} from Intune";
-                    }
-                    else
+                        if (!string.IsNullOrEmpty(networkPath))
+                        {
+                            _currentApp.NetworkSharePath = networkPath;
+                            SourcePathText.Text = networkPath;
+                            ActionButtonsPanel.Visibility = Visibility.Visible;
+                            StatusText.Text = $"Loaded comprehensive details for {app.DisplayName} from Intune";
+                        }
+                        else
+                        {
+                            SourcePathText.Text = "Network share folder not found";
+                            ActionButtonsPanel.Visibility = Visibility.Collapsed;
+                            ManualBrowsePanel.Visibility = Visibility.Visible;  // Show manual browse option
+                            StatusText.Text = $"Loaded details for {app.DisplayName} - Network path not found";
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    await Dispatcher.InvokeAsync(() =>
                     {
-                        SourcePathText.Text = "Network share folder not found";
+                        SourcePathText.Text = "Error searching network path";
                         ActionButtonsPanel.Visibility = Visibility.Collapsed;
-                        StatusText.Text = $"Loaded details for {app.DisplayName} - Network path not found";
-                    }
-                });
+                        ManualBrowsePanel.Visibility = Visibility.Visible;
+                        StatusText.Text = $"Loaded details for {app.DisplayName} - Network error";
+                    });
+                }
             });
         }
 
-       
+
+
 
         private void GroupItem_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {

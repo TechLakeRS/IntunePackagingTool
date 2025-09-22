@@ -14,19 +14,21 @@ using System.Windows;
 namespace IntunePackagingTool.Services
 
 {
-    public class IntuneService : IDisposable
+    public class IntuneService
     {
 
-        private static readonly HttpClient _sharedHttpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromMinutes(2)
-        };
+        private static readonly Lazy<HttpClient> _SharedHttpClient = new Lazy<HttpClient>(() =>
+        new HttpClient { Timeout = TimeSpan.FromMinutes(2) });
+
+        private static HttpClient _sharedHttpClient => _SharedHttpClient.Value;
 
         private readonly CacheService _cache = new CacheService();
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
         private bool _disposed = false;
-      
+        private readonly string _clientId = "b47987a1-70b4-415a-9a4e-9775473e382b";
+        private readonly string _tenantId = "43f10d24-b9bf-46da-a9c8-15c1b0990ce7";
+        private readonly string _certificateThumbprint = "CF6DCE7DF3377CA65D9B40F06BF8C2228AC7821F";
 
         public string ClientId => _clientId;
         public string TenantId => _tenantId;
@@ -386,7 +388,7 @@ namespace IntunePackagingTool.Services
                 var assignmentsTask = GetAssignedGroupsAsync(intuneAppId);
                 var categoriesTask = GetAppCategoriesAsync(intuneAppId);
 
-                await Task.WhenAll(assignmentsTask, categoriesTask);
+                await Task.WhenAll(assignmentsTask, categoriesTask).ConfigureAwait(false);
 
                 appDetail.AssignedGroups = await assignmentsTask;
                 appDetail.Category = await categoriesTask;
@@ -1148,7 +1150,7 @@ namespace IntunePackagingTool.Services
             try
             {
                 var assignmentsUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/assignments";
-                var response = await _sharedHttpClient!.GetAsync(assignmentsUrl);
+                var response = await _sharedHttpClient.GetAsync(assignmentsUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -1157,11 +1159,14 @@ namespace IntunePackagingTool.Services
 
                     if (json.TryGetProperty("value", out var assignmentsArray) && assignmentsArray.ValueKind == JsonValueKind.Array)
                     {
+                        // First pass: collect all assignments with their group IDs
+                        var groupsNeedingNames = new List<(AssignedGroup group, string groupId)>();
+
                         foreach (var assignment in assignmentsArray.EnumerateArray())
                         {
                             var intent = assignment.TryGetProperty("intent", out var intentProp) ? intentProp.GetString() : "Unknown";
                             var groupName = "Unknown Group";
-                            var groupId = "";  // Add this
+                            var groupId = "";
 
                             if (assignment.TryGetProperty("target", out var targetObj))
                             {
@@ -1172,38 +1177,73 @@ namespace IntunePackagingTool.Services
                                     case "#microsoft.graph.groupAssignmentTarget":
                                         if (targetObj.TryGetProperty("groupId", out var groupIdProp))
                                         {
-                                            groupId = groupIdProp.GetString();  // Capture the GroupId
+                                            groupId = groupIdProp.GetString();
                                             if (!string.IsNullOrEmpty(groupId))
                                             {
-                                                groupName = await GetGroupNameAsync(groupId) ?? $"Group ID: {groupId}";
-                                            }
-                                            else
-                                            {
-                                                groupName = "Unknown Group (No ID)";
+                                                // Create the group with temporary name
+                                                var group = new AssignedGroup
+                                                {
+                                                    GroupId = groupId,
+                                                    GroupName = $"Group ID: {groupId}", // Temporary name
+                                                    AssignmentType = intent ?? "Unknown"
+                                                };
+                                                groups.Add(group);
+                                                groupsNeedingNames.Add((group, groupId));
                                             }
                                         }
                                         break;
 
                                     case "#microsoft.graph.allLicensedUsersAssignmentTarget":
-                                        groupName = "All Licensed Users";
+                                        groups.Add(new AssignedGroup
+                                        {
+                                            GroupId = "",
+                                            GroupName = "All Licensed Users",
+                                            AssignmentType = intent ?? "Unknown"
+                                        });
                                         break;
 
                                     case "#microsoft.graph.allDevicesAssignmentTarget":
-                                        groupName = "All Devices";
+                                        groups.Add(new AssignedGroup
+                                        {
+                                            GroupId = "",
+                                            GroupName = "All Devices",
+                                            AssignmentType = intent ?? "Unknown"
+                                        });
                                         break;
 
                                     default:
-                                        groupName = targetType?.Replace("#microsoft.graph.", "") ?? "Unknown Target";
+                                        groups.Add(new AssignedGroup
+                                        {
+                                            GroupId = "",
+                                            GroupName = targetType?.Replace("#microsoft.graph.", "") ?? "Unknown Target",
+                                            AssignmentType = intent ?? "Unknown"
+                                        });
                                         break;
                                 }
                             }
+                        }
 
-                            groups.Add(new AssignedGroup
+                        // Second pass: fetch all group names in parallel
+                        if (groupsNeedingNames.Any())
+                        {
+                            var nameTasks = groupsNeedingNames.Select(async item =>
                             {
-                                GroupId = groupId,  // Add this line
-                                GroupName = groupName,
-                                AssignmentType = intent ?? "Unknown",
+                                try
+                                {
+                                    var name = await GetGroupNameAsync(item.groupId).ConfigureAwait(false);
+                                    if (!string.IsNullOrEmpty(name))
+                                    {
+                                        item.group.GroupName = name;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"Failed to get name for group {item.groupId}: {ex.Message}");
+                                    // Keep the temporary name if we can't get the real one
+                                }
                             });
+
+                            await Task.WhenAll(nameTasks).ConfigureAwait(false);
                         }
                     }
                 }
@@ -1212,7 +1252,7 @@ namespace IntunePackagingTool.Services
                 {
                     groups.Add(new AssignedGroup
                     {
-                        GroupId = "",  // Add this
+                        GroupId = "",
                         GroupName = "No Assignments",
                         AssignmentType = "Not assigned to any groups"
                     });
@@ -1223,7 +1263,7 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"Error getting assigned groups: {ex.Message}");
                 groups.Add(new AssignedGroup
                 {
-                    GroupId = "",  // Add this
+                    GroupId = "",
                     GroupName = "Error Loading Groups",
                     AssignmentType = "Could not load assignments"
                 });
@@ -1521,11 +1561,7 @@ namespace IntunePackagingTool.Services
 
 
         // Dispose method to clean up HttpClient
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
+        
 
         protected virtual void Dispose(bool disposing)
         {
@@ -1543,10 +1579,7 @@ namespace IntunePackagingTool.Services
             }
         }
 
-        ~IntuneService()
-        {
-            Dispose(false);
-        }
+        
     }
 
  

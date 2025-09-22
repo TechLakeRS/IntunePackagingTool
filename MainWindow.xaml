@@ -72,6 +72,8 @@
                             </StackPanel>
                         </StackPanel>
                     </Button>
+
+                  
                     <!-- WDAC -->
                     <Button Name="WDACToolsNavButton" Style="{StaticResource SidebarNavButton}" Click="WDACToolsNavButton_Click">
                         <StackPanel Orientation="Horizontal">
@@ -81,6 +83,19 @@
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="WDAC Tools" FontSize="14" FontWeight="Medium" Foreground="White"/>
                                 <TextBlock Text="Security catalogs" FontSize="10" Foreground="#BDC3C7"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+
+
+                    <Button Name="WingetCatalogNavButton" Style="{StaticResource SidebarNavButton}" Click="WingetCatalogNavButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#E67E22" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                <TextBlock Text="📦" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Winget Catalog" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                <TextBlock Text="Package Manager" FontSize="10" Foreground="#BDC3C7"/>
                             </StackPanel>
                         </StackPanel>
                     </Button>
@@ -564,6 +579,11 @@
                         <!-- Application Detail View (hidden by default) -->
                         <local:ApplicationDetailView x:Name="ApplicationDetailView" Visibility="Collapsed"/>
                     </Grid>
+
+                    <Grid Name="MainContentArea" Grid.Row="1" Grid.Column="1">
+                        <!-- Dynamic content will be added here programmatically -->
+                    </Grid>
+
 
                     <!-- SETTINGS PAGE -->
                     <Grid Name="SettingsPage" Visibility="Collapsed">

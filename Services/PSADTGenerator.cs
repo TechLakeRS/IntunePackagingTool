@@ -700,12 +700,12 @@ namespace IntunePackagingTool.Services
                 {
                     sb.AppendLine("\t\t## EXE Installation with logging");
                     sb.AppendLine($"\t\t$logFile = \"$configToolkitLogDir\\{appInfo.Name}_{appInfo.Version}_Install.log\"");
-                    sb.AppendLine($"\t\tExecute-Process -Path '$dirFiles\\{installerFile}' -Parameters '{string.Join(" ", exeParams)} /log \"$logFile\"' -WindowStyle 'Hidden' -PassThru");
+                    sb.AppendLine($"\t\tExecute-Process -Path \"$dirFiles\\{installerFile}\" -Parameters '{string.Join(" ", exeParams)} /log \"$logFile\"' -WindowStyle 'Hidden' -PassThru");
                 }
                 else
                 {
                     sb.AppendLine("\t\t## EXE Installation");
-                    sb.AppendLine($"\t\tExecute-Process -Path '$dirFiles\\{installerFile}' -Parameters '{string.Join(" ", exeParams)}' -WindowStyle 'Hidden'");
+                    sb.AppendLine($"\t\tExecute-Process -Path \"$dirFiles\\{installerFile}\" -Parameters '{string.Join(" ", exeParams)}' -WindowStyle 'Hidden'");
                 }
             }
             sb.AppendLine();

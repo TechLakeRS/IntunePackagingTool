@@ -503,12 +503,7 @@ namespace IntunePackagingTool
             Close();
         }
 
-        protected override void OnClosed(EventArgs e)
-        {
-            base.OnClosed(e);
-            _intuneService?.Dispose();
-            _uploadService?.Dispose();
-        }
+        
 
         #endregion
 

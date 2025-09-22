@@ -13,7 +13,7 @@ using IntunePackagingTool.Services;
 
 namespace IntunePackagingTool.WizardSteps
 {
-    public partial class ReviewUploadStep : UserControl, IUploadProgress, IDisposable
+    public partial class ReviewUploadStep : UserControl, IUploadProgress
     {
         public event EventHandler? BackRequested;
         public event EventHandler<UploadCompleteEventArgs>? UploadComplete;
@@ -452,23 +452,9 @@ namespace IntunePackagingTool.WizardSteps
             BackRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
+        
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_isDisposed)
-            {
-                if (disposing)
-                {
-                    _intuneService?.Dispose();
-                }
-                _isDisposed = true;
-            }
-        }
+       
     }
 
     // Supporting classes
