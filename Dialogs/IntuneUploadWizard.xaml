@@ -74,12 +74,9 @@
 
         <!-- PROGRESS HEADER -->
         <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}">
-            
             <Border.Effect>
                 <DropShadowEffect Color="Black" Opacity="0.15" ShadowDepth="3" BlurRadius="10"/>
             </Border.Effect>
-            
-            
 
             <Grid Margin="32,24">
                 <Grid.RowDefinitions>
@@ -155,39 +152,6 @@
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- Add this right after the progress header and before the step content area -->
-        <!-- In IntuneUploadWizard.xaml, after the Progress Header border -->
-
-        <!-- SMART MODE BANNER -->
-        <Border Name="SmartModeBanner" 
-        Grid.Row="1" 
-        Background="#27AE60" 
-        Height="50" 
-        VerticalAlignment="Top"
-        Visibility="Collapsed"
-        Margin="0,0,0,-50"
-        Panel.ZIndex="100">
-            <Border.Effect>
-                <DropShadowEffect Color="Black" Opacity="0.15" ShadowDepth="3" BlurRadius="10"/>
-            </Border.Effect>
-
-            <Grid Margin="32,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="✨" FontSize="20" Foreground="White" Margin="0,0,10,0"/>
-                    <TextBlock Text="Smart Mode Activated" 
-                      FontSize="14" FontWeight="Bold" 
-                      Foreground="White" VerticalAlignment="Center"/>
-                    <TextBlock Text="Existing package detected - all settings auto-configured from Deploy-Application.ps1" 
-                      FontSize="12" 
-                      Foreground="#E8F8F5" 
-                      Margin="10,0,0,0"
-                      VerticalAlignment="Center"/>
-                </StackPanel>
-
-                
             </Grid>
         </Border>
 

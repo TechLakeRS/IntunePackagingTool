@@ -87,6 +87,9 @@
                         </StackPanel>
                     </Button>
 
+
+                
+
                     <!-- Settings -->
                     <Button Name="SettingsNavButton" Style="{StaticResource SidebarNavButton}" Click="SettingsNavButton_Click">
                         <StackPanel Orientation="Horizontal">
@@ -137,15 +140,7 @@
                         <TextBlock Name="PageSubtitle" Text="Application packaging overview and quick actions" 
                                  FontSize="14" Foreground="#7F8C8D" Margin="0,4,0,0"/>
                     </StackPanel>
-                    
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Button Name="UploadExistingPackageButton" 
-                            Content="📦 Upload Existing Package to Intune" 
-                            Style="{StaticResource ModernButton}"
-                            Background="#2ECC71"
-                            Margin="10,0,0,0"
-                            Click="UploadExistingPackageButton_Click"
-                            ToolTip="Select an existing package folder to upload to Intune"/>
                         <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="RefreshButton_Click"/>
                     </StackPanel>
                 </Grid>

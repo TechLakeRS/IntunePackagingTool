@@ -1,7 +1,6 @@
 ﻿using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using IntunePackagingTool.Views;
-using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -56,8 +55,6 @@ namespace IntunePackagingTool
         private string _detectedPackageType = "";
         private string _msiProductCode = "";
         private string _msiProductVersion = "";
-
-
         #endregion
 
         #region Properties
@@ -147,7 +144,7 @@ namespace IntunePackagingTool
             LoadCategoriesDropdown();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
             _wdacToolsPage = new WDACToolsPage();
-           
+          
             this.DataContext = this;
 
         }
@@ -253,7 +250,6 @@ namespace IntunePackagingTool
                     PageTitle.Text = "WDAC Security Tools";
                     PageSubtitle.Text = "Generate and manage Windows Defender Application Control catalogs";
                     break;
-                
             }
         }
 
@@ -263,7 +259,7 @@ namespace IntunePackagingTool
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
             WDACToolsNavButton.Style = (Style)FindResource("SidebarNavButton");
-   
+            
 
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
@@ -283,7 +279,7 @@ namespace IntunePackagingTool
             UpdateNavigation(WDACToolsNavButton);
         }
 
-      
+       
         #endregion
 
         #region Application List Management
@@ -772,194 +768,6 @@ namespace IntunePackagingTool
             PSADTSummaryPanel.Visibility = Visibility.Visible;
             ConfigurePSADTButton.Content = "Modify Options";
         }
-        // In MainWindow.xaml.cs
-        private async void UploadExistingPackageButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Use your existing browse method logic
-                var packagePath = BrowseForDeployApplicationFile();
-
-                if (string.IsNullOrEmpty(packagePath))
-                {
-                    // User cancelled or invalid selection
-                    return;
-                }
-
-                // Create ApplicationInfo object (will be auto-filled by wizard)
-                var appInfo = new ApplicationInfo
-                {
-                    SourcesPath = packagePath
-                };
-
-                // Open wizard in Smart Mode
-                var uploadWizard = new IntuneUploadWizard
-                {
-                    ApplicationInfo = appInfo,
-                    PackagePath = packagePath,
-                    Owner = this
-                };
-
-                var result = uploadWizard.ShowDialog();
-
-                if (result == true)
-                {
-                    MessageBox.Show(
-                        "Package uploaded successfully to Intune!",
-                        "Success",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Error uploading package: {ex.Message}",
-                    "Upload Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private string BrowseForDeployApplicationFile()
-        {
-            try
-            {
-                var openFileDialog = new OpenFileDialog
-                {
-                    Title = "Select Deploy-Application.exe from Package",
-                    Filter = "Deploy-Application|Deploy-Application.exe|Executable Files|*.exe|All Files|*.*",
-                    FileName = "Deploy-Application.exe",
-                    CheckFileExists = true,
-                    CheckPathExists = true,
-                    InitialDirectory = @"\\nbb.local\sys\SCCMData\IntuneApplications"
-                };
-
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    var selectedFile = openFileDialog.FileName;
-
-                    // Validate that it's actually Deploy-Application.exe
-                    if (!Path.GetFileName(selectedFile).Equals("Deploy-Application.exe", StringComparison.OrdinalIgnoreCase))
-                    {
-                        MessageBox.Show(
-                            "Please select the Deploy-Application.exe file.",
-                            "Invalid File",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return "";
-                    }
-
-                    // Get the parent directory (should be the Application folder)
-                    var applicationFolder = Path.GetDirectoryName(selectedFile);
-                    if (string.IsNullOrEmpty(applicationFolder))
-                    {
-                        MessageBox.Show(
-                            "Could not determine application folder from selected file.",
-                            "Invalid Path",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return "";
-                    }
-
-                    // Get the package root (parent of Application folder)
-                    var packageRoot = Path.GetDirectoryName(applicationFolder);
-                    if (string.IsNullOrEmpty(packageRoot))
-                    {
-                        MessageBox.Show(
-                            "Could not determine package root folder. Please ensure Deploy-Application.exe is in an 'Application' subfolder.",
-                            "Invalid Structure",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return "";
-                    }
-
-                    // Validate the structure
-                    if (!ValidatePackageStructure(packageRoot))
-                    {
-                        MessageBox.Show(
-                            "Invalid package structure. The selected folder must contain:\n" +
-                            "• Application folder\n" +
-                            "• Deploy-Application.exe\n" +
-                            "• Deploy-Application.ps1",
-                            "Invalid Package",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return "";
-                    }
-
-                    StatusText.Text = $"Selected package: {Path.GetFileName(packageRoot)}";
-                    return packageRoot;
-                }
-
-                return ""; // User cancelled
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Error browsing for package: {ex.Message}",
-                    "Browse Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-                return "";
-            }
-        }
-
-        private bool ValidatePackageStructure(string packagePath)
-        {
-            try
-            {
-                // Check for required folders
-                var applicationFolder = Path.Combine(packagePath, "Application");
-                if (!Directory.Exists(applicationFolder))
-                {
-                    Debug.WriteLine($"Application folder not found: {applicationFolder}");
-                    return false;
-                }
-
-                // Check for Deploy-Application.exe
-                var deployExe = Path.Combine(applicationFolder, "Deploy-Application.exe");
-                if (!File.Exists(deployExe))
-                {
-                    Debug.WriteLine($"Deploy-Application.exe not found: {deployExe}");
-                    return false;
-                }
-
-                // Check for Deploy-Application.ps1
-                var deployScript = Path.Combine(applicationFolder, "Deploy-Application.ps1");
-                if (!File.Exists(deployScript))
-                {
-                    Debug.WriteLine($"Deploy-Application.ps1 not found: {deployScript}");
-                    return false;
-                }
-
-                // Check for AppDeployToolkit folder
-                var toolkitFolder = Path.Combine(applicationFolder, "AppDeployToolkit");
-                if (!Directory.Exists(toolkitFolder))
-                {
-                    Debug.WriteLine($"AppDeployToolkit folder not found: {toolkitFolder}");
-                    // This is a warning, not a failure
-                }
-
-                // Optional: Check other expected folders
-                var folders = new[] { "Documentation", "Icon", "Intune", "NBB_Info", "Sources" };
-                foreach (var folder in folders)
-                {
-                    var folderPath = Path.Combine(packagePath, folder);
-                    if (!Directory.Exists(folderPath))
-                    {
-                        Debug.WriteLine($"Optional folder not found (will be created if needed): {folderPath}");
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error validating package structure: {ex.Message}");
-                return false;
-            }
-        }
 
         #endregion
 
@@ -1187,7 +995,7 @@ namespace IntunePackagingTool
                 return false;
             }
 
-           
+
 
             return true;
         }

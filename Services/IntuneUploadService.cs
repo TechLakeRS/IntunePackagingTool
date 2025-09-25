@@ -941,7 +941,7 @@ namespace IntunePackagingTool.Services
             {
                 try
                 {
-                    // Create new request for each attempt (important!)
+                    // Create new request for each attempt
                     using var request = new HttpRequestMessage(HttpMethod.Put, chunkUri);
                     request.Content = new ByteArrayContent(buffer);
                     request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain")
