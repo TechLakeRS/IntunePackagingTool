@@ -3,13 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <UserControl.Resources>
-        <!-- Reuse modern styles from App.xaml -->
+        <!-- Modern TextBox Style -->
         <Style TargetType="TextBox" x:Key="ModernTextBox">
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
-            <Setter Property="BorderBrush" Value="#CED4DA"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -17,13 +16,15 @@
                         <Border Background="{TemplateBinding Background}" 
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ScrollViewer x:Name="PART_ContentHost"/>
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost" 
+                                         Margin="{TemplateBinding Padding}"
+                                         VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="#3498DB"/>
+                                <Setter Property="BorderBrush" Value="#2196F3"/>
+                                <Setter Property="BorderThickness" Value="2"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -31,125 +32,306 @@
             </Setter>
         </Style>
 
+        <!-- Auto-detected TextBox Style (with green background) -->
+        <Style TargetType="TextBox" x:Key="AutoDetectedTextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="Background" Value="#F0FFF4"/>
+        </Style>
+
+        <!-- Modern ComboBox Style -->
         <Style TargetType="ComboBox" x:Key="ModernComboBox">
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#CED4DA"/>
-            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="42"/>
         </Style>
 
-        <Style TargetType="Button" x:Key="IconButton">
-            <Setter Property="Background" Value="#6C757D"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="16,12"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#5A6268"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <!-- Auto-detected ComboBox Style -->
+        <Style TargetType="ComboBox" x:Key="AutoDetectedComboBox" BasedOn="{StaticResource ModernComboBox}">
+            <Setter Property="Background" Value="#F0FFF4"/>
+        </Style>
+
+        <!-- Field Label Style -->
+        <Style TargetType="TextBlock" x:Key="FieldLabel">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <!-- Auto-detected indicator style -->
+        <Style TargetType="TextBlock" x:Key="AutoDetectedIndicator">
+            <Setter Property="Text" Value="✅ Auto-detected"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#27AE60"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="0,0,0,24">
+    <Grid Background="#FAFAFA">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,30,40,30">
 
-            <!-- Header -->
-            <Border Background="#E3F2FD" BorderBrush="#2196F3" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,24">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="#2196F3" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
-                            <TextBlock Text="📱" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Application Information" FontSize="18" FontWeight="SemiBold" Foreground="#1976D2" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="Configure the basic details that will appear in Microsoft Intune admin center" 
-                             FontSize="13" Foreground="#1565C0"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Application Settings -->
-            <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Padding="24" Margin="0,0,0,24">
-                <StackPanel>
-                    <TextBlock Text="Basic Information" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,20"/>
-
+                <!-- Smart Mode Banner -->
+                <Border Name="AutoDetectedPanel" 
+                        Background="#E8F6F3" 
+                        BorderBrush="#27AE60" 
+                        BorderThickness="1" 
+                        CornerRadius="6" 
+                        Padding="16,12" 
+                        Margin="0,0,0,30"
+                        Visibility="Collapsed">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Column="0" Text="✅" FontSize="18" Margin="0,0,12,0" Foreground="#27AE60" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Auto-detected from Deploy-Application.ps1" 
+                                      FontWeight="SemiBold" FontSize="14" Foreground="#27AE60"/>
+                            <TextBlock Text="All fields have been pre-populated from your existing package" 
+                                      FontSize="12" Foreground="#6C8B7F" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Install Context:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
-                        <ComboBox Grid.Row="0" Grid.Column="1" Name="InstallContextCombo" Style="{StaticResource ModernComboBox}">
+                <!-- Application Details Section -->
+                <TextBlock Text="Application Details" 
+                          FontSize="20" 
+                          FontWeight="Bold" 
+                          Foreground="#1F2937"
+                          Margin="0,0,0,24"/>
+
+                <!-- Form Grid -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Application Name -->
+                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Application Name" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="AppNameIndicator" Style="{StaticResource AutoDetectedIndicator}" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <TextBox Name="AppNameTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                Height="42"/>
+                    </StackPanel>
+
+                    <!-- Version -->
+                    <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Version" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="VersionIndicator" Style="{StaticResource AutoDetectedIndicator}" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <TextBox Name="VersionTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                Height="42"/>
+                    </StackPanel>
+
+                    <!-- Publisher -->
+                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Publisher" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="PublisherIndicator" Style="{StaticResource AutoDetectedIndicator}" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <TextBox Name="PublisherTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                Height="42"/>
+                    </StackPanel>
+
+                    <!-- Install Context -->
+                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Install Context" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="InstallContextIndicator" Style="{StaticResource AutoDetectedIndicator}" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <ComboBox Name="InstallContextCombo" 
+                                 Style="{StaticResource ModernComboBox}">
                             <ComboBoxItem Content="System" IsSelected="True"/>
                             <ComboBoxItem Content="User"/>
                         </ComboBox>
+                    </StackPanel>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Install Command:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
-                        <TextBox Grid.Row="1" Grid.Column="1" Name="InstallCommandTextBox" Style="{StaticResource ModernTextBox}" 
-                                 Text="Deploy-Application.exe -DeploymentType Install"/>
+                    <!-- Install Command -->
+                    <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Install Command" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="InstallCommandIndicator" Style="{StaticResource AutoDetectedIndicator}" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <TextBox Name="InstallCommandTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                Text="Deploy-Application.exe Install"
+                                Height="42"/>
+                    </StackPanel>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Uninstall Command:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
-                        <TextBox Grid.Row="2" Grid.Column="1" Name="UninstallCommandTextBox" Style="{StaticResource ModernTextBox}" 
-                                 Text="Deploy-Application.exe -DeploymentType Uninstall"/>
+                    <!-- Uninstall Command -->
+                    <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Uninstall Command" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="UninstallCommandIndicator" Style="{StaticResource AutoDetectedIndicator}" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <TextBox Name="UninstallCommandTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                Text="Deploy-Application.exe Uninstall"
+                                Height="42"/>
+                    </StackPanel>
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Description:" VerticalAlignment="Top" Margin="0,12,0,0" FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
-                        <TextBox Grid.Row="3" Grid.Column="1" Name="DescriptionTextBox" Style="{StaticResource ModernTextBox}" 
-                                 Height="80" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" 
-                                 Text="Application packaged with NBB PSADT Tools"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
+                    <!-- Description (Full Width) -->
+                    <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,20">
+                        <TextBlock Text="Description" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Name="DescriptionTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                Height="100" 
+                                TextWrapping="Wrap" 
+                                AcceptsReturn="True" 
+                                VerticalScrollBarVisibility="Auto"
+                                VerticalContentAlignment="Top"
+                                Padding="12,10"/>
+                    </StackPanel>
 
-            <!-- App Icon Section -->
-            <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Padding="24">
-                <StackPanel>
-                    <TextBlock Text="Application Icon (Optional)" FontSize="16" FontWeight="SemiBold" Foreground="#212529" Margin="0,0,0,20"/>
+                    <!-- Category and Display Name Row -->
+                    <StackPanel Grid.Row="4" Grid.Column="0" Margin="0,0,0,20">
+                        <TextBlock Text="Category" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Name="CategoryCombo" Style="{StaticResource ModernComboBox}">
+                            <ComboBoxItem Content="Business" IsSelected="True"/>
+                            <ComboBoxItem Content="Developer Tools"/>
+                            <ComboBoxItem Content="Graphics &amp; Design"/>
+                            <ComboBoxItem Content="Productivity"/>
+                            <ComboBoxItem Content="Utilities"/>
+                            <ComboBoxItem Content="Security"/>
+                            <ComboBoxItem Content="Test"/>
+                        </ComboBox>
+                    </StackPanel>
 
+                    <StackPanel Grid.Row="4" Grid.Column="2" Margin="0,0,0,20">
+                        <TextBlock Text="Display Name (Intune)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Name="DisplayNameTextBox" 
+                                Style="{StaticResource ModernTextBox}"
+                                IsReadOnly="True" 
+                                Background="#F5F5F5"
+                                Height="42"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Optional: Icon Section (simplified) -->
+                <Border Background="White" 
+                        BorderBrush="#E0E0E0" 
+                        BorderThickness="1" 
+                        CornerRadius="6" 
+                        Padding="20" 
+                        Margin="0,30,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Width="64" Height="64" Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="8" Margin="0,0,20,0">
-                            <TextBlock Text="📱" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center" Name="DefaultIconText"/>
+                        <Border Grid.Column="0" 
+                                Width="64" 
+                                Height="64" 
+                                Background="#F8F9FA" 
+                                BorderBrush="#E0E0E0" 
+                                BorderThickness="1" 
+                                CornerRadius="8" 
+                                Margin="0,0,20,0">
+                            <Grid>
+                                <TextBlock Text="📦" FontSize="32" 
+                                          HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center" 
+                                          Name="DefaultIconText"/>
+                                <Image Name="SelectedIconImage" 
+                                      Stretch="Uniform" 
+                                      Visibility="Collapsed"/>
+                            </Grid>
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Choose Application Icon" FontWeight="Medium" FontSize="14" Margin="0,0,0,8"/>
-                            <TextBlock Text="Select a PNG or ICO file to represent your application in the Intune admin center" 
-                                     FontSize="12" Foreground="#6C757D" Margin="0,0,0,16"/>
-                            <Button Name="BrowseIconButton" Content="📁 Browse Icon..." Style="{StaticResource IconButton}" 
-                                    Click="BrowseIconButton_Click" HorizontalAlignment="Left"/>
-                            <TextBlock Name="SelectedIconText" Text="" FontSize="11" Foreground="#27AE60" Margin="0,8,0,0" Visibility="Collapsed"/>
+                            <TextBlock Text="Application Icon (Optional)" 
+                                      FontWeight="SemiBold" 
+                                      FontSize="14" 
+                                      Margin="0,0,0,8"/>
+                            <TextBlock Text="PNG, JPG, or ICO file (max 500KB)" 
+                                      FontSize="12" 
+                                      Foreground="#6B7280" 
+                                      Margin="0,0,0,12"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Name="BrowseIconButton" 
+                                       Content="Browse..." 
+                                       Click="BrowseIconButton_Click"
+                                       Padding="16,8"
+                                       Background="#6B7280"
+                                       Foreground="White"
+                                       BorderThickness="0"
+                                       FontWeight="Medium"
+                                       Cursor="Hand">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" 
+                                                   CornerRadius="4"
+                                                   Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" 
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#5A6268"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <Button Name="ClearIconButton" 
+                                       Content="Clear" 
+                                       Click="ClearIconButton_Click"
+                                       Margin="10,0,0,0"
+                                       Padding="16,8"
+                                       Background="#DC3545"
+                                       Foreground="White"
+                                       BorderThickness="0"
+                                       FontWeight="Medium"
+                                       Cursor="Hand"
+                                       Visibility="Collapsed">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" 
+                                                   CornerRadius="4"
+                                                   Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" 
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#C82333"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Name="SelectedIconText" 
+                                      FontSize="11" 
+                                      Foreground="#27AE60" 
+                                      Margin="0,8,0,0" 
+                                      Visibility="Collapsed"/>
                         </StackPanel>
                     </Grid>
-                </StackPanel>
-            </Border>
+                </Border>
 
-        </StackPanel>
-    </ScrollViewer>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

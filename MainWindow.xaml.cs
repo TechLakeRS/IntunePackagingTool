@@ -1,6 +1,7 @@
 ﻿using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using IntunePackagingTool.Views;
+using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -38,7 +39,8 @@ namespace IntunePackagingTool
         private SettingsService? _settingsService;
         private BatchFileSigner? _batchSigner;
         private WDACToolsPage? _wdacToolsPage;
-        private WingetCatalogView _wingetCatalogView;
+        private MsiInfoService.MsiInfo? _currentMsiInfo = null;
+
 
 
         // Pagination
@@ -52,6 +54,9 @@ namespace IntunePackagingTool
         //private bool _catalogGenerated = false;
         private PSADTOptions? _currentPSADTOptions = null;
         private string _detectedPackageType = "";
+        private string _msiProductCode = "";
+        private string _msiProductVersion = "";
+
 
         #endregion
 
@@ -142,7 +147,7 @@ namespace IntunePackagingTool
             LoadCategoriesDropdown();
             ApplicationDetailView.BackToListRequested += ApplicationDetailView_BackToListRequested;
             _wdacToolsPage = new WDACToolsPage();
-            _wingetCatalogView = new WingetCatalogView();
+           
             this.DataContext = this;
 
         }
@@ -248,23 +253,7 @@ namespace IntunePackagingTool
                     PageTitle.Text = "WDAC Security Tools";
                     PageSubtitle.Text = "Generate and manage Windows Defender Application Control catalogs";
                     break;
-                case "WingetCatalog":
-                    // Ensure the UserControl is added to the main content area if not already
-                    if (_wingetCatalogView == null)
-                    {
-                        _wingetCatalogView = new WingetCatalogView();
-                    }
-
-                    // Add to MainContentGrid if not already a child
-                    if (!MainContentGrid.Children.Contains(_wingetCatalogView))
-                    {
-                        MainContentGrid.Children.Add(_wingetCatalogView);
-                    }
-
-                    _wingetCatalogView.Visibility = Visibility.Visible;
-                    PageTitle.Text = "Winget Catalog";
-                    PageSubtitle.Text = "Browse and deploy applications from Windows Package Manager";
-                    break;
+                
             }
         }
 
@@ -274,7 +263,7 @@ namespace IntunePackagingTool
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
             WDACToolsNavButton.Style = (Style)FindResource("SidebarNavButton");
-            WingetCatalogNavButton.Style = (Style)FindResource("SidebarNavButton");
+   
 
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
@@ -284,7 +273,7 @@ namespace IntunePackagingTool
             CreateAppNavButton.Style = (Style)FindResource("SidebarNavButton");
             ViewAppsNavButton.Style = (Style)FindResource("SidebarNavButton");
             SettingsNavButton.Style = (Style)FindResource("SidebarNavButton");
-            WingetCatalogNavButton.Style = (Style)FindResource("SidebarNavButton");
+           
             activeButton.Style = (Style)FindResource("ActiveSidebarNavButton");
         }
 
@@ -294,12 +283,7 @@ namespace IntunePackagingTool
             UpdateNavigation(WDACToolsNavButton);
         }
 
-        private void WingetCatalogNavButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowPage("WingetCatalog");
-            UpdateNavigation(WingetCatalogNavButton);
-        }
-
+      
         #endregion
 
         #region Application List Management
@@ -589,7 +573,16 @@ namespace IntunePackagingTool
 
                 SourcesPathTextBox.Text = selectedFile;
                 DetectPackageType(fileExtension, fileName);
-                ExtractFileMetadata(selectedFile);
+
+                // Enhanced metadata extraction with MSI detection
+                if (fileExtension == ".msi")
+                {
+                    ExtractMsiMetadataEnhanced(selectedFile);
+                }
+                else
+                {
+                    ExtractFileMetadata(selectedFile);
+                }
             }
         }
 
@@ -667,17 +660,20 @@ namespace IntunePackagingTool
                     return;
                 }
 
+                var appInfo = CreateApplicationInfo(); // This now includes MSI data
+
                 var uploadWizard = new IntuneUploadWizard
                 {
                     Owner = this,
-                    ApplicationInfo = new ApplicationInfo
-                    {
-                        Manufacturer = ManufacturerTextBox.Text.Trim(),
-                        Name = AppNameTextBox.Text.Trim(),
-                        Version = VersionTextBox.Text.Trim()
-                    },
+                    ApplicationInfo = appInfo,
                     PackagePath = _currentPackagePath
                 };
+
+                // If MSI, show a tooltip about auto-detection
+                if (appInfo.IsMsiPackage)
+                {
+                    Debug.WriteLine($"Opening upload wizard with MSI Product Code: {appInfo.MsiProductCode}");
+                }
 
                 uploadWizard.ShowDialog();
             }
@@ -776,6 +772,194 @@ namespace IntunePackagingTool
             PSADTSummaryPanel.Visibility = Visibility.Visible;
             ConfigurePSADTButton.Content = "Modify Options";
         }
+        // In MainWindow.xaml.cs
+        private async void UploadExistingPackageButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Use your existing browse method logic
+                var packagePath = BrowseForDeployApplicationFile();
+
+                if (string.IsNullOrEmpty(packagePath))
+                {
+                    // User cancelled or invalid selection
+                    return;
+                }
+
+                // Create ApplicationInfo object (will be auto-filled by wizard)
+                var appInfo = new ApplicationInfo
+                {
+                    SourcesPath = packagePath
+                };
+
+                // Open wizard in Smart Mode
+                var uploadWizard = new IntuneUploadWizard
+                {
+                    ApplicationInfo = appInfo,
+                    PackagePath = packagePath,
+                    Owner = this
+                };
+
+                var result = uploadWizard.ShowDialog();
+
+                if (result == true)
+                {
+                    MessageBox.Show(
+                        "Package uploaded successfully to Intune!",
+                        "Success",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Error uploading package: {ex.Message}",
+                    "Upload Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private string BrowseForDeployApplicationFile()
+        {
+            try
+            {
+                var openFileDialog = new OpenFileDialog
+                {
+                    Title = "Select Deploy-Application.exe from Package",
+                    Filter = "Deploy-Application|Deploy-Application.exe|Executable Files|*.exe|All Files|*.*",
+                    FileName = "Deploy-Application.exe",
+                    CheckFileExists = true,
+                    CheckPathExists = true,
+                    InitialDirectory = @"\\nbb.local\sys\SCCMData\IntuneApplications"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    var selectedFile = openFileDialog.FileName;
+
+                    // Validate that it's actually Deploy-Application.exe
+                    if (!Path.GetFileName(selectedFile).Equals("Deploy-Application.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show(
+                            "Please select the Deploy-Application.exe file.",
+                            "Invalid File",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    // Get the parent directory (should be the Application folder)
+                    var applicationFolder = Path.GetDirectoryName(selectedFile);
+                    if (string.IsNullOrEmpty(applicationFolder))
+                    {
+                        MessageBox.Show(
+                            "Could not determine application folder from selected file.",
+                            "Invalid Path",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    // Get the package root (parent of Application folder)
+                    var packageRoot = Path.GetDirectoryName(applicationFolder);
+                    if (string.IsNullOrEmpty(packageRoot))
+                    {
+                        MessageBox.Show(
+                            "Could not determine package root folder. Please ensure Deploy-Application.exe is in an 'Application' subfolder.",
+                            "Invalid Structure",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    // Validate the structure
+                    if (!ValidatePackageStructure(packageRoot))
+                    {
+                        MessageBox.Show(
+                            "Invalid package structure. The selected folder must contain:\n" +
+                            "• Application folder\n" +
+                            "• Deploy-Application.exe\n" +
+                            "• Deploy-Application.ps1",
+                            "Invalid Package",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return "";
+                    }
+
+                    StatusText.Text = $"Selected package: {Path.GetFileName(packageRoot)}";
+                    return packageRoot;
+                }
+
+                return ""; // User cancelled
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Error browsing for package: {ex.Message}",
+                    "Browse Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return "";
+            }
+        }
+
+        private bool ValidatePackageStructure(string packagePath)
+        {
+            try
+            {
+                // Check for required folders
+                var applicationFolder = Path.Combine(packagePath, "Application");
+                if (!Directory.Exists(applicationFolder))
+                {
+                    Debug.WriteLine($"Application folder not found: {applicationFolder}");
+                    return false;
+                }
+
+                // Check for Deploy-Application.exe
+                var deployExe = Path.Combine(applicationFolder, "Deploy-Application.exe");
+                if (!File.Exists(deployExe))
+                {
+                    Debug.WriteLine($"Deploy-Application.exe not found: {deployExe}");
+                    return false;
+                }
+
+                // Check for Deploy-Application.ps1
+                var deployScript = Path.Combine(applicationFolder, "Deploy-Application.ps1");
+                if (!File.Exists(deployScript))
+                {
+                    Debug.WriteLine($"Deploy-Application.ps1 not found: {deployScript}");
+                    return false;
+                }
+
+                // Check for AppDeployToolkit folder
+                var toolkitFolder = Path.Combine(applicationFolder, "AppDeployToolkit");
+                if (!Directory.Exists(toolkitFolder))
+                {
+                    Debug.WriteLine($"AppDeployToolkit folder not found: {toolkitFolder}");
+                    // This is a warning, not a failure
+                }
+
+                // Optional: Check other expected folders
+                var folders = new[] { "Documentation", "Icon", "Intune", "NBB_Info", "Sources" };
+                foreach (var folder in folders)
+                {
+                    var folderPath = Path.Combine(packagePath, folder);
+                    if (!Directory.Exists(folderPath))
+                    {
+                        Debug.WriteLine($"Optional folder not found (will be created if needed): {folderPath}");
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error validating package structure: {ex.Message}");
+                return false;
+            }
+        }
 
         #endregion
 
@@ -857,6 +1041,7 @@ namespace IntunePackagingTool
                 string productName = GetMsiProperty(database, "ProductName");
                 string manufacturer = GetMsiProperty(database, "Manufacturer");
                 string version = GetMsiProperty(database, "ProductVersion");
+                string productCode = GetMsiProperty(database, "ProductCode");  // NEW: Extract Product Code
 
                 if (string.IsNullOrWhiteSpace(AppNameTextBox.Text) && !string.IsNullOrWhiteSpace(productName))
                     AppNameTextBox.Text = productName;
@@ -866,10 +1051,62 @@ namespace IntunePackagingTool
 
                 if (string.IsNullOrWhiteSpace(VersionTextBox.Text) && !string.IsNullOrWhiteSpace(version))
                     VersionTextBox.Text = version;
+
+                // NEW: Store the MSI Product Code for later use
+                if (!string.IsNullOrWhiteSpace(productCode))
+                {
+                    // Store in a field or property for later use
+                    _msiProductCode = productCode;
+                    _msiProductVersion = version;
+                    Debug.WriteLine($"Extracted MSI Product Code: {productCode}");
+                    Debug.WriteLine($"Extracted MSI Version: {version}");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"MSI metadata extraction failed: {ex.Message}");
+                ExtractMetadataFromFilename(msiPath);
+            }
+        }
+        private void ExtractMsiMetadataEnhanced(string msiPath)
+        {
+            try
+            {
+                // Use the new MsiInfoService
+                _currentMsiInfo = MsiInfoService.ExtractMsiInfo(msiPath);
+
+                if (_currentMsiInfo != null && _currentMsiInfo.IsValid)
+                {
+                    // Populate UI fields
+                    if (string.IsNullOrWhiteSpace(AppNameTextBox.Text) && !string.IsNullOrWhiteSpace(_currentMsiInfo.ProductName))
+                        AppNameTextBox.Text = _currentMsiInfo.ProductName;
+
+                    if (string.IsNullOrWhiteSpace(ManufacturerTextBox.Text) && !string.IsNullOrWhiteSpace(_currentMsiInfo.Manufacturer))
+                        ManufacturerTextBox.Text = _currentMsiInfo.Manufacturer;
+
+                    if (string.IsNullOrWhiteSpace(VersionTextBox.Text) && !string.IsNullOrWhiteSpace(_currentMsiInfo.ProductVersion))
+                        VersionTextBox.Text = _currentMsiInfo.ProductVersion;
+
+                    // Update the package detection display with MSI info
+                    DetectedPackageTypeText.Text = $"MSI Package (Product Code: {_currentMsiInfo.ProductCode})";
+                    DetectedPackageTypeText.ToolTip = $"Product Code: {_currentMsiInfo.ProductCode}\n" +
+                                                      $"Version: {_currentMsiInfo.ProductVersion}\n" +
+                                                      $"Upgrade Code: {_currentMsiInfo.UpgradeCode}";
+
+                    Debug.WriteLine($"✅ MSI detected with Product Code: {_currentMsiInfo.ProductCode}");
+                }
+                else
+                {
+                    // Fallback to generic MSI detection
+                    DetectedPackageTypeText.Text = "MSI Package (Product Code not found)";
+                    ExtractMetadataFromFilename(msiPath);
+
+                    Debug.WriteLine("⚠️ MSI detected but could not extract Product Code");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in enhanced MSI extraction: {ex.Message}");
                 ExtractMetadataFromFilename(msiPath);
             }
         }
@@ -950,28 +1187,16 @@ namespace IntunePackagingTool
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(SourcesPathTextBox.Text))
-            {
-                MessageBox.Show("Please select a Sources Path.", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            if (DetectedPackageType == "Unknown")
-            {
-                MessageBox.Show("Please select a valid installer file (.msi or .exe).", "Validation Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
+           
 
             return true;
         }
 
-    
+
 
         private ApplicationInfo CreateApplicationInfo()
         {
-            return new ApplicationInfo
+            var appInfo = new ApplicationInfo
             {
                 Name = AppNameTextBox.Text.Trim(),
                 Manufacturer = string.IsNullOrWhiteSpace(ManufacturerTextBox.Text) ? "Unknown" : ManufacturerTextBox.Text.Trim(),
@@ -979,6 +1204,16 @@ namespace IntunePackagingTool
                 SourcesPath = SourcesPathTextBox.Text.Trim(),
                 ServiceNowSRI = ""
             };
+
+            // Include MSI information if available
+            if (_currentMsiInfo != null && _currentMsiInfo.IsValid)
+            {
+                appInfo.MsiProductCode = _currentMsiInfo.ProductCode;
+                appInfo.MsiProductVersion = _currentMsiInfo.ProductVersion;
+                appInfo.MsiUpgradeCode = _currentMsiInfo.UpgradeCode;
+            }
+
+            return appInfo;
         }
 
         private void ShowPackageSuccess(ApplicationInfo appInfo, PSADTOptions? psadtOptions)

@@ -1,8 +1,14 @@
 ﻿// Services/WingetCatalogService.cs
-using IntunePackagingTool.Models;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;  // <-- THIS IS FOR Path CLASS
+using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using IntunePackagingTool.Models;
 
 namespace IntunePackagingTool.Services
 {
@@ -11,129 +17,46 @@ namespace IntunePackagingTool.Services
         private readonly string _packageRepository = @"\\nbb.local\sys\SCCMData\IntuneApplications";
         private readonly string _wingetCachePath = @"\\nbb.local\sys\SCCMData\TOOLS\IntunePackagingTool\WingetCache";
         private List<WingetPackage> _catalogCache;
+        private readonly WingetRestApiService _apiService;  // <-- THIS FIELD WAS MISSING
 
         public event EventHandler<string> ProgressChanged;
+
+        public WingetCatalogService()
+        {
+            _apiService = new WingetRestApiService();  // <-- INITIALIZE IT HERE
+            _apiService.ProgressChanged += (s, e) => OnProgressChanged(e);
+        }
 
         public async Task<List<WingetPackage>> GetFullCatalogAsync()
         {
             System.Diagnostics.Debug.WriteLine("=== GetFullCatalogAsync called ===");
-            if (_catalogCache == null || !_catalogCache.Any())
+
+            // Check if running on Windows Server
+            if (IsWindowsServer())
             {
-                System.Diagnostics.Debug.WriteLine("Cache is empty, refreshing from Winget...");
-                await RefreshCatalogFromWinget();
+                System.Diagnostics.Debug.WriteLine("Windows Server detected, REST API will work but local installs won't");
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Returning {_catalogCache.Count} cached packages");
-            }
-            return _catalogCache ?? new List<WingetPackage>();
+
+            // Use REST API instead of command line
+            return await _apiService.SearchPackagesAsync("", 50); // Get 50 popular packages
         }
 
         public async Task<List<WingetPackage>> SearchPackagesAsync(string searchTerm)
         {
-            var packages = new List<WingetPackage>();
             System.Diagnostics.Debug.WriteLine($"=== SearchPackagesAsync called with term: '{searchTerm}' ===");
 
-            try
-            {
-                // If search term is empty, get popular packages
-                string arguments = string.IsNullOrWhiteSpace(searchTerm)
-                    ? "search Microsoft --accept-source-agreements"  // Get Microsoft packages as a test
-                    : $"search \"{searchTerm}\" --accept-source-agreements";
-
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "winget",
-                        Arguments = arguments,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        StandardOutputEncoding = Encoding.UTF8
-                    }
-                };
-
-                System.Diagnostics.Debug.WriteLine($"Executing: winget {arguments}");
-                process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                System.Diagnostics.Debug.WriteLine($"Exit code: {process.ExitCode}");
-                System.Diagnostics.Debug.WriteLine($"Output length: {output.Length}");
-                if (!string.IsNullOrWhiteSpace(error))
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error: {error}");
-                }
-
-                packages = ParseSearchOutput(output);
-                System.Diagnostics.Debug.WriteLine($"Found {packages.Count} packages");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"ERROR in SearchPackagesAsync: {ex.Message}");
-                OnProgressChanged($"Error searching packages: {ex.Message}");
-            }
-
-            return packages;
+            // Use REST API for searching
+            return await _apiService.SearchPackagesAsync(searchTerm, 50);
         }
 
-
-        private async Task RefreshCatalogFromWinget()
+        private bool IsWindowsServer()
         {
-            var packages = new List<WingetPackage>();
-            OnProgressChanged("Fetching package list from Winget...");
-            System.Diagnostics.Debug.WriteLine("=== RefreshCatalogFromWinget started ===");
+            var productName = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                "ProductName",
+                "").ToString();
 
-            try
-            {
-                // Let's try a search command instead of list to get available packages
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "winget",
-                        Arguments = "search \"\" --accept-source-agreements", // Empty search returns all
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        StandardOutputEncoding = Encoding.UTF8
-                    }
-                };
-
-                System.Diagnostics.Debug.WriteLine($"Executing: {process.StartInfo.FileName} {process.StartInfo.Arguments}");
-
-                process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                System.Diagnostics.Debug.WriteLine($"Exit code: {process.ExitCode}");
-                System.Diagnostics.Debug.WriteLine($"Output length: {output.Length} characters");
-                System.Diagnostics.Debug.WriteLine($"Error output: {error}");
-
-                // Log first 500 chars of output for debugging
-                if (output.Length > 0)
-                {
-                    System.Diagnostics.Debug.WriteLine($"First 500 chars of output:\n{output.Substring(0, Math.Min(500, output.Length))}");
-                }
-
-                packages = ParseSearchOutput(output);
-                System.Diagnostics.Debug.WriteLine($"Parsed {packages.Count} packages");
-
-                _catalogCache = packages;
-                OnProgressChanged($"Loaded {packages.Count} packages from Winget");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"ERROR in RefreshCatalogFromWinget: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                OnProgressChanged($"Error loading catalog: {ex.Message}");
-                _catalogCache = new List<WingetPackage>();
-            }
+            return productName.Contains("Server");
         }
 
         private List<WingetPackage> ParseListOutput(string output)
@@ -249,31 +172,29 @@ namespace IntunePackagingTool.Services
         {
             try
             {
-                var process = new Process
+                var details = await _apiService.GetPackageDetailsAsync(packageId);
+                if (details != null)
                 {
-                    StartInfo = new ProcessStartInfo
+                    return new WingetPackage
                     {
-                        FileName = "winget",
-                        Arguments = $"show \"{packageId}\" --accept-source-agreements",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        StandardOutputEncoding = Encoding.UTF8
-                    }
-                };
-
-                process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                return ParseShowOutput(output, packageId);
+                        Id = details.PackageId,
+                        Name = details.PackageName,
+                        Publisher = details.Publisher,
+                        Version = details.LatestVersion,
+                        Description = details.Description,
+                        Homepage = details.Homepage,
+                        License = details.License,
+                        InstallerType = details.InstallerType,
+                        Source = "Winget"
+                    };
+                }
             }
             catch (Exception ex)
             {
                 OnProgressChanged($"Error getting package details: {ex.Message}");
-                return null;
             }
+
+            return null;
         }
 
         private WingetPackage ParseShowOutput(string output, string packageId)
@@ -447,6 +368,35 @@ namespace IntunePackagingTool.Services
                 OnProgressChanged($"Error uninstalling package: {ex.Message}");
                 return false;
             }
+        }
+
+        public async Task<string> DownloadPackageInstallerAsync(string packageId, string targetPath)
+        {
+            try
+            {
+                var details = await _apiService.GetPackageDetailsAsync(packageId);
+                if (details != null && !string.IsNullOrEmpty(details.InstallerUrl))
+                {
+                    var fileName = Path.GetFileName(new Uri(details.InstallerUrl).LocalPath);  // NOW Path WILL WORK
+                    if (string.IsNullOrEmpty(fileName))
+                    {
+                        fileName = $"{packageId.Replace(".", "_")}.exe";
+                    }
+
+                    var outputPath = Path.Combine(targetPath, fileName);  // NOW Path WILL WORK
+
+                    if (await _apiService.DownloadPackageAsync(packageId, targetPath))
+                    {
+                        return outputPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                OnProgressChanged($"Download failed: {ex.Message}");
+            }
+
+            return null;
         }
 
         private void OnProgressChanged(string message)

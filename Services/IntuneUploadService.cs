@@ -830,16 +830,23 @@ namespace IntunePackagingTool.Services
 
         private async Task UploadFileToAzureStorageAsync(string sasUri, string filePath, IUploadProgress? progress = null)
         {
-            const int chunkSize = 6 * 1024 * 1024; // 6MB chunks
+            // Determine optimal chunk size based on file size
             var fileInfo = new FileInfo(filePath);
             var totalSize = fileInfo.Length;
+
+            // Use smaller chunks for very large files to avoid timeouts
+            int chunkSize;
+            if (totalSize > 5L * 1024 * 1024 * 1024) // > 5GB
+                chunkSize = 4 * 1024 * 1024; // 4MB chunks
+            else
+                chunkSize = 6 * 1024 * 1024; // 6MB chunks (default)
+
             var totalChunks = (int)Math.Ceiling((double)totalSize / chunkSize);
 
             Debug.WriteLine($"=== AZURE STORAGE UPLOAD ===");
-            Debug.WriteLine($"File: {Path.GetFileName(filePath)}");
-            Debug.WriteLine($"Size: {totalSize:N0} bytes");
-            Debug.WriteLine($"Chunks: {totalChunks}");
-
+            Debug.WriteLine($"File: {Path.GetFileName(filePath)} ({FormatBytes(totalSize)})");
+            Debug.WriteLine($"Using chunk size: {FormatBytes(chunkSize)}");
+            Debug.WriteLine($"Total chunks: {totalChunks}");
 
             progress?.UpdateProgress(65, $"Starting upload: {Path.GetFileName(filePath)} ({FormatBytes(totalSize)})");
 
@@ -848,7 +855,6 @@ namespace IntunePackagingTool.Services
 
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             var blockIds = new List<string>();
-
             var sasRenewalTimer = System.Diagnostics.Stopwatch.StartNew();
             var currentSasUri = sasUri;
 
@@ -857,68 +863,156 @@ namespace IntunePackagingTool.Services
                 var blockId = Convert.ToBase64String(Encoding.ASCII.GetBytes(chunkIndex.ToString("0000")));
                 blockIds.Add(blockId);
 
-                var remainingBytes = Math.Min(chunkSize, totalSize - (chunkIndex * chunkSize));
-                var buffer = new byte[remainingBytes];
+                // FIXED: Calculate the actual bytes to read for this chunk
+                long startPosition = (long)chunkIndex * chunkSize;
+                int bytesToRead = (int)Math.Min(chunkSize, totalSize - startPosition);
+
+                var buffer = new byte[bytesToRead];
                 var totalBytesRead = 0;
+
+                // Ensure we're at the correct position in the file
+                fileStream.Position = startPosition;
 
                 while (totalBytesRead < buffer.Length)
                 {
                     var bytesRead = await fileStream.ReadAsync(buffer, totalBytesRead, buffer.Length - totalBytesRead);
                     if (bytesRead == 0)
                     {
-                        throw new EndOfStreamException($"Unexpected end of file. Expected {buffer.Length} bytes but got {totalBytesRead}");
+                        // This should only happen if we've calculated wrong
+                        Debug.WriteLine($"WARNING: End of file at chunk {chunkIndex + 1}, read {totalBytesRead} of {buffer.Length} bytes");
+                        break;
                     }
                     totalBytesRead += bytesRead;
                 }
-                var bytesUploaded = (long)chunkIndex * chunkSize;
-                var percentComplete = (int)((bytesUploaded * 100) / totalSize);
+
+                // Verify we read the expected amount
+                if (totalBytesRead != buffer.Length)
+                {
+                    Debug.WriteLine($"❌ Chunk {chunkIndex + 1}: Expected {buffer.Length} bytes, got {totalBytesRead} bytes");
+                    // Resize buffer to actual bytes read
+                    Array.Resize(ref buffer, totalBytesRead);
+                }
+
+                // Update progress
+                var percentComplete = (int)(((long)chunkIndex * 100) / totalChunks);
                 var progressPercentage = 65 + (int)((chunkIndex + 1.0) / totalChunks * 15);
                 progress?.UpdateProgress(progressPercentage,
-                $"Uploading chunk {chunkIndex + 1}/{totalChunks} ({FormatBytes(bytesUploaded)}/{FormatBytes(totalSize)} - {percentComplete}%)");
-
-                var chunkUri = $"{currentSasUri}&comp=block&blockid={blockId}";
-
-                Console.WriteLine($"Uploading chunk {chunkIndex + 1}/{totalChunks} ({buffer.Length:N0} bytes)");
-
-                using var request = new HttpRequestMessage(HttpMethod.Put, chunkUri);
-                request.Content = new ByteArrayContent(buffer);
-
-
-                request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain")
-                {
-                    CharSet = "iso-8859-1"
-                };
-
-
-                request.Headers.Add("x-ms-blob-type", "BlockBlob");
-
-                var response = await azureHttpClient.SendAsync(request);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorText = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"❌ Chunk {chunkIndex} upload failed: {response.StatusCode}");
-                    Console.WriteLine($"Error response: {errorText}");
-                    throw new Exception($"Failed to upload chunk {chunkIndex}. Status: {response.StatusCode}, Response: {errorText}");
-                }
-
-                progressPercentage = 65 + (int)((chunkIndex + 1.0) / totalChunks * 15);
-                progress?.UpdateProgress(progressPercentage, $"Uploading chunk {chunkIndex + 1} of {totalChunks}...");
-
-                Console.WriteLine($"✓ Uploaded chunk {chunkIndex + 1}/{totalChunks}");
+                    $"Uploading chunk {chunkIndex + 1}/{totalChunks} ({percentComplete}%)");
 
                 // SAS renewal every 7 minutes
-                if (chunkIndex < totalChunks - 1 && sasRenewalTimer.ElapsedMilliseconds >= 450000)
+                if (chunkIndex < totalChunks - 1 && sasRenewalTimer.ElapsedMilliseconds >= 420000)
                 {
                     progress?.UpdateProgress(progressPercentage, "Renewing SAS token...");
-                    currentSasUri = await RenewSasUriAsync();
-                    sasRenewalTimer.Restart();
+                    try
+                    {
+                        currentSasUri = await RenewSasUriAsync();
+                        sasRenewalTimer.Restart();
+                        Debug.WriteLine("✅ SAS token renewed successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ SAS renewal failed, continuing with current token: {ex.Message}");
+                    }
+                }
 
+                // Upload chunk with retry logic
+                var chunkUri = $"{currentSasUri}&comp=block&blockid={blockId}";
+                await UploadChunkWithRetryAsync(azureHttpClient, chunkUri, buffer, chunkIndex, totalChunks);
+
+                // Log successful chunk upload
+                Debug.WriteLine($"✅ Uploaded chunk {chunkIndex + 1}/{totalChunks}");
+            }
+
+            // Commit blocks with retry
+            progress?.UpdateProgress(82, "Committing blocks to Azure Storage...");
+            await CommitBlockListWithRetryAsync(azureHttpClient, currentSasUri, blockIds);
+
+            progress?.UpdateProgress(84, "File uploaded successfully to Azure Storage");
+            Debug.WriteLine($"✅ Successfully uploaded file to Azure Storage");
+        }
+
+        // Updated helper method with better error handling
+        private async Task UploadChunkWithRetryAsync(HttpClient client, string chunkUri, byte[] buffer,
+            int chunkIndex, int totalChunks)
+        {
+            const int maxRetries = 5;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    // Create new request for each attempt (important!)
+                    using var request = new HttpRequestMessage(HttpMethod.Put, chunkUri);
+                    request.Content = new ByteArrayContent(buffer);
+                    request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain")
+                    {
+                        CharSet = "iso-8859-1"
+                    };
+                    request.Headers.Add("x-ms-blob-type", "BlockBlob");
+
+                    // Use longer timeout for last chunk and larger chunks
+                    var timeout = chunkIndex == totalChunks - 1 ?
+                        TimeSpan.FromMinutes(15) :
+                        TimeSpan.FromMinutes(5 + attempt); // Increase timeout with each retry
+
+                    using var cts = new CancellationTokenSource(timeout);
+
+                    var response = await client.SendAsync(request, cts.Token);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        if (attempt > 1)
+                            Debug.WriteLine($"✓ Chunk {chunkIndex + 1} succeeded on attempt {attempt}");
+                        return;
+                    }
+
+                    var errorText = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"⚠ Chunk {chunkIndex + 1} failed (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+                    Debug.WriteLine($"  Error details: {errorText}");
+
+                    // Don't retry client errors (4xx) except for 408 (timeout) and 429 (throttled)
+                    if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500
+                        && response.StatusCode != System.Net.HttpStatusCode.RequestTimeout
+                        && (int)response.StatusCode != 429)
+                    {
+                        throw new Exception($"Client error: {response.StatusCode} - {errorText}");
+                    }
+                }
+                catch (TaskCanceledException)
+                {
+                    Debug.WriteLine($"⚠ Chunk {chunkIndex + 1} timed out (attempt {attempt}/{maxRetries})");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Debug.WriteLine($"⚠ Network error on chunk {chunkIndex + 1} (attempt {attempt}/{maxRetries}): {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"❌ Unexpected error on chunk {chunkIndex + 1} (attempt {attempt}/{maxRetries}): {ex.Message}");
+                    if (attempt == maxRetries)
+                        throw;
+                }
+
+                if (attempt < maxRetries)
+                {
+                    // Exponential backoff with jitter: 2-4s, 4-8s, 8-16s, 16-32s
+                    var baseDelay = Math.Pow(2, attempt);
+                    var jitter = new Random().NextDouble(); // 0.0 to 1.0
+                    var delay = TimeSpan.FromSeconds(baseDelay + baseDelay * jitter);
+
+                    Debug.WriteLine($"⏳ Waiting {delay.TotalSeconds:F1}s before retry...");
+                    await Task.Delay(delay);
+                }
+                else
+                {
+                    throw new Exception($"Failed to upload chunk {chunkIndex + 1} after {maxRetries} attempts");
                 }
             }
-            progress?.UpdateProgress(82, "Committing blocks to Azure Storage...");
+        }
 
-
-            Console.WriteLine("Finalizing upload by committing block list...");
+        // Block list commit stays the same
+        private async Task CommitBlockListWithRetryAsync(HttpClient client, string sasUri, List<string> blockIds)
+        {
             var blockListXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?><BlockList>";
             foreach (var blockId in blockIds)
             {
@@ -926,26 +1020,50 @@ namespace IntunePackagingTool.Services
             }
             blockListXml += "</BlockList>";
 
-            var finalizeUri = $"{currentSasUri}&comp=blocklist";
+            const int maxRetries = 5;
 
-            using var finalizeRequest = new HttpRequestMessage(HttpMethod.Put, finalizeUri);
-            finalizeRequest.Content = new StringContent(blockListXml, Encoding.UTF8);
-            finalizeRequest.Content.Headers.ContentType = null; // Remove Content-Type for block list
-
-            var finalizeResponse = await azureHttpClient.SendAsync(finalizeRequest);
-
-            if (!finalizeResponse.IsSuccessStatusCode)
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
-                var errorText = await finalizeResponse.Content.ReadAsStringAsync();
-                Console.WriteLine($"❌ Finalization failed: {finalizeResponse.StatusCode}");
-                Console.WriteLine($"Error response: {errorText}");
-                throw new Exception($"Failed to finalize upload. Status: {finalizeResponse.StatusCode}, Response: {errorText}");
+                try
+                {
+                    var finalizeUri = $"{sasUri}&comp=blocklist";
+                    using var request = new HttpRequestMessage(HttpMethod.Put, finalizeUri);
+                    request.Content = new StringContent(blockListXml, Encoding.UTF8);
+                    request.Content.Headers.ContentType = null; // Important: no Content-Type for block list
+
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+                    var response = await client.SendAsync(request, cts.Token);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Debug.WriteLine($"✅ Block list committed successfully (attempt {attempt})");
+                        return;
+                    }
+
+                    var errorText = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"⚠ Block list commit failed (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+                    Debug.WriteLine($"  Error: {errorText}");
+                }
+                catch (TaskCanceledException)
+                {
+                    Debug.WriteLine($"⚠ Block list commit timed out (attempt {attempt}/{maxRetries})");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"❌ Error committing block list (attempt {attempt}/{maxRetries}): {ex.Message}");
+                }
+
+                if (attempt < maxRetries)
+                {
+                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt) * 2);
+                    Debug.WriteLine($"⏳ Waiting {delay.TotalSeconds}s before retry...");
+                    await Task.Delay(delay);
+                }
+                else
+                {
+                    throw new Exception($"Failed to commit block list after {maxRetries} attempts");
+                }
             }
-
-            progress?.UpdateProgress(84, "File uploaded successfully to Azure Storage");
-            Debug.WriteLine($"✅ Successfully uploaded file to Azure Storage");
-
-
         }
         private string FormatBytes(long bytes)
         {

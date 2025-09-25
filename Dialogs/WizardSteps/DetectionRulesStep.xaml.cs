@@ -319,12 +319,27 @@ namespace IntunePackagingTool.WizardSteps
             FileDetectionEditor.Visibility = Visibility.Collapsed;
             RegistryDetectionEditor.Visibility = Visibility.Collapsed;
 
-            // Clear previous values
-            MsiProductCodeTextBox.Text = "";
-            MsiVersionCheckYes.IsChecked = false;
-            MsiVersionCheckNo.IsChecked = true; // Default to No
-            MsiOperatorComboBox.SelectedIndex = 0; // Default to "Greater than or equal to"
-            MsiVersionValueTextBox.Text = "1.0.0";
+            // NEW: Check if we have MSI info from the parent wizard
+            if (ParentWindow != null && ParentWindow.ApplicationInfo != null && ParentWindow.ApplicationInfo.IsMsiPackage)
+            {
+                // Pre-populate with extracted MSI info
+                MsiProductCodeTextBox.Text = ParentWindow.ApplicationInfo.MsiProductCode;
+                MsiVersionValueTextBox.Text = ParentWindow.ApplicationInfo.MsiProductVersion;
+                MsiVersionCheckYes.IsChecked = true;
+                MsiVersionCheckNo.IsChecked = false;
+                MsiOperatorComboBox.SelectedIndex = 0; // "Greater than or equal to"
+
+                Debug.WriteLine($"Pre-populated MSI detection with Product Code: {ParentWindow.ApplicationInfo.MsiProductCode}");
+            }
+            else
+            {
+                // Clear previous values for manual entry
+                MsiProductCodeTextBox.Text = "";
+                MsiVersionCheckYes.IsChecked = false;
+                MsiVersionCheckNo.IsChecked = true;
+                MsiOperatorComboBox.SelectedIndex = 0;
+                MsiVersionValueTextBox.Text = "1.0.0";
+            }
 
             // Focus on product code field
             MsiProductCodeTextBox.Focus();

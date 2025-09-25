@@ -4,6 +4,7 @@ using IntunePackagingTool.WizardSteps;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -13,8 +14,19 @@ namespace IntunePackagingTool
     public partial class IntuneUploadWizard : Window, IUploadProgress
     {
         // Keep all existing properties and services
-        public ApplicationInfo? ApplicationInfo { get; set; }
+        private ApplicationInfo? _applicationInfo;
+        public ApplicationInfo? ApplicationInfo
+        {
+            get => _applicationInfo;
+            set
+            {
+                _applicationInfo = value;
+                
+            }
+        }
         public string PackagePath { get; set; } = "";
+        public bool IsExistingPackageMode { get; set; }
+        public bool SmartModeEnabled { get; set; }
 
         private ObservableCollection<DetectionRule> _detectionRules = new ObservableCollection<DetectionRule>();
         private IntuneService _intuneService = new IntuneService();
@@ -36,15 +48,67 @@ namespace IntunePackagingTool
 
             
             LoadStep(0);
+            this.Loaded += IntuneUploadWizard_Loaded;
         }
 
-        protected override void OnContentRendered(EventArgs e)
+        private async void IntuneUploadWizard_Loaded(object sender, RoutedEventArgs e)
         {
-            base.OnContentRendered(e);
+            System.Diagnostics.Debug.WriteLine("=== Window Loaded ===");
 
-            if (ApplicationInfo != null)
+            // Initialize based on whether it's an existing package
+            await InitializeWizard();
+        }
+
+        private async Task InitializeWizard()
+        {
+            System.Diagnostics.Debug.WriteLine($"=== InitializeWizard ===");
+            System.Diagnostics.Debug.WriteLine($"PackagePath: {PackagePath}");
+            System.Diagnostics.Debug.WriteLine($"ApplicationInfo null? {ApplicationInfo == null}");
+
+            // Check if this is an existing package
+            if (!string.IsNullOrEmpty(PackagePath))
             {
+                var applicationFolder = Path.Combine(PackagePath, "Application");
+                var deployScript = Path.Combine(applicationFolder, "Deploy-Application.ps1");
+
+                if (Directory.Exists(applicationFolder) && File.Exists(deployScript))
+                {
+                    IsExistingPackageMode = true;
+
+                    // Make sure ApplicationInfo exists
+                    if (ApplicationInfo == null)
+                    {
+                        ApplicationInfo = new ApplicationInfo();
+                    }
+
+                    SmartModeEnabled = await LoadFromExistingPackage();
+
+                    if (SmartModeEnabled)
+                    {
+                        ShowSmartModeBanner();
+
+                        // Update the first step with the loaded data
+                        if (_stepControls[0] is AppDetailsStep appStep)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Setting ApplicationInfo on AppDetailsStep");
+                            appStep.ApplicationInfo = ApplicationInfo;
+                            appStep.EnableSmartMode();
+                        }
+                    }
+                }
+            }
+            else if (ApplicationInfo != null)
+            {
+                // For new packages
                 AppSummaryText.Text = $"{ApplicationInfo.Manufacturer} {ApplicationInfo.Name} v{ApplicationInfo.Version}";
+
+                // Update the first step
+                if (_stepControls[0] is AppDetailsStep appStep)
+                {
+                    appStep.ApplicationInfo = ApplicationInfo;
+                }
+
+                // Add default detection rule
                 _detectionRules.Add(new DetectionRule
                 {
                     Type = DetectionRuleType.File,
@@ -54,17 +118,34 @@ namespace IntunePackagingTool
                 });
             }
 
-            
             UpdateStepData();
+        }
+
+        private void ShowSmartModeBanner()
+        {
+            // Make the smart mode banner visible
+            SmartModeBanner.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateUIForSmartMode()
+        {
+            // Update the UI to show fields are auto-detected
+            if (_stepControls[0] is AppDetailsStep appStep)
+            {
+                appStep.EnableSmartMode();
+            }
         }
 
         #region Step Management (High Performance)
 
         private void LoadStep(int stepIndex)
         {
-            
+            System.Diagnostics.Debug.WriteLine($"=== LoadStep({stepIndex}) called ===");
+
+            // Create step if it doesn't exist
             if (_stepControls[stepIndex] == null)
             {
+                System.Diagnostics.Debug.WriteLine($"Creating step {stepIndex}");
                 _stepControls[stepIndex] = stepIndex switch
                 {
                     0 => new AppDetailsStep(),
@@ -73,11 +154,10 @@ namespace IntunePackagingTool
                     _ => throw new ArgumentException("Invalid step index")
                 };
 
-              
                 SetupStepEvents(_stepControls[stepIndex], stepIndex);
             }
 
-            
+            // Set content
             StepContentArea.Content = _stepControls[stepIndex];
             _currentStep = stepIndex;
 
@@ -93,80 +173,56 @@ namespace IntunePackagingTool
                 case 0:
                     if (stepControl is AppDetailsStep appStep)
                     {
+                        System.Diagnostics.Debug.WriteLine($"=== Setting up AppDetailsStep ===");
+                        System.Diagnostics.Debug.WriteLine($"ApplicationInfo is null? {ApplicationInfo == null}");
+
+                        // Set the ApplicationInfo
                         appStep.ApplicationInfo = ApplicationInfo;
+
+                        // Set up events
                         appStep.ValidationChanged += (valid) =>
                         {
                             _step1Valid = valid;
                             UpdateNavigationButtons();
                         };
+
                         appStep.DataChanged += UpdateApplicationDataFromStep1;
-                    }
-                    break;
 
-                case 1:
-                    if (stepControl is DetectionRulesStep detectionStep)
+                        System.Diagnostics.Debug.WriteLine($"AppDetailsStep setup complete");
+                    }
+                    else
                     {
-                        detectionStep.DetectionRules = _detectionRules;
-                        detectionStep.ParentWindow = this; // For opening child dialogs
-                        detectionStep.ValidationChanged += (valid) =>
-                        {
-                            _step2Valid = valid;
-                            UpdateNavigationButtons();
-                        };
+                        System.Diagnostics.Debug.WriteLine($"ERROR: stepControl is not AppDetailsStep! It's {stepControl?.GetType().Name}");
                     }
                     break;
-
-                case 2:
-                    if (stepControl is ReviewUploadStep reviewStep)
-                    {
-                        if (ApplicationInfo != null)
-                        {
-                            reviewStep.ApplicationInfo = ApplicationInfo;
-                            reviewStep.LoadFromApplicationInfo(ApplicationInfo);
-                        }
-
-                        if (_detectionRules != null)
-                        {
-                            reviewStep.DetectionRules = _detectionRules;
-                        }
-
-                        if (PackagePath != null)
-                        {
-                            var intuneFolder = Path.Combine(PackagePath, "Intune");
-                            if (Directory.Exists(intuneFolder))
-                            {
-                                var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
-                                reviewStep.PackagePath = intuneWinFiles.Length > 0 ? intuneWinFiles[0] : PackagePath;
-                            }
-                            else
-                            {
-                                reviewStep.PackagePath = PackagePath;
-                            }
-                        }
-                    }
-                    break;
+                    // ... rest of cases
             }
         }
 
         private void UpdateStepData()
         {
+            System.Diagnostics.Debug.WriteLine($"=== UpdateStepData called ===");
+            System.Diagnostics.Debug.WriteLine($"ApplicationInfo is null? {ApplicationInfo == null}");
+
+            if (ApplicationInfo != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"ApplicationInfo.Name: '{ApplicationInfo.Name}'");
+                System.Diagnostics.Debug.WriteLine($"ApplicationInfo.Version: '{ApplicationInfo.Version}'");
+                System.Diagnostics.Debug.WriteLine($"ApplicationInfo.Manufacturer: '{ApplicationInfo.Manufacturer}'");
+            }
+
             // Share data between steps
             if (_stepControls[0] is AppDetailsStep appStep)
             {
+                System.Diagnostics.Debug.WriteLine("Updating AppDetailsStep");
                 appStep.ApplicationInfo = ApplicationInfo;
             }
-
-            if (_stepControls[1] is DetectionRulesStep detectionStep)
+            else
             {
-                detectionStep.DetectionRules = _detectionRules;
+                System.Diagnostics.Debug.WriteLine($"Step 0 is not AppDetailsStep, it's {_stepControls[0]?.GetType().Name}");
             }
 
-            if (_stepControls[2] is ReviewUploadStep reviewStep)
-            {
-                reviewStep.ApplicationInfo = ApplicationInfo!;
-                reviewStep.DetectionRules = _detectionRules;
-                reviewStep.PackagePath = PackagePath;
-            }
+            // Rest of the method...
         }
 
         #endregion
@@ -385,14 +441,131 @@ namespace IntunePackagingTool
 
         private void UpdateApplicationDataFromStep1(ApplicationInfo updatedInfo)
         {
-            ApplicationInfo = updatedInfo;
-            AppSummaryText.Text = $"{updatedInfo.Manufacturer} {updatedInfo.Name} v{updatedInfo.Version}";
-            UpdateStepData(); // Propagate to other steps
+            // Don't overwrite with empty values!
+            if (updatedInfo != null)
+            {
+                // Only update if the values are not empty
+                if (!string.IsNullOrEmpty(updatedInfo.Name))
+                    ApplicationInfo.Name = updatedInfo.Name;
+
+                if (!string.IsNullOrEmpty(updatedInfo.Version))
+                    ApplicationInfo.Version = updatedInfo.Version;
+
+                if (!string.IsNullOrEmpty(updatedInfo.Manufacturer))
+                    ApplicationInfo.Manufacturer = updatedInfo.Manufacturer;
+
+                if (!string.IsNullOrEmpty(updatedInfo.InstallContext))
+                    ApplicationInfo.InstallContext = updatedInfo.InstallContext;
+
+                // Update the summary text
+                AppSummaryText.Text = $"{ApplicationInfo.Manufacturer} {ApplicationInfo.Name} v{ApplicationInfo.Version}";
+
+                // Propagate to other steps
+                UpdateStepData();
+            }
         }
 
-        // This method will be called from DetectionRulesStep when user opens detection dialogs
+        private async Task<bool> LoadFromExistingPackage()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(PackagePath))
+                    return false;
 
+                var scriptPath = Path.Combine(PackagePath, "Application", "Deploy-Application.ps1");
+                if (!File.Exists(scriptPath))
+                    return false;
 
+                var scriptContent = await File.ReadAllTextAsync(scriptPath);
+
+                // Make sure ApplicationInfo exists
+                if (ApplicationInfo == null)
+                {
+                    ApplicationInfo = new ApplicationInfo();
+                }
+
+                // Extract vendor/manufacturer
+                var vendorMatch = Regex.Match(scriptContent, @"\$appVendor\s*=\s*['""]([^'""]+)['""]");
+                if (vendorMatch.Success)
+                {
+                    ApplicationInfo.Manufacturer = vendorMatch.Groups[1].Value;
+                    System.Diagnostics.Debug.WriteLine($"Extracted Manufacturer: '{ApplicationInfo.Manufacturer}'");
+                }
+
+                // Extract app name
+                var nameMatch = Regex.Match(scriptContent, @"\$appName\s*=\s*['""]([^'""]+)['""]");
+                if (nameMatch.Success)
+                {
+                    ApplicationInfo.Name = nameMatch.Groups[1].Value;
+                    System.Diagnostics.Debug.WriteLine($"Extracted Name: '{ApplicationInfo.Name}'");
+                }
+
+                // Extract version
+                var versionMatch = Regex.Match(scriptContent, @"\$appVersion\s*=\s*['""]([^'""]+)['""]");
+                if (versionMatch.Success)
+                {
+                    ApplicationInfo.Version = versionMatch.Groups[1].Value;
+                    System.Diagnostics.Debug.WriteLine($"Extracted Version: '{ApplicationInfo.Version}'");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading from existing package: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task AutoDetectDetectionRules()
+        {
+            _detectionRules.Clear();
+
+            // Check for MSI files
+            var applicationPath = Path.Combine(PackagePath, "Application", "Files");
+            if (Directory.Exists(applicationPath))
+            {
+                var msiFiles = Directory.GetFiles(applicationPath, "*.msi", SearchOption.AllDirectories);
+                if (msiFiles.Any())
+                {
+                    // Add MSI detection rule
+                    _detectionRules.Add(new DetectionRule
+                    {
+                        Type = DetectionRuleType.MSI,
+                        Path = "{PLACEHOLDER-PRODUCT-CODE}", // Will need to extract from MSI
+                        FileOrFolderName = ApplicationInfo?.Version ?? "1.0.0",
+                        CheckVersion = true
+                    });
+                }
+                else
+                {
+                    // Add file-based detection rule
+                    var exeFiles = Directory.GetFiles(applicationPath, "*.exe", SearchOption.AllDirectories);
+                    if (exeFiles.Any())
+                    {
+                        _detectionRules.Add(new DetectionRule
+                        {
+                            Type = DetectionRuleType.File,
+                            Path = "%ProgramFiles%\\" + (ApplicationInfo?.Name ?? "MyApp"),
+                            FileOrFolderName = Path.GetFileName(exeFiles.First()),
+                            CheckVersion = false
+                        });
+                    }
+                }
+            }
+
+            // Add default if no rules detected
+            if (_detectionRules.Count == 0)
+            {
+                _detectionRules.Add(new DetectionRule
+                {
+                    Type = DetectionRuleType.File,
+                    Path = "%ProgramFiles%",
+                    FileOrFolderName = $"{ApplicationInfo?.Name ?? "MyApp"}.exe",
+                    CheckVersion = false
+                });
+            }
+        }
 
         public void RemoveDetectionRule(DetectionRule rule)
         {
@@ -490,6 +663,7 @@ namespace IntunePackagingTool
                 {
                     reviewStep.UpdateProgress(percentage, message);
                 }
+
             });
         }
 

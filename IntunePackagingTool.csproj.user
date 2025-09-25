@@ -4,10 +4,16 @@
     <_LastSelectedProfileId>C:\Users\admin.sarkerr\source\repos\IntunePackagingTool\Properties\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Update="ApplicationDetailView.xaml.cs">
+    <Compile Update="Dialogs\ApplicationDetailView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="RemoteTestWindow.xaml.cs">
+    <Compile Update="Dialogs\AddDeviceDialog.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Dialogs\GroupMembersDialog.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Dialogs\RemoteTestWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Views\PSADTConfigDialog.xaml.cs">
@@ -16,7 +22,7 @@
     <Compile Update="Views\ReportingWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="WDACToolsPage.xaml.cs">
+    <Compile Update="Dialogs\WDACToolsPage.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

@@ -26,7 +26,7 @@ namespace IntunePackagingTool.Services
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
         private bool _disposed = false;
-        
+       
 
         public string ClientId => _clientId;
         public string TenantId => _tenantId;
@@ -1017,10 +1017,6 @@ namespace IntunePackagingTool.Services
                                         // The deviceId field is the Azure AD device ID
                                         AzureDeviceId = GetStringValue(member, "deviceId"),
                                         OperatingSystem = GetStringValue(member, "operatingSystem"),
-                                        // Parse the trust type which indicates domain join status
-                                        TrustType = GetStringValue(member, "trustType"),
-                                        DeviceCategory = GetStringValue(member, "deviceCategory"),
-                                        DeviceOwnership = GetStringValue(member, "deviceOwnership"),
                                         IsCompliant = member.TryGetProperty("isCompliant", out var compliantProp)
                                             && compliantProp.GetBoolean(),
                                         LastSyncDateTime = GetSafeDateTime(member, "approximateLastSignInDateTime"),
@@ -1037,8 +1033,7 @@ namespace IntunePackagingTool.Services
                                             : GetStringValue(member, "deviceVersion");
                                     }
 
-                                    // Get profile type
-                                    device.ProfileType = GetStringValue(member, "profileType");
+                                   
 
                                     Debug.WriteLine($"Added device: {device.DeviceName} (ID: {device.Id})");
                                     members.Add(device);

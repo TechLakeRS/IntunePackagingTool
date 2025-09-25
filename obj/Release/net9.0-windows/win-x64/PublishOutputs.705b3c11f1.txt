@@ -1,0 +1,2 @@
+C:\temp\V1\Scripts\RemoteDeployment.ps1
+C:\temp\V1\IntunePackagingTool.exe

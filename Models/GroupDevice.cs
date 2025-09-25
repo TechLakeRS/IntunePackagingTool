@@ -12,10 +12,10 @@ namespace IntunePackagingTool.Models
             public string UserPrincipalName { get; set; }
             public string OperatingSystem { get; set; }
             public string OSVersion { get; set; }
-            public string DeviceCategory { get; set; }  // e.g., "Workstation"
-            public string DeviceOwnership { get; set; }  // e.g., "Company"
-            public string TrustType { get; set; }  // e.g., "AzureAd", "ServerAd", "Workplace"
-            public string ProfileType { get; set; }
+            
+            
+          
+           
             public bool IsCompliant { get; set; }
             public bool AccountEnabled { get; set; }
             public DateTime LastSyncDateTime { get; set; }
