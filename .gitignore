@@ -3,6 +3,9 @@ appsettings.json
 appsettings.Development.json
 appsettings.Production.json
 
+# Claude Code local settings
+.claude/
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
