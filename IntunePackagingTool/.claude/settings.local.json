@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Test-Path \"c:\\Users\\RS\\Pckg\\IntunePackagingTool-2\\bin\\Debug\\net9.0-windows\\win-x64\\IntunePackagingTool.exe\")",
+      "Bash(git reset:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(dotnet build)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

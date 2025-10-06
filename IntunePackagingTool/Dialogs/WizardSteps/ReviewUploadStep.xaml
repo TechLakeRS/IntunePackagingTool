@@ -1,0 +1,221 @@
+﻿<UserControl x:Class="IntunePackagingTool.WizardSteps.ReviewUploadStep"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,24">
+            <TextBlock Text="Review Configuration"
+                       FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Text="  •  Review all settings before uploading"
+                       FontSize="13" Foreground="#6C757D" VerticalAlignment="Center" Margin="8,0,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- App Details Review -->
+                <Border Background="White" CornerRadius="8" Padding="24" Margin="0,0,0,16"
+                        BorderBrush="#E1E8ED" BorderThickness="1">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" Opacity="0.05" ShadowDepth="2" BlurRadius="8"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <Grid Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📱" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Application Details" FontWeight="SemiBold"
+                                           FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button Name="EditAppDetailsButton" Content="✏️ Edit"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6" FontSize="12"
+                                    Click="EditAppDetailsButton_Click"
+                                    ToolTip="Go back to edit application details"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <!-- First set of fields -->
+                                <ColumnDefinition Width="Auto" MinWidth="100"/>
+                                <ColumnDefinition Width="*"/>
+                                <!-- Separator -->
+                                <ColumnDefinition Width="20"/>
+                                <!-- Second set of fields -->
+                                <ColumnDefinition Width="Auto" MinWidth="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Left Column -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" Foreground="#6C757D" FontSize="12" FontWeight="Medium"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Name="AppNameText" FontSize="13" FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" Foreground="#6C757D" FontSize="12" FontWeight="Medium" Margin="0,12,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Name="DescriptionText" TextWrapping="Wrap" FontSize="13" Margin="0,12,0,0"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Version:" Foreground="#6C757D" FontSize="12" FontWeight="Medium" Margin="0,12,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Name="VersionText" FontSize="13" Margin="0,12,0,0"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Publisher:" Foreground="#6C757D" FontSize="12" FontWeight="Medium" Margin="0,12,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Name="PublisherText" FontSize="13" Margin="0,12,0,0"/>
+
+                            <!-- Right Column -->
+                            <TextBlock Grid.Row="0" Grid.Column="3" Text="Install Context:" Foreground="#6C757D" FontSize="12" FontWeight="Medium"/>
+                            <TextBlock Grid.Row="0" Grid.Column="4" Name="InstallContextText" FontSize="13" FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="3" Text="Install Command:" Foreground="#6C757D" FontSize="12" FontWeight="Medium" Margin="0,12,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="4" Name="InstallCommandText" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="3" Text="Uninstall Command:" Foreground="#6C757D" FontSize="12" FontWeight="Medium" Margin="0,12,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="4" Name="UninstallCommandText" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="3" Text="Package Size:" Foreground="#6C757D" FontSize="12" FontWeight="Medium" Margin="0,12,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="4" Name="PackageSizeText" FontSize="13" Margin="0,12,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Detection Rules Review -->
+                <Border Background="White" CornerRadius="8" Padding="24" Margin="0,0,0,16"
+                        BorderBrush="#E1E8ED" BorderThickness="1">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" Opacity="0.05" ShadowDepth="2" BlurRadius="8"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <Grid Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔍" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Detection Rules" FontWeight="SemiBold"
+                                           FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button Name="EditDetectionRulesButton" Content="✏️ Edit"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6" FontSize="12"
+                                    Click="EditDetectionRulesButton_Click"
+                                    ToolTip="Go back to edit detection rules"/>
+                        </Grid>
+                        <ItemsControl Name="DetectionRulesList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#F8F9FA" BorderBrush="#E1E8ED" BorderThickness="1"
+                                            CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding}" FontSize="13" TextWrapping="Wrap" Foreground="#495057"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Groups Preview -->
+                <Border Background="White" CornerRadius="8" Padding="24" Margin="0,0,0,16"
+                        BorderBrush="#E1E8ED" BorderThickness="1">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" Opacity="0.05" ShadowDepth="2" BlurRadius="8"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <TextBlock Text="👥" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Assignment Groups" FontWeight="SemiBold"
+                                       FontSize="16" VerticalAlignment="Center"/>
+                            <Border Background="#E3F2FD" CornerRadius="12" Padding="8,4" Margin="12,0,0,0">
+                                <TextBlock Text="Will be created automatically" FontSize="11"
+                                           Foreground="#1976D2" FontWeight="Medium"/>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,16">
+                            <TextBlock Text="Install Groups:" FontWeight="SemiBold"
+                                       FontSize="13" Foreground="#27AE60" Margin="0,0,0,8"/>
+                            <Border Background="#F1F8F4" BorderBrush="#C8E6C9" BorderThickness="1"
+                                    CornerRadius="6" Padding="12" Margin="0,0,0,6">
+                                <TextBlock Name="SysInstallGroupText" FontFamily="Consolas"
+                                           FontSize="12" TextWrapping="Wrap"/>
+                            </Border>
+                            <Border Background="#F1F8F4" BorderBrush="#C8E6C9" BorderThickness="1"
+                                    CornerRadius="6" Padding="12">
+                                <TextBlock Name="UsrInstallGroupText" FontFamily="Consolas"
+                                           FontSize="12" TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel>
+                            <TextBlock Text="Uninstall Groups:" FontWeight="SemiBold"
+                                       FontSize="13" Foreground="#E74C3C" Margin="0,0,0,8"/>
+                            <Border Background="#FFEBEE" BorderBrush="#FFCDD2" BorderThickness="1"
+                                    CornerRadius="6" Padding="12" Margin="0,0,0,6">
+                                <TextBlock Name="SysUninstallGroupText" FontFamily="Consolas"
+                                           FontSize="12" TextWrapping="Wrap"/>
+                            </Border>
+                            <Border Background="#FFEBEE" BorderBrush="#FFCDD2" BorderThickness="1"
+                                    CornerRadius="6" Padding="12">
+                                <TextBlock Name="UsrUninstallGroupText" FontFamily="Consolas"
+                                           FontSize="12" TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Upload Progress -->
+                <!-- Upload Progress -->
+                <Border Name="ProgressPanel" Visibility="Collapsed" 
+                Background="White" BorderBrush="#E1E8ED" BorderThickness="1"
+                CornerRadius="6" Padding="20">
+                                <StackPanel>
+                                    <TextBlock Text="Upload Progress" FontWeight="SemiBold" 
+                           FontSize="14" Margin="0,0,0,15"/>
+
+                                    <!-- Progress bar with percentage overlay -->
+                                    <Grid Height="20" Margin="0,0,0,10">
+                                        <ProgressBar Name="UploadProgressBar" Height="20"
+                                 Minimum="0" Maximum="100" Value="0"
+                                 Foreground="#27AE60" Background="#E0E0E0"/>
+                                        <TextBlock Name="ProgressPercentageText" 
+                               Text="0%" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontWeight="Bold"
+                               Foreground="White"/>
+                                    </Grid>
+
+                                    <!-- Chunk status text -->
+                        <TextBlock Name="ProgressStatusText" 
+                           Text="Preparing..." 
+                           HorizontalAlignment="Center" 
+                           Margin="0,0,0,10"
+                           FontSize="12"
+                           Foreground="#666666"/>
+
+                        <!-- Progress Steps (if you still want them) -->
+                        <ItemsControl Name="ProgressSteps">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Icon}" 
+                           FontSize="16"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Text}" 
+                           Margin="10,0,0,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1,0 +1,115 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net9.0-windows</TargetFramework>
+		<UseWPF>true</UseWPF>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<SelfContained>true</SelfContained>
+		<PublishSingleFile>true</PublishSingleFile>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		
+		<!-- Version Information -->
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<InformationalVersion>1.0.0-beta</InformationalVersion>
+		
+		<!-- Product Information -->
+		<Product>NBB Intune Packaging Tool</Product>
+		<AssemblyTitle>IntunePackagingTool</AssemblyTitle>
+		<Company>NBB</Company>
+		<Copyright>Copyright © NBB 2025</Copyright>
+		<Description>Application packaging and deployment tool for Microsoft Intune created by Riyadh Sarker</Description>
+		
+		<!-- Application Settings -->
+		
+		<StartupObject>IntunePackagingTool.App</StartupObject>
+		
+		<!-- Publishing Optimization -->
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<PublishTrimmed>false</PublishTrimmed>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+		
+		<!-- Performance Settings -->
+		<TieredCompilation>true</TieredCompilation>
+		<TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+		
+		<!-- Debug Settings -->
+		<DebugType>embedded</DebugType>
+		<DebugSymbols>true</DebugSymbols>
+		<SignAssembly>False</SignAssembly>
+	</PropertyGroup>
+	
+	<!-- Package References -->
+	<ItemGroup>
+		<!-- For Active Directory user lookup -->
+		<PackageReference Include="System.DirectoryServices.AccountManagement" Version="8.0.0" />
+		
+		<!-- For JSON handling (if not already included) -->
+		<PackageReference Include="System.Text.Json" Version="9.0.8" />
+		
+		<!-- For HTTP operations (if not already included) -->
+		<PackageReference Include="System.Net.Http" Version="4.3.4" />
+	</ItemGroup>
+	
+	<!-- Embedded Resources -->
+	<ItemGroup>
+		<None Remove="IntunePackagingTool.csproj~RF6a5397e.TMP" />
+		<None Remove="Scripts\Get-IntuneManagementExtensionDiagnostics.ps1" />
+		<None Remove="Scripts\RemoteDeployment.ps1" />
+	</ItemGroup>
+	
+	<!-- Content Files -->
+	<!-- Content Files -->
+	<ItemGroup>
+		<Content Include="Scripts\Get-IntuneManagementExtensionDiagnostics.ps1">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<EmbeddedResource Include="Scripts\RemoteDeployment.ps1">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</EmbeddedResource>
+		<EmbeddedResource Include="Scripts\Verify-Catalog.ps1">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</EmbeddedResource>
+		<Content Include="appsettings.json">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+	
+	<!-- Application Icon (create this file) -->
+	<ItemGroup Condition="Exists('Resources\app.ico')">
+		<Resource Include="Resources\app.ico" />
+	</ItemGroup>
+	<PropertyGroup>
+		<ApplicationIcon>Resources\app.ico</ApplicationIcon>
+		<UseWindowsForms>False</UseWindowsForms>
+	</PropertyGroup>
+	<!-- Folders -->
+	<ItemGroup>
+		<Folder Include="Resources\" />
+		<Folder Include="Dialogs\WizardSteps\" />
+	</ItemGroup>
+	
+	<!-- XAML Settings -->
+	<ItemGroup>
+		<Page Update="Dialogs\ApplicationDetailView.xaml">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</Page>
+	</ItemGroup>
+	
+	<!-- Conditional Debug/Release Settings -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<Optimize>false</Optimize>
+		<WarningLevel>4</WarningLevel>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DefineConstants>TRACE</DefineConstants>
+		<Optimize>true</Optimize>
+		<WarningLevel>4</WarningLevel>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+	</PropertyGroup>
+</Project>

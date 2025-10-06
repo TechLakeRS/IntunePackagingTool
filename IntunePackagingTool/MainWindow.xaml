@@ -1,0 +1,857 @@
+<Window x:Class="IntunePackagingTool.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:IntunePackagingTool"
+        Title="NBB Application Packaging Tools"
+        Height="900" Width="1400"
+        MinHeight="700" MinWidth="1100"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F7FA"
+        Loaded="MainWindow_Loaded">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" MinWidth="250" MaxWidth="350"/>
+            <ColumnDefinition Width="*" MinWidth="600"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- SIDEBAR WITH GLASS EFFECT -->
+        <Border Grid.Column="0" BorderThickness="0,0,3,0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#1E2A38" Offset="0"/>
+                        <GradientStop Color="#2C3E50" Offset="0.3"/>
+                        <GradientStop Color="#34495E" Offset="0.7"/>
+                        <GradientStop Color="#2C3E50" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#42A5F5" Offset="0"/>
+                        <GradientStop Color="#2196F3" Offset="0.5"/>
+                        <GradientStop Color="#1976D2" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.Effect>
+                    <DropShadowEffect Color="#2196F3" Opacity="0.4" ShadowDepth="4" BlurRadius="16" Direction="0"/>
+                </Border.Effect>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#34495E" Padding="24,20">
+                        <StackPanel>
+                            <Border Background="#3498DB" Width="48" Height="48" CornerRadius="12" Margin="0,0,0,12">
+                                <TextBlock Text="📦" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="NBB Intune Tools" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Application Packaging" FontSize="12" Foreground="#BDC3C7" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="1" Margin="16,24,16,0">
+                        <Button Name="CreateAppNavButton" Style="{StaticResource SidebarNavButton}" Click="CreateAppNavButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#27AE60" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <TextBlock Text="➕" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Create Package" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                    <TextBlock Text="New application" FontSize="10" Foreground="#BDC3C7"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Name="UploadExistingNavButton" Style="{StaticResource SidebarNavButton}" Click="UploadExistingNavButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#27AE60" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <TextBlock Text="➕" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Upload to Intune" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                    <TextBlock Text="Existing package" FontSize="10" Foreground="#BDC3C7"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Name="ViewAppsNavButton" Style="{StaticResource SidebarNavButton}" Click="ViewAppsNavButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#9B59B6" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <TextBlock Text="📱" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Applications" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                    <TextBlock Text="Browse - manage" FontSize="10" Foreground="#BDC3C7"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Name="LogsNavButton" Style="{StaticResource SidebarNavButton}" Click="LogsNavButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FF6B6B" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <TextBlock Text="📋" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Logs" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                    <TextBlock Text="Diagnostics" FontSize="10" Foreground="#BDC3C7"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Name="WDACToolsNavButton" Style="{StaticResource SidebarNavButton}" Click="WDACToolsNavButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#16A085" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <TextBlock Text="🔒" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="WDAC Tools" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                    <TextBlock Text="Security catalogs" FontSize="10" Foreground="#BDC3C7"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Name="SettingsNavButton" Style="{StaticResource SidebarNavButton}" Click="SettingsNavButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#95A5A6" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                    <TextBlock Text="⚙️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Settings" FontSize="14" FontWeight="Medium" Foreground="White"/>
+                                    <TextBlock Text="Configuration" FontSize="10" Foreground="#BDC3C7"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <Border Grid.Row="2" Background="#34495E" Padding="20" Margin="0,20,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#3498DB" Width="32" Height="32" CornerRadius="16" Margin="0,0,12,0">
+                                <TextBlock x:Name="UserInitials" Text="U" FontSize="12" FontWeight="Bold" Foreground="White"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="UserNameDisplay" Text="User" FontSize="11" Foreground="#BDC3C7"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+        <!-- MAIN CONTENT -->
+        <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Page Header -->
+                <Border Grid.Row="0" Background="White" Padding="32,20" BorderBrush="#E9ECEF" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock Name="PageTitle" Text="Dashboard" FontSize="28" FontWeight="Light" Foreground="#2C3E50"/>
+                            <TextBlock Name="PageSubtitle" Text="Application packaging overview and quick actions" 
+                                 FontSize="14" Foreground="#7F8C8D" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}" 
+                                Margin="0,0,8,0" Click="RefreshButton_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Content Container -->
+
+                <Grid Grid.Row="1" Name="MainContentGrid" Margin="32">
+
+                    <!-- CREATE APPLICATION PAGE -->
+                    <Grid Name="CreateApplicationPage" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="400"/>
+                            <ColumnDefinition Width="350" MinWidth="300" MaxWidth="400"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,20,0">
+                            <StackPanel>
+                                <Border Style="{StaticResource ModernCard}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
+                                            <Border Background="#E3F2FD" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                                <TextBlock Text="ℹ️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Application Information" FontSize="18" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,0">
+                                                <TextBlock Text="Manufacturer" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
+                                                <TextBox Name="ManufacturerTextBox" Style="{StaticResource ModernTextBox}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="0" Grid.Column="1">
+                                                <TextBlock Text="Application Name" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
+                                                <TextBox Name="AppNameTextBox" Style="{StaticResource ModernTextBox}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,0">
+                                                <TextBlock Text="Version" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
+                                                <TextBox Name="VersionTextBox" Style="{StaticResource ModernTextBox}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="1" Grid.Column="1">
+                                                <TextBlock Text="Sources Path" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Name="SourcesPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}"
+                                                        Margin="0,0,8,0" TextChanged="SourcesPath_TextChanged"/>
+                                                    <Button Name="BrowseSourcesButton" Grid.Column="1" Content="📁 Browse..."
+                                                        Click="BrowseSourcesButton_Click" Style="{StaticResource SecondaryButton}"
+                                                        VerticalAlignment="Stretch" MinWidth="100"/>
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,16,0,0">
+                                                <Border Background="#FFF3E0" BorderBrush="#FFB74D" BorderThickness="1" CornerRadius="6" Padding="12">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                            <TextBlock Text="⚠️" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="Installation Context" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <CheckBox Name="UserInstallCheckBox"
+                                                                 Content="User Install (No Admin Rights Required)"
+                                                                 FontSize="12"
+                                                                 Margin="0,4,0,0"
+                                                                 ToolTip="Modifies AppDeployToolkitConfig.xml to set RequireAdmin=False. This allows installation without administrator privileges."/>
+                                                        <TextBlock Text="Note: This modifies PSADT config, not PowerShell scripts. Not compatible with 'Install for All Users' option in PSADT Configuration."
+                                                                  FontSize="10"
+                                                                  Foreground="#E67E22"
+                                                                  TextWrapping="Wrap"
+                                                                  Margin="24,4,0,0"
+                                                                  FontStyle="Italic"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <Border Grid.Row="3" Grid.ColumnSpan="2" Name="PSADTConfigSection"
+                                                Background="#F8F9FA" CornerRadius="8" Padding="20" Margin="0,16,0,0" Visibility="Collapsed">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <Grid Grid.Row="0" Margin="0,0,0,20">
+                                                        <StackPanel>
+                                                            <TextBlock Text="Detected Package Type" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,4"/>
+                                                            <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Name="DetectedPackageTypeIcon" Text="❓" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                                    <TextBlock Name="DetectedPackageTypeText" Text="Select source file to detect type" 
+                                                                         FontSize="14" Foreground="#6C757D" VerticalAlignment="Center" FontWeight="Medium"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <Border Grid.Row="1" Background="White" BorderBrush="#3498DB" BorderThickness="1" CornerRadius="6" Padding="16">
+                                                        <Grid>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Border Background="#E3F2FD" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                                                    <TextBlock Text="⚙️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                                <StackPanel VerticalAlignment="Center">
+                                                                    <TextBlock Text="PSADT Configuration" FontSize="14" FontWeight="SemiBold"/>
+                                                                    <TextBlock Name="PSADTStatusText" Text="Not configured - Click to select deployment options" 
+                                                                         FontSize="11" Foreground="#6C757D"/>
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                            <Button Name="ConfigurePSADTButton" HorizontalAlignment="Right" Content="Configure Options"
+                                                                Style="{StaticResource ModernButton}" Background="#3498DB" Padding="16,8" Click="ConfigurePSADT_Click"/>
+                                                        </Grid>
+                                                    </Border>
+
+                                                    <Grid Grid.Row="2" Name="PSADTSummaryPanel" Visibility="Collapsed" Margin="0,16,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Border Grid.Column="0" Background="White" BorderBrush="#E9ECEF" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,8,0">
+                                                            <StackPanel>
+                                                                <TextBlock Name="SelectedOptionsCount" Text="0" FontSize="20" FontWeight="Bold" 
+                                                                     Foreground="#3498DB" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Options" FontSize="10" Foreground="#95A5A6" HorizontalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+
+                                                        <Border Grid.Column="1" Background="White" BorderBrush="#E9ECEF" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,8,0">
+                                                            <StackPanel>
+                                                                <TextBlock Name="EstimatedScriptSize" Text="0KB" FontSize="20" FontWeight="Bold" 
+                                                                     Foreground="#27AE60" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Script Size" FontSize="10" Foreground="#95A5A6" HorizontalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+
+                                                        <Border Grid.Column="2" Background="White" BorderBrush="#E9ECEF" BorderThickness="1" CornerRadius="6" Padding="12">
+                                                            <StackPanel>
+                                                                <TextBlock Name="InjectionCount" Text="0" FontSize="20" FontWeight="Bold" 
+                                                                     Foreground="#9B59B6" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Injections" FontSize="10" Foreground="#95A5A6" HorizontalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Name="PackageStatusPanel" Style="{StaticResource ModernCard}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                            <Border Background="#E8F5E8" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                                <TextBlock Text="📦" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Package Status" FontSize="18" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Name="PackageStatusText" Text="Package not created yet" FontSize="14" Margin="0,0,0,8"/>
+                                        <TextBlock Name="PackagePathText" Text="" FontSize="12" Foreground="#666666" Margin="0,0,0,16"/>
+                                        <Button Name="OpenPackageFolderButton" Content="📂 Open Package Folder" 
+                                            Style="{StaticResource SecondaryButton}" Click="OpenPackageFolderButton_Click"
+                                            Visibility="Collapsed" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Border Style="{StaticResource ModernCard}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
+                                    <Border Background="#FFF3E0" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                        <TextBlock Text="🎯" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Actions" FontSize="18" FontWeight="Medium" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <Border Background="{StaticResource SuccessBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
+                                                <TextBlock Text="1" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Generate Package" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Button Content="🚀 Generate Package" Name="GenerateButton" Click="GenerateButton_Click"
+                                                Style="{StaticResource ModernButton}" Background="{StaticResource SuccessBrush}"
+                                                HorizontalAlignment="Stretch"
+                                                ToolTip="Generate PSADT package with configured options"/>
+                                        <TextBlock Text="Creates PSADT folder structure and script template" FontSize="11" 
+                                                 Foreground="#666666" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <Border Background="{StaticResource SecondaryBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
+                                                <TextBlock Text="2" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Edit Script (Optional)" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Button Content="📝 Open Script Editor" Name="OpenScriptButton" Click="OpenScriptButton_Click"
+                                                Style="{StaticResource SecondaryButton}"
+                                                HorizontalAlignment="Stretch"
+                                                ToolTip="Open Deploy-Application.ps1 in Visual Studio Code"/>
+                                        <TextBlock Text="Customize Deploy-Application.ps1 in VSCode" FontSize="11" 
+                                                 Foreground="#666666" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <Border Background="{StaticResource SecondaryBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
+                                                <TextBlock Text="3" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Remote Test PSADT script" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Button Name="btnRemoteTest" Content="🖥️ Remote Test" Click="btnRemoteTest_Click"
+                                                Style="{StaticResource ModernButton}"
+                                                HorizontalAlignment="Stretch"
+                                                ToolTip="Test package installation on a remote computer"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{StaticResource LightBrush}" CornerRadius="8" Padding="16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <Border Background="{StaticResource PrimaryBrush}" Width="24" Height="24" CornerRadius="12" Margin="0,0,8,0">
+                                                <TextBlock Text="4" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Upload to Intune" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Button Content="☁️ Upload to Intune" Name="UploadButton" Click="UploadButton_Click"
+                                                Style="{StaticResource ModernButton}"
+                                                HorizontalAlignment="Stretch"
+                                                ToolTip="Create .intunewin file and upload to Microsoft Intune"/>
+                                        <TextBlock Text="Create .intunewin and upload to Microsoft Intune" FontSize="11" 
+                                                 Foreground="#666666" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- UPLOAD EXISTING PAGE -->
+                    <Grid Name="UploadExistingPage" Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Grid MaxWidth="1200" Margin="32">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Border Grid.Row="0" Style="{StaticResource ModernCard}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Text="Select Package" FontSize="16" FontWeight="SemiBold" 
+                                                 Foreground="#212529" Margin="0,0,0,20"/>
+
+                                        <Grid Grid.Row="1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0" Text="Deploy-Application.exe:" VerticalAlignment="Center" 
+                                                     FontSize="13" FontWeight="Medium" Foreground="#6C757D"/>
+                                            <TextBox Grid.Column="1" Name="ExistingDeployExePath" Style="{StaticResource ModernTextBox}" 
+                                                   IsReadOnly="True" Margin="0,0,12,0"/>
+                                            <Button Grid.Column="2" Name="BrowseDeployExeButton" Content="📁 Browse..." 
+                                                  Click="BrowseDeployExeButton_Click" Style="{StaticResource SecondaryButton}" MinWidth="120"/>
+                                        </Grid>
+
+                                        <Border Grid.Row="2" Name="PackageValidationStatus" Background="#F8F9FA" BorderBrush="#DEE2E6" 
+                                              BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,16,0,0" Visibility="Collapsed">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Name="ValidationIcon" Text="✅" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Name="ValidationTitle" Text="Valid Package Detected" FontWeight="SemiBold" FontSize="13"/>
+                                                    <TextBlock Name="ValidationMessage" Text="Successfully extracted metadata from Deploy-Application.ps1" 
+                                                             FontSize="11" Foreground="#6C757D" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="1" Name="AppInfoSection" Style="{StaticResource ModernCard}" Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Text="Application Information" FontSize="16" FontWeight="SemiBold" 
+                                                 Foreground="#212529" Margin="0,0,0,20"/>
+
+                                        <Grid Grid.Row="1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="20"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,0,20">
+                                                <TextBlock Text="Application Name" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,6"/>
+                                                <Border Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                                                    <TextBlock Name="ExistingAppName" Text="" FontSize="14" Foreground="#212529" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,0,20">
+                                                <TextBlock Text="Version" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,6"/>
+                                                <Border Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                                                    <TextBlock Name="ExistingVersion" Text="" FontSize="14" Foreground="#212529" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="0" Grid.Row="2" Margin="0,0,0,20">
+                                                <TextBlock Text="Script Date" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,6"/>
+                                                <Border Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                                                    <TextBlock Name="ExistingScriptDate" Text="" FontSize="14" Foreground="#212529" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,20">
+                                                <TextBlock Text="Vendor/Publisher" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,6"/>
+                                                <Border Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                                                    <TextBlock Name="ExistingVendor" Text="" FontSize="14" Foreground="#212529" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" Grid.Row="1" Margin="0,0,0,20">
+                                                <TextBlock Text="Script Author" FontSize="12" FontWeight="Medium" Foreground="#6C757D" Margin="0,0,0,6"/>
+                                                <Border Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                                                    <TextBlock Name="ExistingScriptAuthor" Text="" FontSize="14" Foreground="#212529" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="2" Name="UploadSection" Style="{StaticResource ModernCard}" Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Name="ReadyStatusText" Text="Ready to upload to Microsoft Intune" FontSize="14" FontWeight="Medium"/>
+                                            <TextBlock Name="ValidationSummary" Text="All required information provided" FontSize="12" Foreground="#6C757D" Margin="0,4,0,0"/>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1" Name="UploadToIntuneButton" Content="☁️ Upload to Intune"
+                                              Click="UploadToIntune_Click" IsEnabled="False" Style="{StaticResource ModernButton}"
+                                              Background="#27AE60" Padding="32,12" FontSize="14" Height="48"
+                                              ToolTip="Upload existing PSADT package to Microsoft Intune"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- VIEW APPLICATIONS PAGE -->
+                    <Grid Name="ViewApplicationsPage" Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <Border Name="ApplicationsListPanel" Style="{StaticResource ModernCard}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
+                                        <Border Background="#E3F2FD" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                            <TextBlock Text="📱" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="Microsoft Intune Applications" FontSize="20" FontWeight="SemiBold" 
+                                             Foreground="#212529" VerticalAlignment="Center"/>
+                                        <TextBlock Text="(Double-click any app for details)" FontSize="12" Foreground="#666" 
+                                             VerticalAlignment="Center" Margin="16,0,0,0" FontStyle="Italic"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+                                        <Grid Width="350" VerticalAlignment="Center">
+                                            <TextBox Name="SearchTextBox" MinHeight="40"
+                                                     Style="{StaticResource ModernTextBox}"
+                                                     TextChanged="SearchTextBox_TextChanged"
+                                                     Padding="36,8,36,8"
+                                                     AutomationProperties.Name="Search applications"
+                                                     AutomationProperties.HelpText="Search by application name or publisher"
+                                                     TabIndex="1"/>
+                                            <TextBlock IsHitTestVisible="False"
+                                                       Text="Search applications..."
+                                                       VerticalAlignment="Center"
+                                                       HorizontalAlignment="Left"
+                                                       Margin="36,0,0,0"
+                                                       Foreground="#999999"
+                                                       FontSize="13">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="🔍"
+                                                       FontSize="14"
+                                                       IsHitTestVisible="False"
+                                                       VerticalAlignment="Center"
+                                                       HorizontalAlignment="Left"
+                                                       Margin="10,0,0,0"
+                                                       Foreground="#666666"/>
+                                            <Button Content="✕"
+                                                    Width="24"
+                                                    Height="24"
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Right"
+                                                    Margin="0,0,6,0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Foreground="#999999"
+                                                    FontSize="14"
+                                                    Cursor="Hand"
+                                                    Click="ClearSearch_Click"
+                                                    ToolTip="Clear search"
+                                                    Padding="0">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border Background="{TemplateBinding Background}"
+                                                                            CornerRadius="12"
+                                                                            Padding="{TemplateBinding Padding}">
+                                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                    </Border>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#F0F0F0"/>
+                                                                <Setter Property="Foreground" Value="#333333"/>
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </Grid>
+
+                                        <ComboBox Name="CategoryFilter" Width="200" MinHeight="40" Margin="10,0,0,0" VerticalAlignment="Center"
+                                            Style="{StaticResource ModernComboBox}" SelectedIndex="0" SelectionChanged="CategoryFilter_SelectionChanged"/>
+
+                                        <ComboBox Name="PageSizeCombo" Width="120" MinHeight="40" Margin="10,0,0,0" VerticalAlignment="Center"
+                                            Style="{StaticResource ModernComboBox}" SelectedIndex="1" SelectionChanged="PageSize_Changed">
+                                            <ComboBoxItem Content="25 per page" Tag="25"/>
+                                            <ComboBoxItem Content="50 per page" Tag="50"/>
+                                            <ComboBoxItem Content="100 per page" Tag="100"/>
+                                            <ComboBoxItem Content="200 per page" Tag="200"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <Border Grid.Row="2" Background="{StaticResource LightBrush}" BorderBrush="#DEE2E6" 
+                                      BorderThickness="1" CornerRadius="6,6,0,0" Padding="15,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="20"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Application Name" FontSize="12" FontWeight="SemiBold" Foreground="#495057"/>
+                                            <TextBlock Grid.Column="1" Text="Version" FontSize="12" FontWeight="SemiBold" Foreground="#495057" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="Category" FontSize="12" FontWeight="SemiBold" Foreground="#495057" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="3" Text="●" FontSize="12" FontWeight="SemiBold" Foreground="#495057" HorizontalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <ListView Grid.Row="3" Name="ApplicationsList" ItemsSource="{Binding}" MouseDoubleClick="ApplicationsList_DoubleClick"
+                                        ScrollViewer.ScrollChanged="ApplicationsList_ScrollChanged" BorderThickness="0" Background="Transparent"
+                                        HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                        ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                        VirtualizingStackPanel.IsVirtualizing="False"
+                                        PreviewMouseWheel="ApplicationsList_PreviewMouseWheel">
+                                        <ListView.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <VirtualizingStackPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListView.ItemsPanel>
+
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#F8F9FA"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="White" BorderBrush="#DEE2E6" BorderThickness="1,0,1,1" Padding="15,12" Margin="0">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="120"/>
+                                                            <ColumnDefinition Width="150"/>
+                                                            <ColumnDefinition Width="20"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" 
+                                                                 Foreground="#212529" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Version}" FontSize="12" Foreground="#495057" 
+                                                             VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Category}" FontSize="12" Foreground="#495057" 
+                                                             VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        <Border Grid.Column="3" Background="{StaticResource SuccessBrush}" Width="8" Height="8" 
+                                                          CornerRadius="4" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </Grid>
+                            </Border>
+                        </ScrollViewer>
+                        <local:ApplicationDetailView x:Name="ApplicationDetailView" Visibility="Collapsed"/>
+                    </Grid>
+
+                    <!-- SETTINGS PAGE -->
+                    <Grid Name="SettingsPage" Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <Border Style="{StaticResource ModernCard}">
+                                <StackPanel Margin="20">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                                        <Border Background="#2196F3" Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0">
+                                            <TextBlock Text="⚙️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="Configuration" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <GroupBox Header="Authentication" Margin="0,0,0,15">
+                                        <Grid Margin="10">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Tenant ID:" FontWeight="SemiBold"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Name="TenantIdDisplay" FontFamily="Consolas"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Client ID:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Name="ClientIdDisplay" FontFamily="Consolas" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Certificate:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Name="ThumbprintDisplay" FontFamily="Consolas" Margin="0,5,0,0"/>
+                                        </Grid>
+                                    </GroupBox>
+
+                                    <GroupBox Header="System Paths" Margin="0,0,0,15">
+                                        <Grid Margin="10">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Output Path:" FontWeight="SemiBold"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Name="OutputPathDisplay" TextWrapping="Wrap"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="PSADT Template:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Name="PSADTPathDisplay" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="IntuneWinAppUtil:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Name="UtilPathDisplay" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                        </Grid>
+                                    </GroupBox>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </Grid>
+
+                </Grid>
+
+
+                <!-- Pagination -->
+                <Border Grid.Row="2" Background="#F8F9FA" Padding="20,12" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0"
+                    Name="PaginationPanel" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Name="PreviousPageButton" 
+        Click="PreviousPage_Click"
+        Style="{StaticResource HeaderActionButton}"
+        Content="← Previous"
+        Width="120" Height="40"
+        Margin="0,0,15,0"/>
+
+                        <Border Background="White" 
+        CornerRadius="6" 
+        Padding="20,8" 
+        BorderBrush="#DEE2E6" 
+        BorderThickness="1"
+        VerticalAlignment="Center" 
+        Margin="0,0,15,0">
+                            <TextBlock Name="PageDisplayText"
+               Text="Page 1 of 1" 
+               VerticalAlignment="Center" 
+               FontSize="14"
+               FontWeight="Medium"
+               Foreground="#495057"/>
+                        </Border>
+
+                        <Button Name="NextPageButton" 
+        Click="NextPage_Click"
+        Style="{StaticResource HeaderActionButton}"
+        Content="Next →"
+        Width="120" Height="40"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Status Bar -->
+                <Border Grid.Row="3" Background="White" Padding="32,16" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Fill="#27AE60" Width="12" Height="12" Margin="0,0,8,0"/>
+                            <TextBlock Name="StatusText" Text="Ready • Connected to Microsoft Intune" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock x:Name="LastSyncText" Text="Last sync: Never" FontSize="11" Foreground="#7F8C8D" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                            <ProgressBar Name="ProgressBar" Width="200" Height="6" Visibility="Collapsed"
+                                   Background="#E9ECEF" Foreground="#3498DB" BorderThickness="0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+            </Grid>
+    </Grid>
+</Window>

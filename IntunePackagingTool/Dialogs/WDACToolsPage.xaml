@@ -1,0 +1,421 @@
+﻿<!-- WDACToolsPage.xaml -->
+<UserControl x:Class="IntunePackagingTool.WDACToolsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:IntunePackagingTool"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="900">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Hyper-V Section -->
+            <RowDefinition Height="*"/>
+            <!-- Data Grid -->
+            <RowDefinition Height="Auto"/>
+            <!-- Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- Hyper-V Automated Catalog Generation Section -->
+        <Border Grid.Row="0" Background="White" Padding="20" Margin="0,0,0,20">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.1" ShadowDepth="2" BlurRadius="5"/>
+            </Border.Effect>
+
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                    <Border Background="#3498DB" Width="40" Height="40" CornerRadius="8" Margin="0,0,12,0">
+                        <TextBlock Text="🖥️" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Automated Catalog Generation (Hyper-V)" 
+                                   FontSize="18" FontWeight="SemiBold" Foreground="#2C3E50"/>
+                        <TextBlock Text="Generate catalog files using isolated Hyper-V VM (Recommended)" 
+                                   FontSize="12" Foreground="#6C757D" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Configuration Grid -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- Application Path -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Action Buttons -->
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Application Path -->
+                    <TextBlock Grid.Row="0" Grid.Column="0" 
+                               Text="Application Path:" 
+                               VerticalAlignment="Center" 
+                               FontWeight="Medium" 
+                               Margin="0,0,0,12"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" 
+                             Name="HyperVAppPathTextBox" 
+                             Height="35"
+                             VerticalContentAlignment="Center"
+                             Padding="10,0"
+                             IsReadOnly="True"
+                             Margin="0,0,12,0"/>
+                    <Button Grid.Row="0" Grid.Column="2" 
+                            Name="BrowseHyperVAppButton"
+                            Content="📁 Browse" 
+                            Click="BrowseHyperVApp_Click"
+                            Width="100" 
+                            Height="35"
+                            Margin="0,0,0,12"
+                            Background="#3498DB"
+                            Foreground="White"
+                            FontWeight="Medium"
+                            BorderThickness="0"
+                            Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" 
+                                        CornerRadius="6"
+                                        Padding="15,8">
+                                    <ContentPresenter HorizontalAlignment="Center" 
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#2980B9"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- Action Buttons -->
+                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" 
+                                Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button Name="GenerateHyperVCatalogButton" 
+                                Content="🚀 Generate Catalog with Hyper-V" 
+                                Click="GenerateHyperVCatalog_Click"
+                                Height="40"
+                                Padding="20,0"
+                                Background="#27AE60"
+                                Foreground="White"
+                                FontWeight="Medium"
+                                FontSize="14"
+                                BorderThickness="0"
+                                Cursor="Hand"
+                                IsEnabled="False">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                                            CornerRadius="6"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#229954"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Background" Value="#BDC3C7"/>
+                                            <Setter Property="Cursor" Value="Arrow"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button Name="ViewHyperVLogButton" 
+                                Content="📋 View Log" 
+                                Click="ViewHyperVLog_Click"
+                                Height="40"
+                                Margin="12,0,0,0"
+                                Padding="15,0"
+                                Background="#95A5A6"
+                                Foreground="White"
+                                FontWeight="Medium"
+                                BorderThickness="0"
+                                Cursor="Hand"
+                                IsEnabled="False">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                                            CornerRadius="6"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#7F8C8D"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button Name="VerifyCatalogsButton" 
+        Content="🔍 Verify Catalogs" 
+        Click="VerifyCatalogs_Click"
+        Height="40"
+        Margin="12,0,0,0"
+        Padding="15,0"
+        Background="#9B59B6"
+        Foreground="White"
+        FontWeight="Medium"
+        BorderThickness="0"
+        Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                    CornerRadius="6"
+                    Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                  VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#8E44AD"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Status Panel -->
+                <Border Name="HyperVStatusPanel" 
+                        Background="#F8F9FA" 
+                        CornerRadius="6" 
+                        Padding="16" 
+                        Margin="0,20,0,0"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ProgressBar Name="HyperVProgressBar" 
+                                     Grid.Column="0"
+                                     Width="200" 
+                                     Height="4"
+                                     IsIndeterminate="True"
+                                     Background="#E0E0E0"
+                                     Foreground="#3498DB"
+                                     BorderThickness="0"
+                                     Margin="0,0,16,0"
+                                     VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Name="HyperVStatusText" 
+                                       Text="Initializing Hyper-V automation..." 
+                                       FontWeight="Medium" 
+                                       FontSize="13"/>
+                            <TextBlock Name="HyperVStatusDetail" 
+                                       Text="Please wait..." 
+                                       FontSize="11" 
+                                       Foreground="#6C757D" 
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Info Box -->
+                <Border Background="#E3F2FD" 
+                        BorderBrush="#2196F3" 
+                        BorderThickness="1" 
+                        CornerRadius="6" 
+                        Padding="16" 
+                        Margin="0,20,0,0">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ Hyper-V Automated Process" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="#1976D2" 
+                                   Margin="0,0,0,8"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#424242">
+                            <Run Text="This automated process will:"/>
+                            <LineBreak/>
+                            <Run Text="• Connect to Hyper-V host: PC0030172"/>
+                            <LineBreak/>
+                            <Run Text="• Use VM: WDACVM2"/>
+                            <LineBreak/>
+                            <Run Text="• Restore to snapshot: START05"/>
+                            <LineBreak/>
+                            <Run Text="• Copy application files to VM"/>
+                            <LineBreak/>
+                            <Run Text="• Run PSADT installation with Package Inspector"/>
+                            <LineBreak/>
+                            <Run Text="• Generate and hash catalog file"/>
+                            <LineBreak/>
+                            <Run Text="• Copy catalog back to source folder"/>
+                            <LineBreak/><LineBreak/>
+                            <Run Text="⚠️ Note: Catalog file must still be signed and deployed after generation." FontWeight="Medium"/>
+                            <LineBreak/>
+                            <Run Text="📍 Script Location: \\nbb.local\SYS\SCCMData\SCRIPTS\Intune\CreateSecurityCatalog\Create-CatfileHyperVRS.ps1" FontSize="10" Foreground="#666"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Data Grid -->
+        <Border Grid.Row="1" Background="White" Margin="0">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.1" ShadowDepth="2" BlurRadius="5"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Grid Header -->
+                <Border Grid.Row="0" Background="#F8F9FA" BorderBrush="#DEE2E6" 
+                        BorderThickness="0,0,0,1" Padding="20,15">
+                    <Grid>
+                        <TextBlock Text="Catalog Generation Queue" 
+                                   FontSize="16" FontWeight="Medium" 
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" 
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Right-click for options" 
+                                       FontSize="11" 
+                                       Foreground="#6C757D" 
+                                       FontStyle="Italic"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Data Grid -->
+                <DataGrid Grid.Row="1" 
+                          Name="CatalogQueueGrid" 
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          GridLinesVisibility="Horizontal"
+                          BorderThickness="0"
+                          Background="White"
+                          RowHeight="45"
+                          MouseRightButtonUp="CatalogQueueGrid_MouseRightButtonUp">
+
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#F8F9FA"/>
+                            <Setter Property="Foreground" Value="#495057"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Height" Value="40"/>
+                            <Setter Property="Padding" Value="10,0"/>
+                            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                            <Setter Property="BorderBrush" Value="#DEE2E6"/>
+                        </Style>
+
+                        <Style TargetType="DataGridRow">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#F8F9FA"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#E3F2FD"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Padding" Value="10,0"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGrid.Resources>
+
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="Select" 
+                                                Binding="{Binding IsSelected}" 
+                                                Width="60"
+                                                ElementStyle="{StaticResource {x:Type CheckBox}}"/>
+
+                        <DataGridTextColumn Header="Application Name" 
+                                            Binding="{Binding AppName}" 
+                                            Width="250">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontWeight" Value="Medium"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="Version" 
+                                            Binding="{Binding Version}" 
+                                            Width="100"/>
+
+                        <DataGridTemplateColumn Header="Status" Width="200">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Status}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Path=Status}" 
+                                                                 Value="Complete">
+                                                        <Setter Property="Foreground" Value="#27AE60"/>
+                                                        <Setter Property="FontWeight" Value="Medium"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Path=Status}" 
+                                                                 Value="Running">
+                                                        <Setter Property="Foreground" Value="#3498DB"/>
+                                                        <Setter Property="FontWeight" Value="Medium"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Path=Status}" 
+                                                                 Value="Queued">
+                                                        <Setter Property="Foreground" Value="#95A5A6"/>
+                                                        <Setter Property="FontWeight" Value="Medium"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="Catalog Path" 
+                                            Binding="{Binding CatalogPath}" 
+                                            Width="*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#6C757D"/>
+                                    <Setter Property="FontSize" Value="11"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+   
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#F8F9FA" Padding="20,10" Margin="0,10,0,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Total Tasks: " FontWeight="Medium"/>
+                    <TextBlock Name="TotalTasksText" Text="0" Margin="5,0,20,0"/>
+
+                    <TextBlock Text="Queued: " FontWeight="Medium"/>
+                    <TextBlock Name="QueuedTasksText" Text="0" Margin="5,0,20,0"/>
+
+                    <TextBlock Text="Running: " FontWeight="Medium"/>
+                    <TextBlock Name="RunningTasksText" Text="0" Margin="5,0,0,0" Foreground="#3498DB"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

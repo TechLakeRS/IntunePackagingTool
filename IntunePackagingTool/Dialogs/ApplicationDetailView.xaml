@@ -1,0 +1,729 @@
+﻿<!-- ApplicationDetailView.xaml - Single Page with Better Visual Hierarchy -->
+<UserControl x:Class="IntunePackagingTool.ApplicationDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <!-- Modern Card Style -->
+        <Style x:Key="InfoCard" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+            <Setter Property="BorderBrush" Value="#E5E7EB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" Opacity="0.05" ShadowDepth="2" BlurRadius="8"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Section Header Style -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#1F2937"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <!-- Field Label Style -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+           
+        </Style>
+
+        <!-- Field Value Style -->
+        <Style x:Key="FieldValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Hidden Status TextBlock for code-behind -->
+        
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="*"/>
+            <!-- Scrollable Content -->
+        </Grid.RowDefinitions>
+
+        <!-- HEADER SECTION -->
+        <Grid Grid.Row="0" Background="#1F2937">
+            <Grid.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.15" ShadowDepth="3" BlurRadius="10"/>
+            </Grid.Effect>
+
+            <Grid Margin="24,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Name="StatusText" 
+   Visibility="Collapsed"
+   Text="Application details loaded"/>
+                <!-- Back Button -->
+                <Button Grid.Column="0" 
+                        Name="BackButton" 
+                        Click="BackButton_Click"
+                        Background="Transparent" 
+                        Foreground="White"
+                        BorderThickness="0"
+                        Padding="12,8"
+                        FontWeight="Medium"
+                        Cursor="Hand"
+                        ToolTip="Return to application list">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="←" FontSize="16" Margin="0,0,8,0"/>
+                        <TextBlock Text="Back"/>
+                    </StackPanel>
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="6"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#374151"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- App Title Section -->
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center" 
+                            Margin="20,0">
+                    <Border Width="48" Height="48" 
+                            Background="White" 
+                            CornerRadius="8"
+                            Margin="0,0,12,0">
+                        <Image x:Name="AppIconImage" 
+                               Source="{Binding IconImage}" 
+                               Width="40" Height="40"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Name="AppTitleText" 
+                                   Text="Application Name" 
+                                   FontSize="20" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="White"/>
+                        <TextBlock Name="AppSubtitleText"
+                                   Text="Version • Publisher"
+                                   FontSize="12"
+                                   Foreground="#D1D5DB"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Action Buttons -->
+                <StackPanel Grid.Column="2" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center">
+                    <Button Name="UpdateApplicationButton"
+        Content="🔄 Update" 
+        Click="UpdateApplicationButton_Click"
+        Margin="0,0,8,0"
+        ToolTip="Update this application with latest files"
+        Style="{StaticResource HeaderActionButton}"/>
+
+                    <Button Name="OpenScriptButton"
+        Content="📝 Script" 
+        Click="OpenScriptButton_Click"
+        Margin="0,0,8,0"
+        ToolTip="Open Deploy-Application.ps1"
+        Style="{StaticResource HeaderActionButton}"/>
+
+                    <Button Name="ReportingButton"
+        Content="📊 Reports" 
+        Click="ReportingButton_Click"
+        ToolTip="View installation statistics"
+        Style="{StaticResource HeaderActionButton}"/>
+                  
+                   
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- SCROLLABLE CONTENT AREA -->
+        <ScrollViewer Grid.Row="1" 
+                      Name="DetailScrollViewer"
+                      VerticalScrollBarVisibility="Auto" 
+                      Background="#F9FAFB"
+                      Padding="24,20">
+            <Grid MaxWidth="1400">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" MinWidth="400"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="1*" MinWidth="350"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT COLUMN - Main Information -->
+                <StackPanel Grid.Column="0">
+
+                    <!-- Overview Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                                <Border Background="#EFF6FF" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="📋" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Application Overview" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <TextBlock Text="APPLICATION NAME" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="AppNameText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="PUBLISHER" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="PublisherText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="CATEGORY" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="CategoryText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                                    <TextBlock Text="VERSION" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="AppVersionText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="INSTALL CONTEXT" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="InstallContextText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="FILE SIZE" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="FileSizeText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="OWNER" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="OwnerText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="DEVELOPER" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="DeveloperText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="LAST MODIFIED" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="LastModifiedText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Description Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border Background="#F3E8FF" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="📝" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Description" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+                            <TextBlock Name="DescriptionText" 
+                                       Style="{StaticResource FieldValue}"
+                                       LineHeight="22"
+                                       Margin="0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Installation Commands Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border Background="#ECFDF5" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="⚙️" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Installation Commands" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                    <TextBlock Text="INSTALL COMMAND" Style="{StaticResource FieldLabel}"/>
+                                    <Border Background="#F9FAFB" 
+                                            CornerRadius="4" 
+                                            Padding="10"
+                                            BorderBrush="#E5E7EB"
+                                            BorderThickness="1">
+                                        <TextBlock Name="InstallCommandText" 
+                                                   FontFamily="Consolas" 
+                                                   FontSize="11"
+                                                   Foreground="#374151"
+                                                   TextWrapping="Wrap"/>
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="UNINSTALL COMMAND" Style="{StaticResource FieldLabel}"/>
+                                    <Border Background="#F9FAFB" 
+                                            CornerRadius="4" 
+                                            Padding="10"
+                                            BorderBrush="#E5E7EB"
+                                            BorderThickness="1">
+                                        <TextBlock Name="UninstallCommandText" 
+                                                   FontFamily="Consolas" 
+                                                   FontSize="11"
+                                                   Foreground="#374151"
+                                                   TextWrapping="Wrap"/>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Detection Rules Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border Background="#FEF3C7" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="🔍" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Detection Rules" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+
+                            <ItemsControl Name="DetectionRulesList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#F9FAFB" 
+                                                CornerRadius="6" 
+                                                Padding="12" 
+                                                Margin="0,0,0,8"
+                                                BorderBrush="#E5E7EB" 
+                                                BorderThickness="1">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" 
+                                                           FontWeight="Medium" 
+                                                           FontSize="12" 
+                                                           Foreground="#3B82F6"
+                                                           Margin="0,0,0,4"/>
+                                                <TextBlock Text="{Binding Description}" 
+                                                           FontSize="11" 
+                                                           Foreground="#6B7280" 
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- System Requirements Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Border Background="#E0E7FF" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="💻" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="System Requirements" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <TextBlock Text="DISK SPACE" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="DiskSpaceText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="MEMORY" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="MemoryText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                                    <TextBlock Text="PROCESSORS" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="ProcessorsText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="CPU SPEED" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="CpuSpeedText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="ARCHITECTURES" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="ArchitecturesText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="MIN WINDOWS" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="MinWindowsText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+
+                <!-- RIGHT COLUMN - Assignments & Source Files -->
+                <StackPanel Grid.Column="2">
+
+                    <!-- Assigned Groups Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Background="#FEE2E2" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                        <TextBlock Text="👥" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Assigned Groups" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                                </StackPanel>
+                                <TextBlock Name="GroupCountText"
+                                           Text="0 groups"
+                                           FontSize="11"
+                                           Foreground="#6B7280"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Margin="0,8,0,0"/>
+                            </Grid>
+
+                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl Name="AssignedGroupsList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="White" 
+                                                    CornerRadius="6" 
+                                                    Padding="12" 
+                                                    Margin="0,0,0,6"
+                                                    BorderBrush="#E5E7EB" 
+                                                    BorderThickness="1"
+                                                    MouseEnter="GroupItem_MouseEnter"
+                                                    MouseLeave="GroupItem_MouseLeave"
+                                                    Cursor="Hand">
+                                                <Grid MouseLeftButtonUp="GroupItem_Click" Tag="{Binding}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding GroupName}" 
+                                                                   FontWeight="Medium" 
+                                                                   FontSize="12"
+                                                                   Foreground="#111827"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding AssignmentType}" 
+                                                                   FontSize="10" 
+                                                                   Foreground="#6B7280" 
+                                                                   Margin="0,2,0,0"/>
+                                                    </StackPanel>
+
+                                                    <TextBlock Grid.Column="1" 
+                                                               Text="→" 
+                                                               Name="ViewMembersHint"
+                                                               FontSize="14"
+                                                               Foreground="#9CA3AF"
+                                                               Visibility="Collapsed"
+                                                               VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <!-- Empty State -->
+                            <Border Name="NoGroupsPanel"
+                                    Visibility="Collapsed"
+                                    Background="#F9FAFB"
+                                    CornerRadius="6"
+                                    Padding="20"
+                                    BorderBrush="#E5E7EB"
+                                    BorderThickness="1">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="👥" 
+                                               FontSize="32" 
+                                               HorizontalAlignment="Center" 
+                                               Opacity="0.3"/>
+                                    <TextBlock Text="No groups assigned" 
+                                               FontSize="12"
+                                               FontWeight="Medium"
+                                               Foreground="#6B7280"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,8,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Source Files Card -->
+                    <Border Background="#EFF6FF" 
+                            CornerRadius="8" 
+                            Padding="16"
+                            BorderBrush="#BFDBFE" 
+                            BorderThickness="1"
+                            Margin="0,0,0,16">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border Background="#3B82F6" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="📁" FontSize="16" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Package Source" 
+                                               FontSize="13" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="#1E3A8A"/>
+                                    <TextBlock Text="Network share location" 
+                                               FontSize="10" 
+                                               Foreground="#60A5FA" 
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Path Display -->
+                            <Border Background="White" 
+                                    CornerRadius="6" 
+                                    Padding="10" 
+                                    Margin="0,0,0,10"
+                                    BorderBrush="#BFDBFE"
+                                    BorderThickness="1">
+                                <TextBlock Name="SourcePathText" 
+                                           Text="Searching..."
+                                           FontFamily="Consolas" 
+                                           FontSize="10" 
+                                           Foreground="#374151"
+                                           TextWrapping="Wrap"/>
+                            </Border>
+
+                            <!-- Action Buttons -->
+                            <StackPanel Name="ActionButtonsPanel" 
+                                        Visibility="Collapsed"
+                                        Margin="0,0,0,8">
+                                <Button Name="OpenFolderButton" 
+                                        Click="OpenFolderButton_Click"
+                                        Background="#10B981" 
+                                        Foreground="White"
+                                        BorderThickness="0" 
+                                        Padding="10,8"
+                                        Margin="0,0,0,4"
+                                        FontWeight="Medium"
+                                        FontSize="11"
+                                        Cursor="Hand"
+                                        HorizontalAlignment="Stretch">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="6"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="📂" FontSize="12" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Open Folder"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#059669"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <Button Name="CopyPathButton" 
+                                        Click="CopyPathButton_Click"
+                                        Background="#6B7280" 
+                                        Foreground="White"
+                                        BorderThickness="0" 
+                                        Padding="10,8"
+                                        Margin="0,0,0,4"
+                                        FontWeight="Medium"
+                                        FontSize="11"
+                                        Cursor="Hand"
+                                        HorizontalAlignment="Stretch">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="6"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="📋" FontSize="12" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Copy Path"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#4B5563"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <Button Name="ChangePathButton" 
+                                        Click="BrowsePackageFolderButton_Click"
+                                        Background="#F59E0B" 
+                                        Foreground="White"
+                                        BorderThickness="0" 
+                                        Padding="10,8"
+                                        FontWeight="Medium"
+                                        FontSize="11"
+                                        Cursor="Hand"
+                                        HorizontalAlignment="Stretch"
+                                        ToolTip="Browse for Deploy-Application.exe">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="6"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="🔄" FontSize="12" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Change Path"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#D97706"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Manual Browse Panel -->
+                            <StackPanel Name="ManualBrowsePanel" Visibility="Collapsed">
+                                <Button Name="BrowsePackageButton" 
+                                        Click="BrowsePackageFolderButton_Click"
+                                        Background="#F59E0B" 
+                                        Foreground="White"
+                                        BorderThickness="0" 
+                                        Padding="10,8"
+                                        FontWeight="Medium"
+                                        FontSize="11"
+                                        Cursor="Hand"
+                                        HorizontalAlignment="Stretch">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="6"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="📂" FontSize="12" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Browse for Package"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#D97706"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Help Text -->
+                            <Border Background="#DBEAFE" 
+                                    CornerRadius="4" 
+                                    Padding="8"
+                                    BorderBrush="#93C5FD"
+                                    BorderThickness="1"
+                                    Margin="0,8,0,0">
+                                <TextBlock Name="PathHelpText" 
+                                           Text="Package should have Application subfolder"
+                                           FontSize="9" 
+                                           Foreground="#1E40AF" 
+                                           TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Publishing Info Card -->
+                    <Border Style="{StaticResource InfoCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border Background="#FEF3C7" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="📤" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Publishing Status" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+
+                            <TextBlock Text="UPLOAD STATE" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="UploadStateText" Style="{StaticResource FieldValue}"/>
+
+                            <TextBlock Text="PUBLISHING STATE" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="PublishingStateText" Style="{StaticResource FieldValue}"/>
+
+                            <TextBlock Text="CREATED DATE" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Name="CreatedDateText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- URLs Card (if available) -->
+                    <Border Name="UrlsPanel" Style="{StaticResource InfoCard}" Visibility="Collapsed">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border Background="#E0E7FF" Width="32" Height="32" CornerRadius="6" Margin="0,0,10,0">
+                                    <TextBlock Text="🔗" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Links" VerticalAlignment="Center" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            </StackPanel>
+
+                            <StackPanel Name="PrivacyUrlPanel" Visibility="Collapsed" Margin="0,0,0,12">
+                                <TextBlock Text="PRIVACY INFO" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Name="PrivacyUrlText" 
+                                           Foreground="#3B82F6" 
+                                           TextDecorations="Underline" 
+                                           Cursor="Hand"
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis"
+                                           MouseLeftButtonUp="PrivacyUrl_Click"/>
+                            </StackPanel>
+
+                            <StackPanel Name="InfoUrlPanel" Visibility="Collapsed">
+                                <TextBlock Text="INFORMATION URL" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Name="InfoUrlText" 
+                                           Foreground="#3B82F6" 
+                                           TextDecorations="Underline" 
+                                           Cursor="Hand"
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis"
+                                           MouseLeftButtonUp="InfoUrl_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+       
+    </Grid>
+</UserControl>

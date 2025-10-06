@@ -1,0 +1,172 @@
+﻿<Window x:Class="IntunePackagingTool.Dialogs.CdfViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CDF File Viewer" Height="700" Width="1000"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="0,0,0,1" Padding="20">
+            <StackPanel>
+                <TextBlock Text="CDF (Catalog Definition File) Viewer" FontSize="20" FontWeight="SemiBold" Foreground="#2C3E50"/>
+                <TextBlock Text="View and analyze the contents of CDF files used to create security catalogs" 
+                          FontSize="12" Foreground="#6C757D" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- File Selection -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#DEE2E6" BorderThickness="0,0,0,1" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="CDF File:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,10,0"/>
+                <TextBox Grid.Column="1" Name="CdfPathTextBox" IsReadOnly="True" VerticalAlignment="Center" Padding="8,5"/>
+                <Button Grid.Column="2" Name="BrowseButton" Content="Browse..." Click="Browse_Click" 
+                        Padding="15,5" Margin="10,0,5,0" Background="#007BFF" Foreground="White"/>
+                <Button Grid.Column="3" Name="OpenInNotepadButton" Content="Open in Notepad" Click="OpenInNotepad_Click" 
+                        Padding="15,5" Margin="5,0,5,0" IsEnabled="False"/>
+                <Button Grid.Column="4" Name="RefreshButton" Content="Refresh" Click="Refresh_Click" 
+                        Padding="15,5" Margin="5,0,0,0" IsEnabled="False"/>
+            </Grid>
+        </Border>
+
+        <!-- Content Area -->
+        <TabControl Grid.Row="2" Name="ContentTabs" Margin="10">
+            <!-- Parsed View Tab -->
+            <TabItem Header="Parsed View">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Summary -->
+                    <Border Grid.Row="0" Background="#E8F4F8" BorderBrush="#B8E0ED" BorderThickness="1" 
+                            CornerRadius="4" Margin="10" Padding="15">
+                        <StackPanel>
+                            <TextBlock Name="SummaryText" FontSize="14" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Files Grid -->
+                    <DataGrid Grid.Row="1" Name="FilesDataGrid" Margin="10,0,10,10" 
+                              AutoGenerateColumns="False" CanUserSortColumns="True" 
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                              AlternatingRowBackground="#F8F9FA" IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="File Path" Binding="{Binding FilePath}" Width="2*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Padding" Value="5"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Exists}" Value="False">
+                                                <Setter Property="Foreground" Value="Red"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Hash Algorithm" Binding="{Binding HashAlgorithm}" Width="Auto"/>
+                            <DataGridTextColumn Header="Exists" Binding="{Binding Exists}" Width="60"/>
+                            <DataGridTextColumn Header="File Size" Binding="{Binding FileSize}" Width="100"/>
+                            <DataGridTextColumn Header="Attributes" Binding="{Binding Attributes}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Raw Content Tab -->
+            <TabItem Header="Raw Content">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Toolbar -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+                        <CheckBox Name="WordWrapCheckBox" Content="Word Wrap" IsChecked="True" 
+                                  Checked="WordWrap_Changed" Unchecked="WordWrap_Changed" Margin="0,0,15,0"/>
+                        <Button Name="CopyRawButton" Content="Copy to Clipboard" Click="CopyRaw_Click" 
+                                Padding="10,3" Margin="0,0,10,0"/>
+                        <TextBlock Name="LineCountText" VerticalAlignment="Center" Foreground="#6C757D"/>
+                    </StackPanel>
+
+                    <!-- Raw Text -->
+                    <Border Grid.Row="1" BorderBrush="#DEE2E6" BorderThickness="1" Margin="10,0,10,10">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <TextBox Name="RawContentTextBox" IsReadOnly="True" 
+                                     FontFamily="Consolas" FontSize="12" Background="#F8F9FA"
+                                     TextWrapping="Wrap" AcceptsReturn="True" Padding="10"/>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Catalog Info Tab -->
+            <TabItem Header="Catalog Info">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <GroupBox Grid.Row="0" Header="CDF Header Information" Margin="0,0,0,10">
+                        <StackPanel Margin="10">
+                            <TextBlock Name="CatalogNameText" Margin="0,2"/>
+                            <TextBlock Name="HashAlgorithmText" Margin="0,2"/>
+                            <TextBlock Name="CatalogVersionText" Margin="0,2"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="1" Header="Corresponding Catalog File" Margin="0,0,0,10">
+                        <StackPanel Margin="10">
+                            <TextBlock Name="CatalogFilePathText" TextWrapping="Wrap" Margin="0,2"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Name="VerifyCatalogButton" Content="Verify Catalog" 
+                                        Click="VerifyCatalog_Click" Padding="10,5" Margin="0,0,10,0"
+                                        IsEnabled="False"/>
+                                <Button Name="CreateCatalogButton" Content="Create/Update Catalog" 
+                                        Click="CreateCatalog_Click" Padding="10,5" 
+                                        IsEnabled="False"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="2" Header="Additional Attributes">
+                        <TextBox Name="AttributesTextBox" IsReadOnly="True" 
+                                 TextWrapping="Wrap" AcceptsReturn="True"
+                                 FontFamily="Consolas" Background="#F8F9FA" Padding="10"/>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Name="StatusText" Grid.Column="0" Padding="10,5" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Name="CloseButton" Content="Close" Click="Close_Click" 
+                        Padding="20,5" Margin="10,5" MinWidth="80"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

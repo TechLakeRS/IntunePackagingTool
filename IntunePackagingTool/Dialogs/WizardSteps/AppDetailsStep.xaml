@@ -1,0 +1,195 @@
+﻿<UserControl x:Class="IntunePackagingTool.WizardSteps.AppDetailsStep"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <!-- Styles are in ModernTheme.xaml -->
+
+        <!-- Field Label Style - specific to wizard -->
+        <Style TargetType="TextBlock" x:Key="FieldLabel">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="#6C757D"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <!-- Section Header Style - specific to wizard -->
+        <Style TargetType="TextBlock" x:Key="SectionHeader">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#212529"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+        </Style>
+
+        <!-- Required Field Label -->
+        <Style TargetType="TextBlock" x:Key="RequiredFieldLabel" BasedOn="{StaticResource FieldLabel}">
+            <Setter Property="Foreground" Value="#E74C3C"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="0,0,20,0">
+
+            <!-- Application Details Section -->
+            <Border Style="{StaticResource ModernCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Section Header -->
+                    <TextBlock Grid.Row="0" Text="Application Details" Style="{StaticResource SectionHeader}"/>
+
+                    <!-- Form Fields -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Left Column -->
+                        <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Application Name" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text=" *" Style="{StaticResource RequiredFieldLabel}"/>
+                            </StackPanel>
+                            <TextBox Name="AppNameTextBox" Style="{StaticResource ModernTextBox}"
+                                     ToolTip="Enter the display name for your application"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Version" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text=" *" Style="{StaticResource RequiredFieldLabel}"/>
+                            </StackPanel>
+                            <TextBox Name="VersionTextBox" Style="{StaticResource ModernTextBox}"
+                                     ToolTip="Version number (e.g., 1.0.0 or 2023.1.5)"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="0" Grid.Row="2" Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Install Context" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text=" *" Style="{StaticResource RequiredFieldLabel}"/>
+                            </StackPanel>
+                            <ComboBox Name="InstallContextCombo" Style="{StaticResource ModernComboBox}"
+                                      ToolTip="Choose System (all users) or User (per-user install)">
+                                <ComboBoxItem Content="System" IsSelected="True"/>
+                                <ComboBoxItem Content="User"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Right Column -->
+                        <StackPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Publisher" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text=" *" Style="{StaticResource RequiredFieldLabel}"/>
+                            </StackPanel>
+                            <TextBox Name="PublisherTextBox" Style="{StaticResource ModernTextBox}"
+                                     ToolTip="Enter the publisher/manufacturer name"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Grid.Row="1" Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Install Command" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text=" *" Style="{StaticResource RequiredFieldLabel}"/>
+                            </StackPanel>
+                            <TextBox Name="InstallCommandTextBox" Style="{StaticResource ModernTextBox}"
+                                     Text="Deploy-Application.exe Install"
+                                     ToolTip="Command to install the application"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Grid.Row="2" Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Uninstall Command" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text=" *" Style="{StaticResource RequiredFieldLabel}"/>
+                            </StackPanel>
+                            <TextBox Name="UninstallCommandTextBox" Style="{StaticResource ModernTextBox}"
+                                     Text="Deploy-Application.exe Uninstall"
+                                     ToolTip="Command to uninstall the application"/>
+                        </StackPanel>
+
+                        <!-- Description - Full Width -->
+                        <StackPanel Grid.Column="0" Grid.Row="3" Grid.ColumnSpan="3">
+                            <TextBlock Text="Description (Optional)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Name="DescriptionTextBox" Style="{StaticResource ModernTextBox}"
+                                     MinHeight="80" MaxHeight="120" TextWrapping="Wrap" AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     ToolTip="Provide a description for this application (visible in Intune Company Portal)"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Icon and Requirements Row -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Application Icon Card -->
+                <Border Grid.Column="0" Style="{StaticResource ModernCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Application Icon" Style="{StaticResource SectionHeader}"/>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Icon Preview -->
+                            <Border Grid.Column="0" Width="64" Height="64" 
+                                    Background="#F8F9FA" 
+                                    BorderBrush="#DEE2E6" 
+                                    BorderThickness="1" 
+                                    CornerRadius="8" 
+                                    Margin="0,0,16,0">
+                                <Grid>
+                                    <TextBlock Name="DefaultIconText" Text="📱" FontSize="32" 
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Image Name="SelectedIconImage" Visibility="Collapsed" 
+                                           Width="48" Height="48" Stretch="Uniform"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Icon Upload Section -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Choose Application Icon"
+                                           FontSize="13" FontWeight="Medium" Margin="0,0,0,8"/>
+                                <TextBlock Text="PNG or ICO file (max 1MB, recommended 512x512)"
+                                           FontSize="11" Foreground="#6C757D" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                <Button Name="BrowseIconButton" Content="Browse..."
+                                        Style="{StaticResource ModernButton}"
+                                        Width="120"
+                                        Click="BrowseIconButton_Click"
+                                        HorizontalAlignment="Left"
+                                        ToolTip="Select an icon file for your application"/>
+                                <TextBlock Name="SelectedIconText" Text=""
+                                           FontSize="11" Foreground="#27AE60"
+                                           Margin="0,8,0,0" Visibility="Collapsed" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+               
+            </Grid>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
