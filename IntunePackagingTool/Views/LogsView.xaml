@@ -28,8 +28,8 @@
                         <TextBlock Text="📋" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel>
-                        <TextBlock Text="Intune Management Extension Diagnostics" FontSize="18" FontWeight="SemiBold"/>
-                        <TextBlock Text="View logs and troubleshoot application installations" FontSize="12" Foreground="#666" Margin="0,2,0,0"/>
+                        <TextBlock Text="Application Logs &amp; Diagnostics" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="View Intune and NBB application installation logs" FontSize="12" Foreground="#666" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -141,7 +141,8 @@
                                   CanUserAddRows="False"
                                  >
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="File Name" Binding="{Binding Name}" Width="*"/>
+                                <DataGridTextColumn Header="File Name" Binding="{Binding Name}" Width="2*"/>
+                                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="1.5*"/>
                                 <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100"/>
                                 <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified}" Width="200"/>
                                 <DataGridTemplateColumn Header="Actions" Width="150">

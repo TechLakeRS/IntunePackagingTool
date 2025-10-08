@@ -57,53 +57,140 @@ namespace IntunePackagingTool.Utilities
 
                     if (isLocal)
                     {
-                        // For local machine, directly read log files
-                        var localPath = @"C:\ProgramData\Microsoft\IntuneManagementExtension\Logs";
-                        if (Directory.Exists(localPath))
+                        // For local machine, directly read log files from multiple sources
+
+                        // 1. Intune Management Extension logs
+                        var intunePath = @"C:\ProgramData\Microsoft\IntuneManagementExtension\Logs";
+                        if (Directory.Exists(intunePath))
                         {
-                            var logFiles = Directory.GetFiles(localPath, "*.log");
+                            var logFiles = Directory.GetFiles(intunePath, "*.log");
                             foreach (var logFile in logFiles)
                             {
                                 var fileInfo = new FileInfo(logFile);
                                 result.LogFiles.Add(new LogFileInfo
                                 {
                                     Name = fileInfo.Name,
-                                    Path = logFile,  // Local path
+                                    Path = logFile,
                                     Size = fileInfo.Length,
-                                    LastModified = fileInfo.LastWriteTime
+                                    LastModified = fileInfo.LastWriteTime,
+                                    Source = "Intune Management Extension"
                                 });
                             }
                         }
+
+                        // 2. System application installation logs (NBB)
+                        var systemNbbPath = @"C:\NBB\Logs\Software_Installations";
+                        if (Directory.Exists(systemNbbPath))
+                        {
+                            var logFiles = Directory.GetFiles(systemNbbPath, "*.log", SearchOption.AllDirectories);
+                            foreach (var logFile in logFiles)
+                            {
+                                var fileInfo = new FileInfo(logFile);
+                                result.LogFiles.Add(new LogFileInfo
+                                {
+                                    Name = fileInfo.Name,
+                                    Path = logFile,
+                                    Size = fileInfo.Length,
+                                    LastModified = fileInfo.LastWriteTime,
+                                    Source = "NBB System Installations"
+                                });
+                            }
+                        }
+
+                        // 3. User application installation logs (NBB)
+                        var userNbbPath = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            @"NBB\Logs\Software_Installations");
+                        if (Directory.Exists(userNbbPath))
+                        {
+                            var logFiles = Directory.GetFiles(userNbbPath, "*.log", SearchOption.AllDirectories);
+                            foreach (var logFile in logFiles)
+                            {
+                                var fileInfo = new FileInfo(logFile);
+                                result.LogFiles.Add(new LogFileInfo
+                                {
+                                    Name = fileInfo.Name,
+                                    Path = logFile,
+                                    Size = fileInfo.Length,
+                                    LastModified = fileInfo.LastWriteTime,
+                                    Source = "NBB User Installations"
+                                });
+                            }
+                        }
+
                         result.IsSuccess = true;
                     }
                     else
                     {
                         // For remote computers, store the UNC path
-                        var remotePath = $@"\\{computerName}\c$\ProgramData\Microsoft\IntuneManagementExtension\Logs";
+                        bool foundAnyLogs = false;
 
-                        outputCallback?.Invoke($"Checking remote path: {remotePath}");
+                        // 1. Intune Management Extension logs
+                        var intunePath = $@"\\{computerName}\c$\ProgramData\Microsoft\IntuneManagementExtension\Logs";
+                        outputCallback?.Invoke($"Checking Intune logs: {intunePath}");
 
-                        if (Directory.Exists(remotePath))
+                        if (Directory.Exists(intunePath))
                         {
-                            var logFiles = Directory.GetFiles(remotePath, "*.log");
+                            var logFiles = Directory.GetFiles(intunePath, "*.log");
                             foreach (var logFile in logFiles)
                             {
                                 var fileInfo = new FileInfo(logFile);
                                 result.LogFiles.Add(new LogFileInfo
                                 {
                                     Name = fileInfo.Name,
-                                    Path = logFile,  // Store the UNC path
+                                    Path = logFile,
                                     Size = fileInfo.Length,
-                                    LastModified = fileInfo.LastWriteTime
+                                    LastModified = fileInfo.LastWriteTime,
+                                    Source = "Intune Management Extension"
                                 });
                                 outputCallback?.Invoke($"Found: {fileInfo.Name}");
                             }
+                            foundAnyLogs = true;
+                        }
+
+                        // 2. System application installation logs (NBB)
+                        var systemNbbPath = $@"\\{computerName}\c$\NBB\Logs\Software_Installations";
+                        outputCallback?.Invoke($"Checking NBB system logs: {systemNbbPath}");
+
+                        if (Directory.Exists(systemNbbPath))
+                        {
+                            try
+                            {
+                                var logFiles = Directory.GetFiles(systemNbbPath, "*.log", SearchOption.AllDirectories);
+                                foreach (var logFile in logFiles)
+                                {
+                                    var fileInfo = new FileInfo(logFile);
+                                    result.LogFiles.Add(new LogFileInfo
+                                    {
+                                        Name = fileInfo.Name,
+                                        Path = logFile,
+                                        Size = fileInfo.Length,
+                                        LastModified = fileInfo.LastWriteTime,
+                                        Source = "NBB System Installations"
+                                    });
+                                    outputCallback?.Invoke($"Found: {fileInfo.Name}");
+                                }
+                                foundAnyLogs = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                outputCallback?.Invoke($"Warning: Could not access some NBB system logs: {ex.Message}");
+                            }
+                        }
+
+                        // Note: User-based logs are harder to access remotely as they're in user profiles
+                        // We would need to enumerate user profiles, which requires more complex logic
+                        // For now, we'll document this limitation
+
+                        if (foundAnyLogs)
+                        {
                             result.IsSuccess = true;
                         }
                         else
                         {
-                            result.Errors.Add($"Cannot access remote path: {remotePath}");
+                            result.Errors.Add($"Cannot access remote paths on {computerName}");
                             result.Errors.Add("Ensure you have administrative access and the admin$ share is enabled.");
+                            result.Errors.Add($"Tried:\n- {intunePath}\n- {systemNbbPath}");
                         }
                     }
                 }
@@ -525,6 +612,7 @@ namespace IntunePackagingTool.Utilities
         public string Path { get; set; }
         public long Size { get; set; }
         public DateTime LastModified { get; set; }
+        public string Source { get; set; } = "Unknown";
 
         public string SizeFormatted
         {
