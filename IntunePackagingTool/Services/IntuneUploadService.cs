@@ -62,11 +62,11 @@ namespace IntunePackagingTool.Services
                 await SignApplicationFilesAsync(packagePath, progress);
 
                 // Step 1: Create the .intunewin file
-                progress?.UpdateProgress(20, "Converting package to .intunewin format...");
+                progress?.UpdateProgress(20, "Packaging application files...");
                 await CreateIntuneWinFileAsync(packagePath);
 
                 // Step 2: Find the created .intunewin file
-                progress?.UpdateProgress(25, "Locating .intunewin file...");
+                progress?.UpdateProgress(25, "Verifying package creation...");
                 var intuneFolder = Path.Combine(packagePath, "Intune");
                 var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
                 if (intuneWinFiles.Length == 0)
@@ -78,48 +78,48 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"✓ Found .intunewin file: {Path.GetFileName(intuneWinFile)}");
 
                 // Step 3: Extract .intunewin metadata
-                progress?.UpdateProgress(30, "Extracting .intunewin metadata...");
+                progress?.UpdateProgress(30, "Reading package metadata...");
                 var intuneWinInfo = ExtractIntuneWinInfo(intuneWinFile);
 
                 // Step 4: Create Win32LobApp
-                progress?.UpdateProgress(35, "Creating application in Intune...");
+                progress?.UpdateProgress(35, "Registering application in Intune...");
                 var appId = await CreateWin32LobAppAsync(appInfo, installCommand, uninstallCommand, description, detectionRules, installContext, intuneWinInfo, iconPath);
 
                 // Step 5: Create content version
-                progress?.UpdateProgress(45, "Creating content version...");
+                progress?.UpdateProgress(45, "Preparing content storage...");
                 var contentVersionId = await CreateContentVersionAsync(appId);
                 _currentAppId = appId;
                 _currentContentVersionId = contentVersionId;
 
                 // Step 6: Create file entry
-                progress?.UpdateProgress(55, "Creating file entry...");
+                progress?.UpdateProgress(55, "Initializing file upload...");
                 var fileId = await CreateFileEntryAsync(appId, contentVersionId, intuneWinInfo);
                 _currentFileId = fileId;
 
                 // Step 7: Wait for Azure Storage URI
-                progress?.UpdateProgress(65, "Getting Azure Storage URI...");
+                progress?.UpdateProgress(65, "Requesting Azure upload URL...");
                 var azureStorageInfo = await WaitForAzureStorageUriAsync(appId, contentVersionId, fileId);
 
                 // Step 8: Upload file to Azure Storage
-                progress?.UpdateProgress(75, "Uploading file to Azure Storage...");
+                progress?.UpdateProgress(75, "Uploading package to Azure...");
                 await UploadFileToAzureStorageAsync(azureStorageInfo.SasUri, intuneWinInfo.EncryptedFilePath, progress);
 
                 // Step 9: Commit the file
-                progress?.UpdateProgress(85, "Committing file...");
+                progress?.UpdateProgress(85, "Finalizing package upload...");
                 await CommitFileAsync(appId, contentVersionId, fileId, intuneWinInfo.EncryptionInfo);
 
                 // Step 10: Wait for file processing
-                progress?.UpdateProgress(90, "Waiting for file processing...");
+                progress?.UpdateProgress(90, "Processing uploaded package...");
                 await WaitForFileProcessingAsync(appId, contentVersionId, fileId, "CommitFile");
 
                 // Step 11: Commit the app
-                progress?.UpdateProgress(95, "Finalizing application...");
+                progress?.UpdateProgress(95, "Publishing application...");
                 await CommitAppAsync(appId, contentVersionId);
 
                 // Step 12: Cleanup temp files
                 CleanupTempFiles(intuneWinInfo);
 
-                progress?.UpdateProgress(100, "Application uploaded successfully!");
+                progress?.UpdateProgress(100, "✓ Upload complete!");
                 return appId;
             }
             catch (Exception ex)
@@ -849,7 +849,7 @@ namespace IntunePackagingTool.Services
             Debug.WriteLine($"Using chunk size: {FormatBytes(chunkSize)}");
             Debug.WriteLine($"Total chunks: {totalChunks}");
 
-            progress?.UpdateProgress(65, $"Starting upload: {Path.GetFileName(filePath)} ({FormatBytes(totalSize)})");
+            progress?.UpdateProgress(65, $"Preparing upload ({FormatBytes(totalSize)})...");
 
             using var azureHttpClient = new HttpClient();
             azureHttpClient.Timeout = TimeSpan.FromMinutes(10);
@@ -925,10 +925,10 @@ namespace IntunePackagingTool.Services
             }
 
             // Commit blocks with retry
-            progress?.UpdateProgress(82, "Committing blocks to Azure Storage...");
+            progress?.UpdateProgress(82, "Finalizing Azure upload...");
             await CommitBlockListWithRetryAsync(azureHttpClient, currentSasUri, blockIds);
 
-            progress?.UpdateProgress(84, "File uploaded successfully to Azure Storage");
+            progress?.UpdateProgress(84, "Package uploaded to Azure");
             Debug.WriteLine($"✅ Successfully uploaded file to Azure Storage");
         }
 
@@ -1507,11 +1507,11 @@ namespace IntunePackagingTool.Services
                 sharedHttpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
                 // Step 1: Create the .intunewin file
-                progress?.UpdateProgress(10, "Converting package to .intunewin format...");
+                progress?.UpdateProgress(10, "Packaging application files...");
                 await CreateIntuneWinFileAsync(packagePath);
 
                 // Step 2: Find the created .intunewin file
-                progress?.UpdateProgress(15, "Locating .intunewin file...");
+                progress?.UpdateProgress(15, "Verifying package creation...");
                 var intuneFolder = Path.Combine(packagePath, "Intune");
                 var intuneWinFiles = Directory.GetFiles(intuneFolder, "*.intunewin");
                 if (intuneWinFiles.Length == 0)
@@ -1523,44 +1523,44 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"✓ Found .intunewin file: {Path.GetFileName(intuneWinFile)}");
 
                 // Step 3: Extract .intunewin metadata
-                progress?.UpdateProgress(20, "Extracting .intunewin metadata...");
+                progress?.UpdateProgress(20, "Reading package metadata...");
                 var intuneWinInfo = ExtractIntuneWinInfo(intuneWinFile);
 
-                // Step 4: Create NEW content version for EXISTING app 
-                progress?.UpdateProgress(25, "Creating new content version for existing app...");
+                // Step 4: Create NEW content version for EXISTING app
+                progress?.UpdateProgress(25, "Preparing new version...");
                 var contentVersionId = await CreateContentVersionAsync(existingAppId);
                 _currentAppId = existingAppId;  // Use existing app ID
                 _currentContentVersionId = contentVersionId;
 
                 // Step 5: Create file entry
-                progress?.UpdateProgress(35, "Creating file entry...");
+                progress?.UpdateProgress(35, "Initializing file upload...");
                 var fileId = await CreateFileEntryAsync(existingAppId, contentVersionId, intuneWinInfo);
                 _currentFileId = fileId;
 
                 // Step 6: Wait for Azure Storage URI
-                progress?.UpdateProgress(45, "Getting Azure Storage URI...");
+                progress?.UpdateProgress(45, "Requesting Azure upload URL...");
                 var azureStorageInfo = await WaitForAzureStorageUriAsync(existingAppId, contentVersionId, fileId);
 
                 // Step 7: Upload file to Azure Storage
-                progress?.UpdateProgress(55, "Uploading file to Azure Storage...");
+                progress?.UpdateProgress(55, "Uploading package to Azure...");
                 await UploadFileToAzureStorageAsync(azureStorageInfo.SasUri, intuneWinInfo.EncryptedFilePath, progress);
 
                 // Step 8: Commit the file
-                progress?.UpdateProgress(85, "Committing file...");
+                progress?.UpdateProgress(85, "Finalizing package upload...");
                 await CommitFileAsync(existingAppId, contentVersionId, fileId, intuneWinInfo.EncryptionInfo);
 
                 // Step 9: Wait for file processing
-                progress?.UpdateProgress(90, "Waiting for file processing...");
+                progress?.UpdateProgress(90, "Processing uploaded package...");
                 await WaitForFileProcessingAsync(existingAppId, contentVersionId, fileId, "CommitFile");
 
                 // Step 10: Commit the app with new content version
-                progress?.UpdateProgress(95, "Finalizing application update...");
+                progress?.UpdateProgress(95, "Publishing updated version...");
                 await UpdateCommittedContentVersionAsync(existingAppId, contentVersionId);
 
                 // Step 11: Cleanup temp files
                 CleanupTempFiles(intuneWinInfo);
 
-                progress?.UpdateProgress(100, "Application updated successfully!");
+                progress?.UpdateProgress(100, "✓ Update complete!");
                 return true;
             }
             catch (Exception ex)
