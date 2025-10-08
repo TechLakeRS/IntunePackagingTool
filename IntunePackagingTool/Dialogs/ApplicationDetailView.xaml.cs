@@ -68,8 +68,7 @@ namespace IntunePackagingTool
 
         private void UpdateOverview(ApplicationDetail app)
         {
-            // Basic Information
-            AppNameText.Text = app.DisplayName;
+            // Basic Information (app name removed - shown in header)
             AppVersionText.Text = app.Version;
             PublisherText.Text = app.Publisher;
             CategoryText.Text = app.Category;

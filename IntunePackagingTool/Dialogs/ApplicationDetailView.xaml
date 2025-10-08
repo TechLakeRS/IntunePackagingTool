@@ -209,25 +209,25 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                                    <TextBlock Text="APPLICATION NAME" Style="{StaticResource FieldLabel}"/>
-                                    <TextBlock Name="AppNameText" Style="{StaticResource FieldValue}"/>
-
                                     <TextBlock Text="PUBLISHER" Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Name="PublisherText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="VERSION" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="AppVersionText" Style="{StaticResource FieldValue}"/>
 
                                     <TextBlock Text="CATEGORY" Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Name="CategoryText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                                    <TextBlock Text="VERSION" Style="{StaticResource FieldLabel}"/>
-                                    <TextBlock Name="AppVersionText" Style="{StaticResource FieldValue}"/>
-
                                     <TextBlock Text="INSTALL CONTEXT" Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Name="InstallContextText" Style="{StaticResource FieldValue}"/>
 
                                     <TextBlock Text="FILE SIZE" Style="{StaticResource FieldLabel}"/>
-                                    <TextBlock Name="FileSizeText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                    <TextBlock Name="FileSizeText" Style="{StaticResource FieldValue}"/>
+
+                                    <TextBlock Text="LAST MODIFIED" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Name="LastModifiedText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2">
@@ -235,10 +235,7 @@
                                     <TextBlock Name="OwnerText" Style="{StaticResource FieldValue}"/>
 
                                     <TextBlock Text="DEVELOPER" Style="{StaticResource FieldLabel}"/>
-                                    <TextBlock Name="DeveloperText" Style="{StaticResource FieldValue}"/>
-
-                                    <TextBlock Text="LAST MODIFIED" Style="{StaticResource FieldLabel}"/>
-                                    <TextBlock Name="LastModifiedText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
+                                    <TextBlock Name="DeveloperText" Style="{StaticResource FieldValue}" Margin="0,0,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </Grid>
