@@ -117,8 +117,25 @@ namespace IntunePackagingTool
             InitializeTimer();
             InitializeServices();
             InitializeUI();
+            InitializeNotificationService();
+        }
 
+        private void InitializeNotificationService()
+        {
+            // Initialize notification service with toast container
+            NotificationService.Instance.Initialize(ToastContainer);
 
+            // Handle notification clicks - open status panel
+            NotificationService.Instance.NotificationClicked += (s, notificationId) =>
+            {
+                OpenStatusPanel();
+            };
+
+            // Update notification history list when new notifications arrive
+            NotificationService.Instance.NotificationAdded += (s, item) =>
+            {
+                UpdateNotificationHistory();
+            };
         }
 
         private void InitializeTimer()
@@ -426,8 +443,10 @@ namespace IntunePackagingTool
 
                 if (uploadWizard.ShowDialog() == true)
                 {
-                    MessageBox.Show("Package uploaded successfully to Microsoft Intune!",
-                        "Upload Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // Show non-blocking success notification
+                    NotificationService.Instance.ShowSuccess(
+                        "Upload Successful",
+                        "Package uploaded successfully to Microsoft Intune!");
 
                     // Reset form
                     ResetUploadExistingForm();
@@ -435,8 +454,10 @@ namespace IntunePackagingTool
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Upload failed: {ex.Message}", "Upload Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                // Show error notification (doesn't auto-close)
+                NotificationService.Instance.ShowError(
+                    "Upload Failed",
+                    ex.Message);
             }
             finally
             {
@@ -1561,5 +1582,80 @@ namespace IntunePackagingTool
 
         #endregion
 
+        #region Notification and Status Panel
+
+        private void OpenStatusPanel()
+        {
+            StatusPanel.Visibility = Visibility.Visible;
+
+            // Slide in animation
+            var slideIn = new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = 400,
+                To = 0,
+                Duration = TimeSpan.FromMilliseconds(300),
+                EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+            };
+
+            StatusPanelTransform.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slideIn);
+        }
+
+        private void CloseStatusPanel_Click(object sender, RoutedEventArgs e)
+        {
+            // Slide out animation
+            var slideOut = new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = 0,
+                To = 400,
+                Duration = TimeSpan.FromMilliseconds(300),
+                EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseIn }
+            };
+
+            slideOut.Completed += (s, args) =>
+            {
+                StatusPanel.Visibility = Visibility.Collapsed;
+            };
+
+            StatusPanelTransform.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slideOut);
+        }
+
+        private void UpdateNotificationHistory()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var history = NotificationService.Instance.History.Select(h => new NotificationHistoryItemViewModel(h)).ToList();
+                NotificationHistoryList.ItemsSource = history;
+            });
+        }
+
+        #endregion
+
+    }
+
+    // ViewModel for notification history display
+    public class NotificationHistoryItemViewModel
+    {
+        private readonly NotificationHistoryItem _item;
+
+        public NotificationHistoryItemViewModel(NotificationHistoryItem item)
+        {
+            _item = item;
+        }
+
+        public string TypeIcon => _item.Type switch
+        {
+            Controls.ToastType.Success => "✅",
+            Controls.ToastType.Error => "❌",
+            Controls.ToastType.Warning => "⚠️",
+            Controls.ToastType.Info => "ℹ️",
+            Controls.ToastType.InProgress => "⏳",
+            _ => "•"
+        };
+
+        public string Title => _item.Title;
+        public string Message => _item.Message;
+        public string TimeAgo => _item.TimeAgo;
+        public string Duration => _item.Duration;
+        public Visibility HasMessage => string.IsNullOrEmpty(_item.Message) ? Visibility.Collapsed : Visibility.Visible;
     }
 }

@@ -99,8 +99,10 @@ namespace IntunePackagingTool
                     AppendOutput("✓ DEPLOYMENT COMPLETED SUCCESSFULLY!");
                     AppendOutput("========================================");
 
-                    MessageBox.Show($"Deployment to {computerName} completed successfully!",
-                        "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // Show non-blocking success notification
+                    Services.NotificationService.Instance.ShowSuccess(
+                        "Deployment Successful",
+                        $"Deployment to {computerName} completed successfully!");
                 }
                 else
                 {
@@ -108,8 +110,10 @@ namespace IntunePackagingTool
                     AppendOutput("✗ DEPLOYMENT FAILED!");
                     AppendOutput("========================================");
 
-                    MessageBox.Show($"Deployment to {computerName} failed. Check the output for details.",
-                        "Deployment Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    // Show error notification (doesn't auto-close)
+                    Services.NotificationService.Instance.ShowError(
+                        "Deployment Failed",
+                        $"Deployment to {computerName} failed. Check the output for details.");
                 }
             }
             catch (Exception ex)
