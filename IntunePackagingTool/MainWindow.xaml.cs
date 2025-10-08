@@ -733,8 +733,8 @@ namespace IntunePackagingTool
                                 ApplicationDetailView.LoadApplicationDetail(appDetail);
                                 ApplicationDetailView.ResetScrollPosition();
 
-                                PageTitle.Text = $"Application Details: {selectedApp.DisplayName}";
-                                PageSubtitle.Text = "Live data from Microsoft Intune";
+                                // Hide MainWindow header - ApplicationDetailView has its own header
+                                PageHeader.Visibility = Visibility.Collapsed;
                                 StatusText.Text = $"Loaded live details for {selectedApp.DisplayName} from Intune";
                             }
                         });
@@ -758,6 +758,9 @@ namespace IntunePackagingTool
         {
             ApplicationDetailView.Visibility = Visibility.Collapsed;
             ApplicationsListPanel.Visibility = Visibility.Visible;
+
+            // Show MainWindow header again
+            PageHeader.Visibility = Visibility.Visible;
             PageTitle.Text = "Microsoft Intune Applications";
             PageSubtitle.Text = "Browse and manage your application packages";
         }

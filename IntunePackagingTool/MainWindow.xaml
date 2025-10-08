@@ -151,15 +151,15 @@
                 </Grid.RowDefinitions>
 
                 <!-- Page Header -->
-                <Border Grid.Row="0" Background="White" Padding="32,20" BorderBrush="#E9ECEF" BorderThickness="0,0,0,1">
+                <Border Name="PageHeader" Grid.Row="0" Background="White" Padding="32,20" BorderBrush="#E9ECEF" BorderThickness="0,0,0,1">
                     <Grid>
                         <StackPanel>
                             <TextBlock Name="PageTitle" Text="Dashboard" FontSize="28" FontWeight="Light" Foreground="#2C3E50"/>
-                            <TextBlock Name="PageSubtitle" Text="Application packaging overview and quick actions" 
+                            <TextBlock Name="PageSubtitle" Text="Application packaging overview and quick actions"
                                  FontSize="14" Foreground="#7F8C8D" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}" 
+                            <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}"
                                 Margin="0,0,8,0" Click="RefreshButton_Click"/>
                         </StackPanel>
                     </Grid>
