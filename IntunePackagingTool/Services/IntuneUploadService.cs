@@ -39,6 +39,14 @@ namespace IntunePackagingTool.Services
             }
         }
 
+        private async Task<HttpRequestMessage> CreateAuthenticatedRequestAsync(HttpMethod method, string url)
+        {
+            var token = await _intuneService.GetAccessTokenAsync();
+            var request = new HttpRequestMessage(method, url);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            return request;
+        }
+
         public async Task<string> UploadWin32ApplicationAsync(
             ApplicationInfo appInfo,
             string packagePath,
@@ -55,7 +63,6 @@ namespace IntunePackagingTool.Services
                 progress?.UpdateProgress(5, "Authenticating with Microsoft Graph...");
                 var token = await _intuneService.GetAccessTokenAsync();
                 EnsureHttpClient();
-                sharedHttpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
                 // Step 0 - Sign files before conversion
                 progress?.UpdateProgress(10, "Signing application files...");
@@ -584,8 +591,9 @@ namespace IntunePackagingTool.Services
 
                 }
             }
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await sharedHttpClient!.PostAsync("https://graph.microsoft.com/beta/deviceAppManagement/mobileApps", content);
+            using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, "https://graph.microsoft.com/beta/deviceAppManagement/mobileApps");
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await sharedHttpClient!.SendAsync(request);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -666,8 +674,9 @@ namespace IntunePackagingTool.Services
         private async Task<string> CreateContentVersionAsync(string appId)
         {
             var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions";
-            var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await sharedHttpClient!.PostAsync(url, content);
+            using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, url);
+            request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var response = await sharedHttpClient!.SendAsync(request);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -701,10 +710,9 @@ namespace IntunePackagingTool.Services
             var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions/{contentVersionId}/files";
             var json = JsonSerializer.Serialize(fileBody, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
-
-
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await sharedHttpClient!.PostAsync(url, content);
+            using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, url);
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await sharedHttpClient!.SendAsync(request);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -729,7 +737,8 @@ namespace IntunePackagingTool.Services
             {
                 try
                 {
-                    var response = await sharedHttpClient!.GetAsync(url);
+                    using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, url);
+                    var response = await sharedHttpClient!.SendAsync(request);
                     var responseText = await response.Content.ReadAsStringAsync();
 
                     if (!response.IsSuccessStatusCode)
@@ -1124,11 +1133,11 @@ namespace IntunePackagingTool.Services
             });
 
 
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             try
             {
-                var response = await sharedHttpClient!.PostAsync(url, content);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, url);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await sharedHttpClient!.SendAsync(request);
                 var responseText = await response.Content.ReadAsStringAsync();
 
 
@@ -1159,7 +1168,8 @@ namespace IntunePackagingTool.Services
 
             for (int attempts = 0; attempts < 120; attempts++)
             {
-                var response = await sharedHttpClient!.GetAsync(url);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, url);
+                var response = await sharedHttpClient!.SendAsync(request);
                 var responseText = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -1233,8 +1243,9 @@ namespace IntunePackagingTool.Services
 
             var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}";
             var json = JsonSerializer.Serialize(commitBody, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await sharedHttpClient!.PatchAsync(url, content);
+            using var request = await CreateAuthenticatedRequestAsync(new HttpMethod("PATCH"), url);
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await sharedHttpClient!.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -1369,8 +1380,9 @@ namespace IntunePackagingTool.Services
         {
             var renewUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{_currentAppId}/microsoft.graph.win32LobApp/contentVersions/{_currentContentVersionId}/files/{_currentFileId}/renewUpload";
 
-            var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await sharedHttpClient!.PostAsync(renewUrl, content);
+            using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, renewUrl);
+            request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var response = await sharedHttpClient!.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -1388,7 +1400,8 @@ namespace IntunePackagingTool.Services
 
             for (int attempts = 0; attempts < 30; attempts++) // 5 minutes max
             {
-                var response = await sharedHttpClient!.GetAsync(url);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, url);
+                var response = await sharedHttpClient!.SendAsync(request);
                 var responseText = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -1428,7 +1441,8 @@ namespace IntunePackagingTool.Services
                 // Step 1: Get the existing app to preserve important fields like the icon
                 Debug.WriteLine($"Fetching existing app metadata for {appId}...");
                 var getUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}";
-                var getResponse = await sharedHttpClient!.GetAsync(getUrl);
+                using var getRequest = await CreateAuthenticatedRequestAsync(HttpMethod.Get, getUrl);
+                var getResponse = await sharedHttpClient!.SendAsync(getRequest);
 
                 if (!getResponse.IsSuccessStatusCode)
                 {
@@ -1475,8 +1489,9 @@ namespace IntunePackagingTool.Services
 
                 Debug.WriteLine($"Updating app with preserved metadata...");
 
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await sharedHttpClient!.PatchAsync(url, content);
+                using var request = await CreateAuthenticatedRequestAsync(new HttpMethod("PATCH"), url);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await sharedHttpClient!.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -1502,9 +1517,7 @@ namespace IntunePackagingTool.Services
             try
             {
                 progress?.UpdateProgress(5, "Authenticating with Microsoft Graph...");
-                var token = await _intuneService.GetAccessTokenAsync();
                 EnsureHttpClient();
-                sharedHttpClient!.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
                 // Step 1: Create the .intunewin file
                 progress?.UpdateProgress(10, "Packaging application files...");

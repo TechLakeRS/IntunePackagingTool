@@ -73,7 +73,7 @@
 		<EmbeddedResource Include="Scripts\Verify-Catalog.ps1">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</EmbeddedResource>
-		<Content Include="appsettings.json">
+		<Content Include="appsettings.json" Condition="Exists('appsettings.json')">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
