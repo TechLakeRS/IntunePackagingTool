@@ -734,7 +734,8 @@ namespace IntunePackagingTool.Services
 
                 // First, get the category ID for "Test"
                 var categoriesUrl = "https://graph.microsoft.com/beta/deviceAppManagement/mobileAppCategories";
-                var response = await _sharedHttpClient.GetAsync(categoriesUrl);
+                using var getCatRequest = await CreateAuthenticatedRequestAsync(HttpMethod.Get, categoriesUrl);
+                var response = await _sharedHttpClient.SendAsync(getCatRequest);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -778,7 +779,9 @@ namespace IntunePackagingTool.Services
                     Encoding.UTF8,
                     "application/json");
 
-                var assignResponse = await _sharedHttpClient.PostAsync(assignUrl, assignContent);
+                using var postRequest = await CreateAuthenticatedRequestAsync(HttpMethod.Post, assignUrl);
+                postRequest.Content = assignContent;
+                var assignResponse = await _sharedHttpClient.SendAsync(postRequest);
 
                 if (assignResponse.IsSuccessStatusCode)
                 {
@@ -807,7 +810,8 @@ namespace IntunePackagingTool.Services
 
                 // First check if group exists
                 var checkUrl = $"https://graph.microsoft.com/beta/groups?$filter=displayName eq '{Uri.EscapeDataString(displayName)}'";
-                var checkResponse = await _sharedHttpClient.GetAsync(checkUrl);
+                using var checkRequest = await CreateAuthenticatedRequestAsync(HttpMethod.Get, checkUrl);
+                var checkResponse = await _sharedHttpClient.SendAsync(checkRequest);
 
                 if (checkResponse.IsSuccessStatusCode)
                 {
@@ -848,7 +852,9 @@ namespace IntunePackagingTool.Services
                 var content = new StringContent(JsonSerializer.Serialize(groupPayload),
                     System.Text.Encoding.UTF8, "application/json");
 
-                var createResponse = await _sharedHttpClient.PostAsync(createUrl, content);
+                using var createRequest = await CreateAuthenticatedRequestAsync(HttpMethod.Post, createUrl);
+                createRequest.Content = content;
+                var createResponse = await _sharedHttpClient.SendAsync(createRequest);
                 var responseContent = await createResponse.Content.ReadAsStringAsync();
 
                 if (!createResponse.IsSuccessStatusCode)
@@ -967,7 +973,9 @@ namespace IntunePackagingTool.Services
             var content = new StringContent(JsonSerializer.Serialize(assignmentPayload),
                 System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _sharedHttpClient.PostAsync(url, content);
+            using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, url);
+            request.Content = content;
+            var response = await _sharedHttpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -991,7 +999,8 @@ namespace IntunePackagingTool.Services
                 var requestUrl = $"https://graph.microsoft.com/v1.0/devices?$filter=displayName eq '{deviceName}'";
                 Debug.WriteLine($"[FindDeviceByNameAsync] Request URL: {requestUrl}");
 
-                var response = await _sharedHttpClient.GetAsync(requestUrl);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, requestUrl);
+                var response = await _sharedHttpClient.SendAsync(request);
                 Debug.WriteLine($"[FindDeviceByNameAsync] Response status: {response.StatusCode}");
 
                 if (response.IsSuccessStatusCode)
@@ -1033,7 +1042,8 @@ namespace IntunePackagingTool.Services
 
                 var requestUrl = $"https://graph.microsoft.com/beta/groups/{groupId}/members/{deviceId}";
 
-                var response = await _sharedHttpClient.GetAsync(requestUrl);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, requestUrl);
+                var response = await _sharedHttpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -1065,7 +1075,9 @@ namespace IntunePackagingTool.Services
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 Debug.WriteLine($"[AddDeviceToGroupAsync] Sending POST request...");
-                var response = await _sharedHttpClient.PostAsync(requestUrl, content);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, requestUrl);
+                request.Content = content;
+                var response = await _sharedHttpClient.SendAsync(request);
 
                 Debug.WriteLine($"[AddDeviceToGroupAsync] Response Status Code: {(int)response.StatusCode} ({response.StatusCode})");
 
@@ -1095,7 +1107,8 @@ namespace IntunePackagingTool.Services
 
                 var requestUrl = $"https://graph.microsoft.com/beta/groups/{groupId}/members/{deviceId}/$ref";
 
-                var response = await _sharedHttpClient.DeleteAsync(requestUrl);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Delete, requestUrl);
+                var response = await _sharedHttpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -1147,7 +1160,8 @@ namespace IntunePackagingTool.Services
 
                 while (!string.IsNullOrEmpty(requestUrl))
                 {
-                    var response = await _sharedHttpClient.GetAsync(requestUrl);
+                    using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, requestUrl);
+                    var response = await _sharedHttpClient.SendAsync(request);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -1233,7 +1247,8 @@ namespace IntunePackagingTool.Services
 
                 while (!string.IsNullOrEmpty(requestUrl))
                 {
-                    var response = await _sharedHttpClient.GetAsync(requestUrl);
+                    using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, requestUrl);
+                    var response = await _sharedHttpClient.SendAsync(request);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -1298,7 +1313,8 @@ namespace IntunePackagingTool.Services
             try
             {
                 var assignmentsUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/assignments";
-                var response = await _sharedHttpClient.GetAsync(assignmentsUrl);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, assignmentsUrl);
+                var response = await _sharedHttpClient.SendAsync(request);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -1425,7 +1441,8 @@ namespace IntunePackagingTool.Services
             try
             {
                 var groupUrl = $"https://graph.microsoft.com/beta/groups/{groupId}?$select=displayName";
-                var response = await _sharedHttpClient!.GetAsync(groupUrl);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, groupUrl);
+                var response = await _sharedHttpClient!.SendAsync(request);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -1447,16 +1464,25 @@ namespace IntunePackagingTool.Services
             try
             {
                 var categoriesUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/categories";
-                var response = await _sharedHttpClient!.GetAsync(categoriesUrl);
+                Debug.WriteLine($"Fetching categories from: {categoriesUrl}");
+
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, categoriesUrl);
+                var response = await _sharedHttpClient!.SendAsync(request);
+
+                Debug.WriteLine($"Category response status: {response.StatusCode}");
 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseText = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"Category response: {responseText}");
+
                     var json = JsonSerializer.Deserialize<JsonElement>(responseText);
 
                     if (json.TryGetProperty("value", out var categoriesArray) && categoriesArray.ValueKind == JsonValueKind.Array)
                     {
                         var categoryNames = new List<string>();
+                        var categoryCount = categoriesArray.GetArrayLength();
+                        Debug.WriteLine($"Found {categoryCount} categories for app {appId}");
 
                         foreach (var category in categoriesArray.EnumerateArray())
                         {
@@ -1464,19 +1490,35 @@ namespace IntunePackagingTool.Services
                             {
                                 var catName = catNameProp.GetString();
                                 if (!string.IsNullOrWhiteSpace(catName))
+                                {
+                                    Debug.WriteLine($"  - Category: {catName}");
                                     categoryNames.Add(catName);
+                                }
                             }
                         }
 
-                        return categoryNames.Count > 0 ? string.Join(", ", categoryNames) : "Uncategorized";
+                        var result = categoryNames.Count > 0 ? string.Join(", ", categoryNames) : "Uncategorized";
+                        Debug.WriteLine($"✓ Final category result: {result}");
+                        return result;
                     }
+                    else
+                    {
+                        Debug.WriteLine($"⚠️ No 'value' property or not an array in category response");
+                    }
+                }
+                else
+                {
+                    var errorText = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"❌ Category fetch failed: {response.StatusCode} - {errorText}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error getting categories: {ex.Message}");
+                Debug.WriteLine($"❌ Error getting categories for {appId}: {ex.Message}");
+                Debug.WriteLine($"   Stack trace: {ex.StackTrace}");
             }
 
+            Debug.WriteLine($"Returning 'Uncategorized' for app {appId}");
             return "Uncategorized";
         }
         public async Task<InstallationStatistics> GetInstallationStatisticsAsync(string appId)
@@ -1495,7 +1537,9 @@ namespace IntunePackagingTool.Services
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _sharedHttpClient.PostAsync(reportUrl, content);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, reportUrl);
+                request.Content = content;
+                var response = await _sharedHttpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -1593,7 +1637,9 @@ namespace IntunePackagingTool.Services
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _sharedHttpClient.PostAsync(reportUrl, content);
+                using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, reportUrl);
+                request.Content = content;
+                var response = await _sharedHttpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
