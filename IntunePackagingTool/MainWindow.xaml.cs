@@ -204,6 +204,29 @@ namespace IntunePackagingTool
             // Any additional loading logic here
         }
 
+        protected override void OnClosed(EventArgs e)
+        {
+            // Unsubscribe from event handlers to prevent memory leaks
+            if (ApplicationDetailView != null)
+            {
+                ApplicationDetailView.BackToListRequested -= ApplicationDetailView_BackToListRequested;
+            }
+
+            // Cancel any pending operations
+            _loadCancellation?.Cancel();
+            _loadCancellation?.Dispose();
+            _loadCancellation = null;
+
+            // Stop search timer
+            if (_searchTimer != null)
+            {
+                _searchTimer.Stop();
+                _searchTimer.Tick -= SearchTimer_Tick;
+            }
+
+            base.OnClosed(e);
+        }
+
         #endregion
 
         #region INotifyPropertyChanged Implementation
@@ -533,12 +556,25 @@ namespace IntunePackagingTool
 
         private async Task LoadAllApplicationsAsync()
         {
+            // Cancel and dispose any existing load operation before creating new one
+            var oldCancellation = _loadCancellation;
+            _loadCancellation = null;
+
+            try
+            {
+                oldCancellation?.Cancel();
+            }
+            catch { /* Ignore cancellation errors */ }
+            finally
+            {
+                oldCancellation?.Dispose();
+            }
+
             try
             {
                 if (_intuneService == null) return;
 
-                // Cancel any existing load operation
-                _loadCancellation?.Cancel();
+                // Create new cancellation token
                 _loadCancellation = new CancellationTokenSource();
 
                 ShowStatus("Loading all applications from Microsoft Intune...");

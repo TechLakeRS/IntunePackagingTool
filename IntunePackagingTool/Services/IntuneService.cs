@@ -91,47 +91,63 @@ namespace IntunePackagingTool.Services
             _accessToken = tokenResponse.AccessToken;
             _tokenExpiry = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn);
 
-            _sharedHttpClient.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+            // ✅ FIX: Don't mutate shared HttpClient headers - we'll add headers per-request instead
+            // This prevents memory leaks and threading issues with the static HttpClient
 
             return _accessToken;
+        }
+
+        /// <summary>
+        /// Creates an HttpRequestMessage with authentication headers
+        /// This avoids mutating the shared HttpClient's DefaultRequestHeaders
+        /// </summary>
+        private async Task<HttpRequestMessage> CreateAuthenticatedRequestAsync(HttpMethod method, string url)
+        {
+            var token = await GetAccessTokenAsync();
+            var request = new HttpRequestMessage(method, url);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            return request;
         }
 
         private X509Certificate2 LoadCertificate()
         {
             Debug.WriteLine($"Looking for certificate with thumbprint: {_certificateThumbprint}");
 
+            X509Certificate2Collection certificates;
+
             // Try CurrentUser\My first
-            var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-            store.Open(OpenFlags.ReadOnly);
-            Debug.WriteLine($"Searching CurrentUser\\My store, found {store.Certificates.Count} total certificates");
-
-            // Debug: List all certificate thumbprints in CurrentUser\My
-            foreach (var storeCert in store.Certificates)
+            using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
             {
-                Debug.WriteLine($"  - Certificate: Subject={storeCert.Subject}, Thumbprint={storeCert.Thumbprint}");
-            }
-
-            var certificates = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
-            Debug.WriteLine($"Found {certificates.Count} matching certificates in CurrentUser\\My");
-            store.Close();
-
-            // If not found, try LocalMachine\My
-            if (certificates.Count == 0)
-            {
-                store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
                 store.Open(OpenFlags.ReadOnly);
-                Debug.WriteLine($"Searching LocalMachine\\My store, found {store.Certificates.Count} total certificates");
+                Debug.WriteLine($"Searching CurrentUser\\My store, found {store.Certificates.Count} total certificates");
 
-                // Debug: List all certificate thumbprints in LocalMachine\My
+                // Debug: List all certificate thumbprints in CurrentUser\My
                 foreach (var storeCert in store.Certificates)
                 {
                     Debug.WriteLine($"  - Certificate: Subject={storeCert.Subject}, Thumbprint={storeCert.Thumbprint}");
                 }
 
                 certificates = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
-                Debug.WriteLine($"Found {certificates.Count} matching certificates in LocalMachine\\My");
-                store.Close();
+                Debug.WriteLine($"Found {certificates.Count} matching certificates in CurrentUser\\My");
+            } // Store automatically disposed here
+
+            // If not found, try LocalMachine\My
+            if (certificates.Count == 0)
+            {
+                using (var store = new X509Store(StoreName.My, StoreLocation.LocalMachine))
+                {
+                    store.Open(OpenFlags.ReadOnly);
+                    Debug.WriteLine($"Searching LocalMachine\\My store, found {store.Certificates.Count} total certificates");
+
+                    // Debug: List all certificate thumbprints in LocalMachine\My
+                    foreach (var storeCert in store.Certificates)
+                    {
+                        Debug.WriteLine($"  - Certificate: Subject={storeCert.Subject}, Thumbprint={storeCert.Thumbprint}");
+                    }
+
+                    certificates = store.Certificates.Find(X509FindType.FindByThumbprint, _certificateThumbprint, false);
+                    Debug.WriteLine($"Found {certificates.Count} matching certificates in LocalMachine\\My");
+                } // Store automatically disposed here
             }
 
             if (certificates.Count == 0)
@@ -240,7 +256,8 @@ namespace IntunePackagingTool.Services
                     // Use retry logic for Graph API calls (handles transient failures)
                     var (response, responseText) = await Utilities.RetryHelper.ExecuteWithRetryAsync(async () =>
                     {
-                        var resp = await _sharedHttpClient.GetAsync(requestUrl, cancellationToken);
+                        using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, requestUrl);
+                        var resp = await _sharedHttpClient.SendAsync(request, cancellationToken);
                         var text = await resp.Content.ReadAsStringAsync(cancellationToken);
                         return (resp, text);
                     }, maxRetries: 3, initialDelayMs: 1000, cancellationToken);
@@ -252,7 +269,8 @@ namespace IntunePackagingTool.Services
 
                         var (retryResponse, retryResponseText) = await Utilities.RetryHelper.ExecuteWithRetryAsync(async () =>
                         {
-                            var resp = await _sharedHttpClient.GetAsync(requestUrl, cancellationToken);
+                            using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Get, requestUrl);
+                            var resp = await _sharedHttpClient.SendAsync(request, cancellationToken);
                             var text = await resp.Content.ReadAsStringAsync(cancellationToken);
                             return (resp, text);
                         }, maxRetries: 3, initialDelayMs: 1000, cancellationToken);
@@ -322,7 +340,8 @@ namespace IntunePackagingTool.Services
                 var appUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{intuneAppId}";
                 Debug.WriteLine($"Getting complete app details from: {appUrl}");
 
-                var appResponse = await _sharedHttpClient.GetAsync(appUrl);
+                using var appRequest = await CreateAuthenticatedRequestAsync(HttpMethod.Get, appUrl);
+                var appResponse = await _sharedHttpClient.SendAsync(appRequest);
                 var appResponseText = await appResponse.Content.ReadAsStringAsync();
 
                 if (!appResponse.IsSuccessStatusCode)
