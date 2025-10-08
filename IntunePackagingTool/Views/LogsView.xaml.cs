@@ -20,8 +20,12 @@ namespace IntunePackagingTool.Views
         private IntuneDiagnosticsService _diagnosticsService;
         private ObservableCollection<LogEntry> _logEntries;
         private ObservableCollection<Win32AppStatus> _win32Apps;
-        private ObservableCollection<LogFileInfo> _logFiles;
+        private ObservableCollection<LogFileInfo> _allLogs;
+        private ObservableCollection<LogFileInfo> _intuneLogs;
+        private ObservableCollection<LogFileInfo> _systemLogs;
+        private ObservableCollection<LogFileInfo> _userLogs;
         private string _currentComputerName;
+        private bool _isLocalComputer;
 
         public LogsView()
         {
@@ -29,10 +33,16 @@ namespace IntunePackagingTool.Views
             _diagnosticsService = new IntuneDiagnosticsService();
             _logEntries = new ObservableCollection<LogEntry>();
             _win32Apps = new ObservableCollection<Win32AppStatus>();
-            _logFiles = new ObservableCollection<LogFileInfo>();
+            _allLogs = new ObservableCollection<LogFileInfo>();
+            _intuneLogs = new ObservableCollection<LogFileInfo>();
+            _systemLogs = new ObservableCollection<LogFileInfo>();
+            _userLogs = new ObservableCollection<LogFileInfo>();
 
-           
-            LogFilesGrid.ItemsSource = _logFiles;
+            // Bind grids to collections
+            AllLogsGrid.ItemsSource = _allLogs;
+            IntuneLogsGrid.ItemsSource = _intuneLogs;
+            SystemLogsGrid.ItemsSource = _systemLogs;
+            UserLogsGrid.ItemsSource = _userLogs;
 
             // Set default computer name
             ComputerNameTextBox.Text = Environment.MachineName;
@@ -56,12 +66,17 @@ namespace IntunePackagingTool.Views
                 return;
             }
 
+            // Check if local computer
+            _isLocalComputer = string.IsNullOrEmpty(_currentComputerName) ||
+                              _currentComputerName.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase) ||
+                              _currentComputerName.Equals("localhost", StringComparison.OrdinalIgnoreCase);
+
             // Show loading
             LoadingOverlay.Visibility = Visibility.Visible;
             EmptyState.Visibility = Visibility.Collapsed;
             LogTabControl.Visibility = Visibility.Collapsed;
             GetLogsButton.IsEnabled = false;
-           
+
             StatusText.Text = $"Retrieving logs from {_currentComputerName}...";
 
             try
@@ -73,7 +88,10 @@ namespace IntunePackagingTool.Views
                     // Clear existing data
                     _logEntries.Clear();
                     _win32Apps.Clear();
-                    _logFiles.Clear();
+                    _allLogs.Clear();
+                    _intuneLogs.Clear();
+                    _systemLogs.Clear();
+                    _userLogs.Clear();
 
                     // Populate log entries
                     foreach (var entry in result.RecentLogEntries)
@@ -87,15 +105,49 @@ namespace IntunePackagingTool.Views
                         _win32Apps.Add(app);
                     }
 
-                    // Populate log files
+                    // Categorize and populate log files
                     foreach (var file in result.LogFiles)
                     {
-                        _logFiles.Add(file);
+                        // Add to "All Logs"
+                        _allLogs.Add(file);
+
+                        // Categorize by source
+                        if (file.Source == "Intune Management Extension")
+                        {
+                            _intuneLogs.Add(file);
+                        }
+                        else if (file.Source == "NBB System Installations")
+                        {
+                            _systemLogs.Add(file);
+                        }
+                        else if (file.Source == "NBB User Installations")
+                        {
+                            _userLogs.Add(file);
+                        }
+                    }
+
+                    // Show/hide user logs empty state for remote computers
+                    if (!_isLocalComputer && _userLogs.Count == 0)
+                    {
+                        UserLogsEmptyState.Visibility = Visibility.Visible;
+                        UserLogsGrid.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        UserLogsEmptyState.Visibility = Visibility.Collapsed;
+                        UserLogsGrid.Visibility = Visibility.Visible;
                     }
 
                     // Show results
                     LogTabControl.Visibility = Visibility.Visible;
-                    StatusText.Text = $"Logs loaded from {_currentComputerName}";
+
+                    // Update status with counts
+                    var statusParts = new List<string>();
+                    if (_intuneLogs.Count > 0) statusParts.Add($"{_intuneLogs.Count} Intune log(s)");
+                    if (_systemLogs.Count > 0) statusParts.Add($"{_systemLogs.Count} system app log(s)");
+                    if (_userLogs.Count > 0) statusParts.Add($"{_userLogs.Count} user app log(s)");
+
+                    StatusText.Text = $"Loaded from {_currentComputerName}: {string.Join(", ", statusParts)}";
                     LastUpdatedText.Text = $"Last updated: {DateTime.Now:HH:mm:ss}";
                 }
                 else
@@ -116,9 +168,8 @@ namespace IntunePackagingTool.Views
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
                 GetLogsButton.IsEnabled = true;
-             
 
-                if (_logEntries.Count == 0 && _win32Apps.Count == 0 && _logFiles.Count == 0)
+                if (_allLogs.Count == 0)
                 {
                     EmptyState.Visibility = Visibility.Visible;
                 }

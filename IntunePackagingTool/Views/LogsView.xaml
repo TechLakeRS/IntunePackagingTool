@@ -129,37 +129,132 @@
                     </Style>
                 </TabControl.Resources>
 
-                
-
-               
-
-                <!-- Log Files Tab -->
-                <TabItem Header="📁 Log Files">
+                <!-- Intune Management Extension Logs Tab -->
+                <TabItem Header="🔷 Intune Logs">
                     <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="0,8,8,8">
-                        <DataGrid Name="LogFilesGrid" 
+                        <DataGrid Name="IntuneLogsGrid"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
-                                 >
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="File Name" Binding="{Binding Name}" Width="2*"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="120"/>
+                                <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="180"/>
+                                <DataGridTemplateColumn Header="Actions" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="📖 View"
+                                                    Tag="{Binding}"
+                                                    Click="ViewLogFile_Click"
+                                                    Padding="8,4"
+                                                    Cursor="Hand"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </TabItem>
+
+                <!-- System Application Logs Tab -->
+                <TabItem Header="🖥️ System App Logs">
+                    <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="0,8,8,8">
+                        <DataGrid Name="SystemLogsGrid"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="File Name" Binding="{Binding Name}" Width="2*"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="120"/>
+                                <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="180"/>
+                                <DataGridTemplateColumn Header="Actions" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="📖 View"
+                                                    Tag="{Binding}"
+                                                    Click="ViewLogFile_Click"
+                                                    Padding="8,4"
+                                                    Cursor="Hand"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </TabItem>
+
+                <!-- User Application Logs Tab -->
+                <TabItem Header="👤 User App Logs">
+                    <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="0,8,8,8">
+                        <Grid>
+                            <DataGrid Name="UserLogsGrid"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      IsReadOnly="True"
+                                      HeadersVisibility="Column">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="File Name" Binding="{Binding Name}" Width="2*"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="120"/>
+                                    <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="180"/>
+                                    <DataGridTemplateColumn Header="Actions" Width="120">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="📖 View"
+                                                        Tag="{Binding}"
+                                                        Click="ViewLogFile_Click"
+                                                        Padding="8,4"
+                                                        Cursor="Hand"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Empty state for remote computers -->
+                            <Border Name="UserLogsEmptyState"
+                                    Background="White"
+                                    Visibility="Collapsed"
+                                    Padding="40">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="ℹ️" FontSize="48" HorizontalAlignment="Center" Opacity="0.5"/>
+                                    <TextBlock Text="User logs not available for remote computers"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,10,0,5"/>
+                                    <TextBlock Text="User-based logs can only be viewed on the local computer"
+                                               FontSize="12"
+                                               Foreground="#666"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- All Logs Tab (Combined View) -->
+                <TabItem Header="📋 All Logs">
+                    <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="0,8,8,8">
+                        <DataGrid Name="AllLogsGrid"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="File Name" Binding="{Binding Name}" Width="2*"/>
                                 <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="1.5*"/>
                                 <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100"/>
-                                <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified}" Width="200"/>
-                                <DataGridTemplateColumn Header="Actions" Width="150">
+                                <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="180"/>
+                                <DataGridTemplateColumn Header="Actions" Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <StackPanel Orientation="Horizontal">
-                                                <Button Content="📖 View" 
-                                                        Tag="{Binding}"
-                                                        Click="ViewLogFile_Click"
-                                                        Margin="2"
-                                                        Padding="5,2"/>
-                                                <Button Content="💾 Save" 
-                                                        Tag="{Binding}"
-                                                        Click="SaveLogFile_Click"
-                                                        Margin="2"
-                                                        Padding="5,2"/>
-                                            </StackPanel>
+                                            <Button Content="📖 View"
+                                                    Tag="{Binding}"
+                                                    Click="ViewLogFile_Click"
+                                                    Padding="8,4"
+                                                    Cursor="Hand"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
