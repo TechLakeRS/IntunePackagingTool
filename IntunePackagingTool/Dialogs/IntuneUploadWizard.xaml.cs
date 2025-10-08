@@ -494,11 +494,9 @@ namespace IntunePackagingTool
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Upload failed: {ex.Message}\n\n" +
-                    $"The .intunewin file may have been created locally, but the upload to Intune failed.\n" +
-                    $"You can upload it manually through the Intune admin center.",
-                    "Upload Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Services.NotificationService.Instance.ShowError(
+                    "Upload Error",
+                    $"{ex.Message}\n\nThe .intunewin file may have been created locally.");
 
                 Debug.WriteLine($"Upload error: {ex}");
             }

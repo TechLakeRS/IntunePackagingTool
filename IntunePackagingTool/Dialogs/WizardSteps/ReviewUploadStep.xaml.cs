@@ -224,8 +224,9 @@ namespace IntunePackagingTool.WizardSteps
         {
             if (_applicationDetail == null)
             {
-                MessageBox.Show("Application details not loaded.", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                Services.NotificationService.Instance.ShowError(
+                    "Upload Error",
+                    "Application details not loaded");
                 return false;
             }
 
@@ -267,23 +268,21 @@ namespace IntunePackagingTool.WizardSteps
 
                 await Task.Delay(1000);
 
-                MessageBox.Show(
-                    $"Application '{_applicationDetail.DisplayName}' has been successfully deployed to Intune!\n\n" +
-                    "✅ Application uploaded\n" +
-                    "✅ 4 assignment groups created\n" +
-                    "✅ Groups assigned to application\n\n" +
-                    "You can now add members to the groups from Azure AD.",
+                // Show success toast notification
+                Services.NotificationService.Instance.ShowSuccess(
                     "Deployment Successful",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                    $"Application '{_applicationDetail.DisplayName}' deployed to Intune with {groupIds.Count} assignment groups");
 
                 return true;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Upload failed: {ex}");
-                MessageBox.Show($"Upload failed: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                // Show error toast notification
+                Services.NotificationService.Instance.ShowError(
+                    "Upload Failed",
+                    ex.Message);
 
                 AddProgressStep("❌", $"Upload failed: {ex.Message}");
                 return false;
