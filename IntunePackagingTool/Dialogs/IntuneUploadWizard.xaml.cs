@@ -1,4 +1,4 @@
-﻿using IntunePackagingTool.Models;
+using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using IntunePackagingTool.WizardSteps;
 using System.Collections.ObjectModel;
@@ -43,7 +43,6 @@ namespace IntunePackagingTool
             );
 
             _uploadService = new IntuneUploadService(_intuneService);
-
 
             LoadStep(0);
         }
@@ -208,7 +207,7 @@ namespace IntunePackagingTool
         {
             if (_currentStep < 2 && ValidateCurrentStep())
             {
-                // ✅ PERFORMANCE: Share data between steps before moving
+                // ? PERFORMANCE: Share data between steps before moving
                 await ShareDataToNextStep();
                 LoadStep(_currentStep + 1);
             }
@@ -224,7 +223,7 @@ namespace IntunePackagingTool
                         appStep.GetInstallContext()
                     );
                 }
-                // ✅ PERFORMANCE: Trigger upload from final step
+                // ? PERFORMANCE: Trigger upload from final step
                 await TriggerUploadFromStep3();
             }
         }
@@ -269,7 +268,6 @@ namespace IntunePackagingTool
                 reviewStep.SelectedIconPath = appStep.SelectedIconPath;
                 Debug.WriteLine($"Passing install command to upload: '{appStep.GetInstallCommand()}'");
                 Debug.WriteLine($"Passing icon path to upload: '{appStep.SelectedIconPath}'");
-
 
                 // Debug to verify values
                 Debug.WriteLine($"Passing install command to upload: '{appStep.GetInstallCommand()}'");
@@ -381,13 +379,13 @@ namespace IntunePackagingTool
 
             if (_currentStep < 2)
             {
-                NextButton.Content = "Continue →";
+                NextButton.Content = "Continue ?";
                 NextButton.Style = (Style)FindResource("WizardPrimaryButton");
                 NextButton.IsEnabled = ValidateCurrentStep();
             }
             else
             {
-                NextButton.Content = "🚀 Upload to Intune";
+                NextButton.Content = "?? Upload to Intune";
                 NextButton.Style = (Style)FindResource("WizardSuccessButton");
                 NextButton.IsEnabled = _step2Valid; // Must have valid detection rules
             }
@@ -396,7 +394,7 @@ namespace IntunePackagingTool
             if (!ValidateCurrentStep() && _currentStep < 2)
             {
                 ValidationStatusPanel.Visibility = Visibility.Visible;
-                ValidationIcon.Text = "⚠️";
+                ValidationIcon.Text = "??";
                 ValidationMessage.Text = _currentStep switch
                 {
                     0 => "Please complete all application details",
@@ -422,8 +420,6 @@ namespace IntunePackagingTool
         }
 
         // This method will be called from DetectionRulesStep when user opens detection dialogs
-
-
 
         public void RemoveDetectionRule(DetectionRule rule)
         {
@@ -538,12 +534,10 @@ namespace IntunePackagingTool
 
         #region Public Methods for Step Access (Performance Optimized)
 
-
         public ObservableCollection<DetectionRule> GetDetectionRules()
         {
             return _detectionRules;
         }
-
 
         public void UpdateDetectionRules(ObservableCollection<DetectionRule> newRules)
         {
@@ -561,7 +555,7 @@ namespace IntunePackagingTool
         #endregion
     }
 
-    // ✅ PERFORMANCE: Event delegates for fast step communication
+    // ? PERFORMANCE: Event delegates for fast step communication
     public delegate void ValidationChangedEventHandler(bool isValid);
     public delegate void DataChangedEventHandler(ApplicationInfo applicationInfo);
     public delegate Task UploadRequestedEventHandler(string installCommand, string uninstallCommand, string description, string installContext);

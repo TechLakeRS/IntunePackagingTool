@@ -1,4 +1,4 @@
-﻿using IntunePackagingTool.Models;
+using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using IntunePackagingTool.Views;
 using IntunePackagingTool.Helpers;
@@ -59,8 +59,6 @@ namespace IntunePackagingTool
         private WDACToolsPage? _wdacToolsPage;
         private MsiInfoService.MsiInfo? _currentMsiInfo = null;
         private LogsView? _logsView;
-
-
 
         // Pagination
         private int _currentPage = 1;
@@ -241,6 +239,9 @@ namespace IntunePackagingTool
                 _searchTimer.Tick -= SearchTimer_Tick;
             }
 
+            // Stop background refresh
+            ApplicationCacheService.Instance.StopBackgroundRefresh();
+
             base.OnClosed(e);
         }
 
@@ -278,7 +279,6 @@ namespace IntunePackagingTool
                 ProcessSelectedDeployExe(openFileDialog.FileName);
             }
         }
-
 
         private void CreateAppNavButton_Click(object sender, RoutedEventArgs e)
         {
@@ -410,7 +410,7 @@ namespace IntunePackagingTool
             try
             {
                 UploadToIntuneButton.IsEnabled = false;
-                UploadToIntuneButton.Content = "⏳ Uploading...";
+                UploadToIntuneButton.Content = "? Uploading...";
 
                 // Get the parent folder (one level up from Application folder)
                 var packagePath = Path.GetDirectoryName(_existingPackageFolder);
@@ -462,11 +462,10 @@ namespace IntunePackagingTool
             finally
             {
                 UploadToIntuneButton.IsEnabled = true;
-                UploadToIntuneButton.Content = "☁️ Upload to Intune";
+                UploadToIntuneButton.Content = "?? Upload to Intune";
                 ValidateUploadButton();
             }
         }
-
 
         private void SetActiveNavButton(Button activeButton)
         {
@@ -505,13 +504,11 @@ namespace IntunePackagingTool
             UploadSection.Visibility = Visibility.Collapsed;
         }
 
-
-
         #region Validation and Upload
         private void ShowValidationSuccess()
         {
             PackageValidationStatus.Visibility = Visibility.Visible;
-            ValidationIcon.Text = "✅";
+            ValidationIcon.Text = "?";
             ValidationIcon.Foreground = new SolidColorBrush(Color.FromRgb(39, 174, 96));
             ValidationTitle.Text = "Valid Package Detected";
             ValidationMessage.Text = "Successfully extracted metadata from Deploy-Application.ps1";
@@ -519,7 +516,7 @@ namespace IntunePackagingTool
         private void ShowValidationError(string message)
         {
             PackageValidationStatus.Visibility = Visibility.Visible;
-            ValidationIcon.Text = "❌";
+            ValidationIcon.Text = "?";
             ValidationIcon.Foreground = new SolidColorBrush(Color.FromRgb(231, 76, 60));
             ValidationTitle.Text = "Invalid Selection";
             ValidationMessage.Text = message;
@@ -531,18 +528,16 @@ namespace IntunePackagingTool
                            !string.IsNullOrWhiteSpace(ExistingVendor.Text) &&
                            !string.IsNullOrWhiteSpace(ExistingVersion.Text);
 
-
             UploadToIntuneButton.IsEnabled = isValid;
 
             if (isValid)
             {
-                ReadyStatusText.Text = "✅ Ready to upload to Microsoft Intune";
+                ReadyStatusText.Text = "? Ready to upload to Microsoft Intune";
 
                 ValidationSummary.Foreground = new SolidColorBrush(Color.FromRgb(39, 174, 96));
             }
 
         }
-
 
         private void ResetUploadExistingForm()
         {
@@ -557,9 +552,6 @@ namespace IntunePackagingTool
             ExistingScriptDate.Text = "";
             ExistingScriptAuthor.Text = "";
 
-
-
-
             PackageValidationStatus.Visibility = Visibility.Collapsed;
             HideAllSections();
         }
@@ -567,9 +559,6 @@ namespace IntunePackagingTool
         #endregion
 
         #endregion
-
-
-
 
         #region Application List Management
 
@@ -601,14 +590,19 @@ namespace IntunePackagingTool
                 ShowStatus("Loading all applications from Microsoft Intune...");
                 ShowProgress(true);
 
-                _allApplications = await _intuneService.GetApplicationsAsync(
+                // Use cache service for better performance
+                var cacheService = ApplicationCacheService.Instance;
+
+                // Register IntuneService with ServiceLocator for background refresh
+                ServiceLocator.Register(_intuneService);
+
+                _allApplications = await cacheService.GetApplicationsAsync(
+                    _intuneService,
                     forceRefresh: false,
                     cancellationToken: _loadCancellation.Token);
 
                 _applicationsLoaded = true;
                 _lastSyncTime = DateTime.Now;
-
-                Debug.WriteLine($"Loaded {_allApplications.Count} applications into cache");
 
                 _currentPage = 1;
                 ApplyFiltersAndPagination();
@@ -836,8 +830,11 @@ namespace IntunePackagingTool
                 ShowStatus("Refreshing applications from Microsoft Intune...");
                 ShowProgress(true);
 
-                // Force refresh from Intune
-                _allApplications = await _intuneService.GetApplicationsAsync(forceRefresh: true);
+                // Force refresh from Intune (bypass cache)
+                var cacheService = ApplicationCacheService.Instance;
+                _allApplications = await cacheService.GetApplicationsAsync(
+                    _intuneService,
+                    forceRefresh: true);
                 _applicationsLoaded = true;
                 _lastSyncTime = DateTime.Now;
 
@@ -962,7 +959,6 @@ namespace IntunePackagingTool
             }
         }
 
-
         private void CheckForMsiInFiles()
         {
             try
@@ -1073,7 +1069,7 @@ namespace IntunePackagingTool
                 await Dispatcher.InvokeAsync(() =>
                 {
                     ShowPackageSuccess(appInfo, psadtOptions);
-                    StatusText.Text = $"Package created successfully • {DateTime.Now:HH:mm:ss}";
+                    StatusText.Text = $"Package created successfully � {DateTime.Now:HH:mm:ss}";
                 });
             }
             catch (Exception ex)
@@ -1150,9 +1146,9 @@ namespace IntunePackagingTool
                 var extension = Path.GetExtension(SourcesPathTextBox.Text).ToLower();
                 DetectedPackageTypeIcon.Text = extension switch
                 {
-                    ".msi" => "📦",
-                    ".exe" => "⚙️",
-                    _ => "❓"
+                    ".msi" => "??",
+                    ".exe" => "??",
+                    _ => "?"
                 };
 
                 DetectedPackageTypeText.Text = extension switch
@@ -1209,24 +1205,23 @@ namespace IntunePackagingTool
 
             if (extension == ".msi")
             {
-                DetectedPackageTypeIcon.Text = "📦";
+                DetectedPackageTypeIcon.Text = "??";
                 DetectedPackageTypeText.Text = "MSI Package";
 
             }
             else if (extension == ".exe")
             {
-                DetectedPackageTypeIcon.Text = "⚙️";
+                DetectedPackageTypeIcon.Text = "??";
                 DetectedPackageTypeText.Text = "EXE Installer";
 
             }
             else
             {
                 PSADTConfigSection.Visibility = Visibility.Collapsed;  // Changed
-                DetectedPackageTypeIcon.Text = "❓";
+                DetectedPackageTypeIcon.Text = "?";
                 DetectedPackageTypeText.Text = "Unknown package type";
             }
         }
-
 
         private void ExtractFileMetadata(string filePath)
         {
@@ -1303,7 +1298,7 @@ namespace IntunePackagingTool
                                                       $"Version: {_currentMsiInfo.ProductVersion}\n" +
                                                       $"Upgrade Code: {_currentMsiInfo.UpgradeCode}";
 
-                    Debug.WriteLine($"✅ MSI detected with Product Code: {_currentMsiInfo.ProductCode}");
+                    Debug.WriteLine($"? MSI detected with Product Code: {_currentMsiInfo.ProductCode}");
                 }
                 else
                 {
@@ -1311,7 +1306,7 @@ namespace IntunePackagingTool
                     DetectedPackageTypeText.Text = "MSI Package (Product Code not found)";
                     ExtractMetadataFromFilename(msiPath);
 
-                    Debug.WriteLine("⚠️ MSI detected but could not extract Product Code");
+                    Debug.WriteLine("?? MSI detected but could not extract Product Code");
                 }
             }
             catch (Exception ex)
@@ -1320,7 +1315,6 @@ namespace IntunePackagingTool
                 ExtractMetadataFromFilename(msiPath);
             }
         }
-
 
         private void ExtractExeMetadata(string exePath)
         {
@@ -1357,8 +1351,6 @@ namespace IntunePackagingTool
         {
             return PackageCreationHelper.ValidatePackageInputs(AppNameTextBox.Text);
         }
-
-
 
         private ApplicationInfo CreateApplicationInfo()
         {
@@ -1499,7 +1491,6 @@ namespace IntunePackagingTool
             remoteTest.ShowDialog();
         }
 
-
         #endregion
 
         #region Settings Management
@@ -1527,8 +1518,6 @@ namespace IntunePackagingTool
                 UtilPathDisplay.Text = _uploadService.ConverterPath;
             }
         }
-
-
 
         #endregion
 
@@ -1644,12 +1633,12 @@ namespace IntunePackagingTool
 
         public string TypeIcon => _item.Type switch
         {
-            Controls.ToastType.Success => "✅",
-            Controls.ToastType.Error => "❌",
-            Controls.ToastType.Warning => "⚠️",
-            Controls.ToastType.Info => "ℹ️",
-            Controls.ToastType.InProgress => "⏳",
-            _ => "•"
+            Controls.ToastType.Success => "?",
+            Controls.ToastType.Error => "?",
+            Controls.ToastType.Warning => "??",
+            Controls.ToastType.Info => "??",
+            Controls.ToastType.InProgress => "?",
+            _ => "�"
         };
 
         public string Title => _item.Title;

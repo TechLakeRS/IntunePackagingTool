@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -42,7 +42,6 @@ namespace IntunePackagingTool.Models
 
         public string IconType { get; set; } = string.Empty;
 
-
         public BitmapImage? IconImage
         {
             get => _iconImage;
@@ -69,13 +68,13 @@ namespace IntunePackagingTool.Models
                     IconImage = icon;
                     if (icon != null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"✅ Icon loaded: {icon.PixelWidth}x{icon.PixelHeight}");
+                        System.Diagnostics.Debug.WriteLine($"? Icon loaded: {icon.PixelWidth}x{icon.PixelHeight}");
                     }
                 });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Failed to load icon: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"? Failed to load icon: {ex.Message}");
                 IconImage = null;
             }
         }

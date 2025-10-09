@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -14,7 +14,6 @@ namespace IntunePackagingTool.Models
             public string OSVersion { get; set; }
 
             public bool IsSelected { get; set; }
-
 
         public bool IsCompliant { get; set; }
             public bool AccountEnabled { get; set; }

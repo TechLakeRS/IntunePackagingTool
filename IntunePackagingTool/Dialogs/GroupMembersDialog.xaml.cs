@@ -1,4 +1,4 @@
-﻿using IntunePackagingTool.Models;
+using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using IntunePackagingTool.Utilities;
 using System;
@@ -52,7 +52,6 @@ namespace IntunePackagingTool.Dialogs
 
             // Set up data bindings
             MembersDataGrid.ItemsSource = _membersView;
-
 
             // Handle selection changes
             MembersDataGrid.SelectionChanged += (s, e) =>
@@ -252,7 +251,6 @@ namespace IntunePackagingTool.Dialogs
         {
             LoadGroupMembers();
         }
-
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {

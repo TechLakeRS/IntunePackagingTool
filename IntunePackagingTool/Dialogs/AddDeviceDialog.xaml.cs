@@ -1,4 +1,4 @@
-﻿using IntunePackagingTool.Models;
+using IntunePackagingTool.Models;
 using IntunePackagingTool.Services;
 using System;
 using System.Collections.ObjectModel;
@@ -159,7 +159,6 @@ namespace IntunePackagingTool.Dialogs
             }
         }
 
-
         private void ShowInlineMessage(string message, MessageType type)
         {
             InlineMessageText.Text = message;
@@ -168,19 +167,19 @@ namespace IntunePackagingTool.Dialogs
             switch (type)
             {
                 case MessageType.Success:
-                    InlineMessageIcon.Text = "✓";
+                    InlineMessageIcon.Text = "?";
                     InlineMessageBorder.Background = System.Windows.Media.Brushes.LightGreen;
                     break;
                 case MessageType.Warning:
-                    InlineMessageIcon.Text = "⚠";
+                    InlineMessageIcon.Text = "?";
                     InlineMessageBorder.Background = System.Windows.Media.Brushes.LightYellow;
                     break;
                 case MessageType.Error:
-                    InlineMessageIcon.Text = "✗";
+                    InlineMessageIcon.Text = "?";
                     InlineMessageBorder.Background = System.Windows.Media.Brushes.MistyRose;
                     break;
                 case MessageType.Info:
-                    InlineMessageIcon.Text = "ℹ";
+                    InlineMessageIcon.Text = "?";
                     InlineMessageBorder.Background = System.Windows.Media.Brushes.LightBlue;
                     break;
             }
@@ -262,7 +261,6 @@ namespace IntunePackagingTool.Dialogs
             get => _timestamp;
             set { _timestamp = value; OnPropertyChanged(); }
         }
-
 
         public event PropertyChangedEventHandler PropertyChanged;
 

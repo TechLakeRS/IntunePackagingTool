@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Xml.Linq;
 using IntunePackagingTool.Configuration;
 
-
 namespace IntunePackagingTool.Services
 {
     public interface IUploadProgress
@@ -271,10 +270,8 @@ namespace IntunePackagingTool.Services
                     var detectionXmlPath = Path.Combine(tempDir, "detection.xml");
                     detectionEntry.ExtractToFile(detectionXmlPath);
 
-
                     // Step 2: Parse detection.xml
                     var xmlContent = File.ReadAllText(detectionXmlPath);
-
 
                     var detectionXml = XDocument.Load(detectionXmlPath);
                     var appInfo = detectionXml.Root;
@@ -516,7 +513,6 @@ namespace IntunePackagingTool.Services
                     ["deviceRestartBehavior"] = "allow"
                 },
 
-
                 ["detectionRules"] = formattedDetectionRules.ToArray(),
                 ["returnCodes"] = new[]
                 {
@@ -528,9 +524,6 @@ namespace IntunePackagingTool.Services
             };
 
             // In CreateWin32LobAppAsync method, enhance the icon handling section:
-
-
-
 
             if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
             {
@@ -580,7 +573,6 @@ namespace IntunePackagingTool.Services
                 WriteIndented = true
             });
 
-
             if (json.Contains("\"largeIcon\""))
             {
                 // Extract just the largeIcon part for verification (first 100 chars of value)
@@ -603,7 +595,6 @@ namespace IntunePackagingTool.Services
 
             var createdApp = JsonSerializer.Deserialize<JsonElement>(responseText);
             var appId = createdApp.GetProperty("id").GetString();
-
 
             try
             {
@@ -652,8 +643,6 @@ namespace IntunePackagingTool.Services
 
                 Debug.WriteLine($"MIME type: {mimeType}");
 
-
-
                 var iconData = new Dictionary<string, object>
                 {
                     ["type"] = mimeType,
@@ -695,8 +684,6 @@ namespace IntunePackagingTool.Services
         {
             var encryptedSize = new FileInfo(intuneWinInfo.EncryptedFilePath).Length;
 
-
-
             var fileBody = new Dictionary<string, object?>
             {
                 ["@odata.type"] = "#microsoft.graph.mobileAppContentFile",
@@ -723,15 +710,12 @@ namespace IntunePackagingTool.Services
             var fileEntry = JsonSerializer.Deserialize<JsonElement>(responseText);
             var fileId = fileEntry.GetProperty("id").GetString();
 
-
             return fileId ?? throw new Exception("File ID not returned");
         }
 
         private async Task<AzureStorageInfo> WaitForAzureStorageUriAsync(string appId, string contentVersionId, string fileId)
         {
             var url = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{appId}/microsoft.graph.win32LobApp/contentVersions/{contentVersionId}/files/{fileId}";
-
-
 
             for (int attempts = 0; attempts < 120; attempts++) // 20 minutes total
             {
@@ -762,7 +746,6 @@ namespace IntunePackagingTool.Services
                     var uploadState = uploadStateProp.GetString() ?? "";
                     Debug.WriteLine($"Attempt {attempts + 1}: Upload state = '{uploadState}'");
 
-
                     if (uploadState.Equals("AzureStorageUriRequestSuccess", StringComparison.OrdinalIgnoreCase) ||
                         uploadState.Equals("azureStorageUriRequestSuccess", StringComparison.OrdinalIgnoreCase))
                     {
@@ -779,7 +762,6 @@ namespace IntunePackagingTool.Services
                             throw new Exception("Upload state is success but azureStorageUri is missing");
                         }
                     }
-
 
                     if (uploadState.Equals("AzureStorageUriRequestPending", StringComparison.OrdinalIgnoreCase) ||
                         uploadState.Equals("azureStorageUriRequestPending", StringComparison.OrdinalIgnoreCase))
@@ -804,9 +786,7 @@ namespace IntunePackagingTool.Services
                         throw new Exception("Azure Storage URI request timed out");
                     }
 
-
                     Debug.WriteLine($"❓ Unknown upload state: '{uploadState}' - will wait and retry");
-
 
                     if (attempts < 115) // 
                     {
@@ -1089,7 +1069,6 @@ namespace IntunePackagingTool.Services
         private async Task CommitFileAsync(string appId, string contentVersionId, string fileId, EncryptionInfo encryptionInfo)
         {
 
-
             // Check for empty/null values
             var issues = new List<string>();
             if (string.IsNullOrWhiteSpace(encryptionInfo.EncryptionKey)) issues.Add("EncryptionKey is empty");
@@ -1132,15 +1111,12 @@ namespace IntunePackagingTool.Services
                 WriteIndented = true  // Make it readable
             });
 
-
             try
             {
                 using var request = await CreateAuthenticatedRequestAsync(HttpMethod.Post, url);
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await sharedHttpClient!.SendAsync(request);
                 var responseText = await response.Content.ReadAsStringAsync();
-
-
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -1188,7 +1164,6 @@ namespace IntunePackagingTool.Services
 
                 var uploadState = uploadStateProp.GetString() ?? "";
                 Debug.WriteLine($"Attempt {attempts + 1}: Upload state = '{uploadState}'");
-
 
                 if (uploadState.Equals(successState, StringComparison.OrdinalIgnoreCase))
                 {

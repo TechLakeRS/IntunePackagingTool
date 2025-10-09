@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -42,7 +42,6 @@ namespace IntunePackagingTool.Services
                 string scriptPath;
                 string arguments;
 
-
                 {
                     progress?.Report("Using VM-based catalog generation...");
                     scriptPath = _vmScriptPath;
@@ -62,14 +61,14 @@ namespace IntunePackagingTool.Services
 
                 if (result.Success && !string.IsNullOrEmpty(result.CatalogPath))
                 {
-                    progress?.Report($"✓ Catalog generated successfully: {Path.GetFileName(result.CatalogPath)}");
+                    progress?.Report($"? Catalog generated successfully: {Path.GetFileName(result.CatalogPath)}");
                 }
             }
             catch (Exception ex)
             {
                 result.Success = false;
                 result.ErrorMessage = ex.Message;
-                progress?.Report($"✗ Error: {ex.Message}");
+                progress?.Report($"? Error: {ex.Message}");
             }
 
             return result;
@@ -231,10 +230,6 @@ namespace IntunePackagingTool.Services
             }
             return "";
         }
-
-
-
-
 
         public static (string Name, string Version) ParseApplicationInfo(string applicationPath)
         {

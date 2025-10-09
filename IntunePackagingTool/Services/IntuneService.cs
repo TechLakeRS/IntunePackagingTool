@@ -49,7 +49,6 @@ namespace IntunePackagingTool.Services
             Debug.WriteLine($"  CertificateThumbprint: {_certificateThumbprint}");
         }
 
-
         public async Task<string> GetAccessTokenAsync()
         {
             if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
@@ -57,7 +56,6 @@ namespace IntunePackagingTool.Services
 
                 return _accessToken;
             }
-
 
             var certificate = LoadCertificate();
             var assertion = CreateJwtAssertion(certificate);
@@ -333,8 +331,6 @@ namespace IntunePackagingTool.Services
                 Debug.WriteLine($"=== FETCHING APP DETAILS FOR: {intuneAppId} ===");
 
                 var token = await GetAccessTokenAsync();
-
-
 
                 // Get the complete application details including detection rules in single call
                 var appUrl = $"https://graph.microsoft.com/beta/deviceAppManagement/mobileApps/{intuneAppId}";
@@ -989,7 +985,6 @@ namespace IntunePackagingTool.Services
             }
         }
 
-
         public async Task<GroupDevice> FindDeviceByNameAsync(string deviceName)
         {
             try
@@ -1605,7 +1600,6 @@ namespace IntunePackagingTool.Services
             }
         }
 
-
         
         private static int GetSafeInt(JsonElement element)
         {
@@ -1752,7 +1746,6 @@ namespace IntunePackagingTool.Services
             // Handle null or other types
             return "Unknown";
         }
-
 
         // Dispose method to clean up HttpClient
         

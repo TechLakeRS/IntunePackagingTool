@@ -1,4 +1,4 @@
-﻿using IntunePackagingTool.Services;
+using IntunePackagingTool.Services;
 using IntunePackagingTool.Utilities;
 using Microsoft.Win32;
 using System;
@@ -204,11 +204,6 @@ namespace IntunePackagingTool.Views
 
             return entry;
         }
-
-
-
-
-
 
         // LogsView.xaml.cs - Updated ViewLogFile_Click method
         private async void ViewLogFile_Click(object sender, RoutedEventArgs e)
