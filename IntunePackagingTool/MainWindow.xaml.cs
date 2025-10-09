@@ -190,6 +190,10 @@ namespace IntunePackagingTool
 
             // Set current user
             SetCurrentUser();
+
+            // Initialize theme button
+            UpdateThemeButton();
+            ThemeService.Instance.ThemeChanged += OnThemeChanged;
         }
 
         private void SetCurrentUser()
@@ -228,6 +232,9 @@ namespace IntunePackagingTool
             {
                 ApplicationDetailView.BackToListRequested -= ApplicationDetailView_BackToListRequested;
             }
+
+            // Unsubscribe from theme change events
+            ThemeService.Instance.ThemeChanged -= OnThemeChanged;
 
             // Cancel any pending operations
             _loadCancellation?.Cancel();
@@ -1577,6 +1584,41 @@ namespace IntunePackagingTool
                     timeText = $"{(int)elapsed.TotalDays} day{((int)elapsed.TotalDays > 1 ? "s" : "")} ago";
 
                 LastSyncText.Text = $"Last sync: {timeText}";
+            }
+        }
+
+        #endregion
+
+        #region Theme Management
+
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            ThemeService.Instance.ToggleTheme();
+        }
+
+        private void OnThemeChanged(object? sender, AppTheme theme)
+        {
+            Dispatcher.Invoke(() => UpdateThemeButton());
+        }
+
+        private void UpdateThemeButton()
+        {
+            var theme = ThemeService.Instance.CurrentTheme;
+
+            switch (theme)
+            {
+                case AppTheme.Light:
+                    ThemeIcon.Text = "🌙";
+                    ThemeText.Text = "Dark";
+                    break;
+                case AppTheme.Dark:
+                    ThemeIcon.Text = "☀️";
+                    ThemeText.Text = "Light";
+                    break;
+                case AppTheme.System:
+                    ThemeIcon.Text = "🖥️";
+                    ThemeText.Text = "System";
+                    break;
             }
         }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using IntunePackagingTool.Services;
 
 namespace IntunePackagingTool
 {
@@ -8,6 +9,9 @@ namespace IntunePackagingTool
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // Initialize theme service
+            ThemeService.Instance.Initialize();
 
             // Set up global exception handling
             this.DispatcherUnhandledException += (sender, ex) =>

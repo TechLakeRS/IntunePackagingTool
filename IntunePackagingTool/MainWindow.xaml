@@ -6,7 +6,7 @@
         Height="900" Width="1400"
         MinHeight="700" MinWidth="1100"
         WindowStartupLocation="CenterScreen"
-        Background="#F5F7FA"
+        Background="{DynamicResource BackgroundBrush}"
         Loaded="MainWindow_Loaded">
 
     <Grid>
@@ -20,22 +20,9 @@
         </Grid.RowDefinitions>
 
         <!-- SIDEBAR WITH GLASS EFFECT -->
-        <Border Grid.Column="0" BorderThickness="0,0,3,0">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#1E2A38" Offset="0"/>
-                        <GradientStop Color="#2C3E50" Offset="0.3"/>
-                        <GradientStop Color="#34495E" Offset="0.7"/>
-                        <GradientStop Color="#2C3E50" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Border.BorderBrush>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#42A5F5" Offset="0"/>
-                        <GradientStop Color="#2196F3" Offset="0.5"/>
-                        <GradientStop Color="#1976D2" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.BorderBrush>
+        <Border Grid.Column="0" BorderThickness="0,0,3,0"
+                Background="{DynamicResource SidebarGradientBrush}"
+                BorderBrush="{DynamicResource SidebarBorderGradientBrush}">
                 <Border.Effect>
                     <DropShadowEffect Color="#2196F3" Opacity="0.4" ShadowDepth="4" BlurRadius="16" Direction="0"/>
                 </Border.Effect>
@@ -155,7 +142,8 @@
                 </Grid.RowDefinitions>
 
                 <!-- Page Header -->
-                <Border Name="PageHeader" Grid.Row="0" Background="White" Padding="32,20" BorderBrush="#E9ECEF" BorderThickness="0,0,0,1">
+                <Border Name="PageHeader" Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}"
+                        Padding="32,20" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                     <Grid>
                         <StackPanel>
                             <TextBlock Name="PageTitle" Text="Dashboard" FontSize="28" FontWeight="Light" Foreground="#2C3E50"/>
@@ -163,6 +151,14 @@
                                  FontSize="14" Foreground="#7F8C8D" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Name="ThemeToggleButton" Style="{StaticResource SecondaryButton}"
+                                Margin="0,0,8,0" Click="ThemeToggleButton_Click"
+                                ToolTip="Toggle theme">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Name="ThemeIcon" Text="🌙" FontSize="14" Margin="0,0,4,0"/>
+                                    <TextBlock Name="ThemeText" Text="Dark" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
                             <Button Name="RefreshButton" Content="🔄 Refresh" Style="{StaticResource SecondaryButton}"
                                 Margin="0,0,8,0" Click="RefreshButton_Click"/>
                         </StackPanel>
