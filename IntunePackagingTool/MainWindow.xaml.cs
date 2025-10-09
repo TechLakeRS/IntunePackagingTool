@@ -239,9 +239,6 @@ namespace IntunePackagingTool
                 _searchTimer.Tick -= SearchTimer_Tick;
             }
 
-            // Stop background refresh
-            ApplicationCacheService.Instance.StopBackgroundRefresh();
-
             base.OnClosed(e);
         }
 
@@ -590,14 +587,7 @@ namespace IntunePackagingTool
                 ShowStatus("Loading all applications from Microsoft Intune...");
                 ShowProgress(true);
 
-                // Use cache service for better performance
-                var cacheService = ApplicationCacheService.Instance;
-
-                // Register IntuneService with ServiceLocator for background refresh
-                ServiceLocator.Register(_intuneService);
-
-                _allApplications = await cacheService.GetApplicationsAsync(
-                    _intuneService,
+                _allApplications = await _intuneService.GetApplicationsAsync(
                     forceRefresh: false,
                     cancellationToken: _loadCancellation.Token);
 
@@ -830,10 +820,8 @@ namespace IntunePackagingTool
                 ShowStatus("Refreshing applications from Microsoft Intune...");
                 ShowProgress(true);
 
-                // Force refresh from Intune (bypass cache)
-                var cacheService = ApplicationCacheService.Instance;
-                _allApplications = await cacheService.GetApplicationsAsync(
-                    _intuneService,
+                // Force refresh from Intune
+                _allApplications = await _intuneService.GetApplicationsAsync(
                     forceRefresh: true);
                 _applicationsLoaded = true;
                 _lastSyncTime = DateTime.Now;
