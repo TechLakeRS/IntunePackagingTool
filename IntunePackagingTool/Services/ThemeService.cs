@@ -67,13 +67,16 @@ namespace IntunePackagingTool.Services
                 actualTheme = GetSystemTheme();
             }
 
-            // Clear existing theme dictionaries
+            // Clear existing theme dictionaries (but NOT ModernTheme.xaml)
             var mergedDictionaries = application.Resources.MergedDictionaries;
             ResourceDictionary? existingTheme = null;
 
             foreach (var dict in mergedDictionaries)
             {
-                if (dict.Source?.OriginalString.Contains("Theme.xaml") == true)
+                // Only remove DarkTheme or LightTheme, NOT ModernTheme
+                if (dict.Source != null &&
+                    (dict.Source.OriginalString.Contains("DarkTheme.xaml") ||
+                     dict.Source.OriginalString.Contains("LightTheme.xaml")))
                 {
                     existingTheme = dict;
                     break;
